@@ -118,3 +118,19 @@ test('layout density adjusts spacing in both modes without changing connections'
   assert.deepEqual(autoLayout(structuredClone(source),mode,NaN),autoLayout(structuredClone(source),mode));
  }
 });
+
+test('transition label boxes round trip and toggle in TikZ without changing lexer behavior',()=>{
+ const m=example(),before=tokenize(m,'hello 42'),plain=toTikz(m);
+ assert.ok(!plain.includes('rounded corners=1pt'));
+ m.labelBoxes=true;assert.equal(validate(JSON.parse(JSON.stringify(m))).labelBoxes,true);
+ const boxed=toTikz(m);assert.equal((boxed.match(/draw=gray,rounded corners=1pt/g)||[]).length,m.edges.length);
+ assert.deepEqual(tokenize(m,'hello 42'),before);
+ m.labelBoxes=false;assert.equal(toTikz(m),plain);
+ m.labelBoxes='yes';assert.throws(()=>validate(m),/label box/);
+});
+
+test('opaque TeX label boxes render after every transition arrow',()=>{
+ const m=example();m.labelBoxes=true;const tex=toTikz(m);
+ assert.ok(tex.indexOf('node[fill=white,draw=gray,rounded corners=1pt')>tex.lastIndexOf('draw[->]'));
+ assert.equal((tex.match(/node\[fill=white,draw=gray/g)||[]).length,m.edges.length);
+});

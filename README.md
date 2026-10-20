@@ -30,3 +30,5 @@ Use **Select (V)** to drag a selection box, or **Shift-click** items to add/remo
 Use **Comment (C)** to add a comment label. Double-click a comment to edit its text; drag it to reposition it. Comments support multiple lines, group selection, copy/paste, deletion, and undo/redo. They save with JSON and appear in SVG and TikZ exports without affecting lexer behavior.
 
 **Ctrl-drag** from a state onto another state inserts an intermediary: parent → new state → destination. Drop on blank canvas to place the intermediary there and continue connecting from it to your next destination. Ctrl also works with right-drag. Each insertion is one undo step; both new rules start blank.
+
+Use **Box transition labels** in the toolbar to toggle borders around regex labels. The setting saves with the machine, supports Undo, and is included in SVG and TikZ exports.
