@@ -54,3 +54,13 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
   assert.deepEqual(inserted,target?['s2']:[null,{x:200,y:100}]);
  }
 });
+
+test('tree layout reserves separate bands for uneven subtrees and centers each parent',()=>{
+ const m={start:'root',states:['root','a','b','a1','a2','a3','b1','b2'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','a'],['root','b'],['a','a1'],['a','a2'],['a2','a3'],['b','b1'],['b','b2'],['b2','root']].map(([from,to])=>({from,to,label:'[a-z]'})),comments:[{id:'note',text:'Notes',x:0,y:0}]};
+ autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
+ assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
+ assert.equal(get('root').y,(get('a').y+get('b').y)/2);
+ assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
+ assert.ok(m.comments[0].y>Math.max(...m.states.map(s=>s.y))+100);
+ const first=JSON.stringify(m);autoLayout(m);assert.equal(JSON.stringify(m),first);validate(m);
+});

@@ -1,14 +1,38 @@
 import {commentLayout} from './comments.js';
 import {destination,statePortalBox} from './portals.js';
-// Layered layout reserves space for state circles, token labels, and self loops.
+// Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine) {
  if(!machine.states.length)return machine;
- const root=machine.start??machine.states[0].id,levels=new Map([[root,0]]),queue=[root];
- for(let i=0;i<queue.length;i++)for(const e of machine.edges){if(e.from===queue[i]){let target;try{target=destination(machine,e).id}catch{continue}if(!levels.has(target)){levels.set(target,levels.get(e.from)+1);queue.push(target)}}}
- let last=Math.max(...levels.values());for(const s of machine.states)if(!levels.has(s.id))levels.set(s.id,++last);
- const columns=new Map();for(const s of machine.states){const rank=levels.get(s.id);if(!columns.has(rank))columns.set(rank,[]);columns.get(rank).push(s)}
- const height=Math.max(...[...columns.values()].map(c=>c.length))*160;
- for(const [rank,states] of columns)states.forEach((s,i)=>{s.x=160+rank*220;s.y=150+(height-states.length*160)/2+i*160});
+ const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
+ const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
+ for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
+ for(const root of [machine.start,...states.keys()]){
+  if(!states.has(root)||seen.has(root))continue;
+  roots.push(root);seen.add(root);const queue=[root];
+  for(let i=0;i<queue.length;i++){const id=queue[i];order.push(id);for(const next of outgoing.get(id))if(!seen.has(next)){seen.add(next);children.get(id).push(next);queue.push(next)}}
+ }
+ const heights=new Map(),gap=60;
+ for(const id of [...order].reverse()){
+  const loops=machine.edges.filter(e=>e.from===id&&e.to===id&&e.portal==null).length;
+  const own=220+Math.max(0,loops-1)*55;
+  const branches=children.get(id);
+  heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
+ }
+ const step=Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)));
+ let forestTop=100;
+ for(const root of roots){
+  const queue=[{id:root,depth:0,top:forestTop}];
+  for(let i=0;i<queue.length;i++){
+   const {id,depth,top}=queue[i],s=states.get(id),branches=children.get(id);
+   s.x=160+depth*step;s.y=top+heights.get(id)/2;
+   const childHeight=branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap;
+   let childTop=top+(heights.get(id)-childHeight)/2;
+   for(const child of branches){queue.push({id:child,depth:depth+1,top:childTop});childTop+=heights.get(child)+gap}
+  }
+  forestTop+=heights.get(root)+120;
+ }
+ let noteTop=forestTop+40;
+ for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40}
  return machine;
 }
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
