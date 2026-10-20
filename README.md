@@ -24,3 +24,7 @@ Only one initial state can be assigned. Its toggle is hidden on other states. Un
 Portal labels are supported: enable **Connect via portal** on an arrow, or use **New portal transition** on a state. Matching labels resolve to one destination state without an extra input-consuming step. Missing or duplicate destinations are reported by the tester. Renaming a unique destination updates references. Portal JSON is stored with the machine; TikZ and SVG preserve the labels.
 
 Right-drag an arrow from a state and release on empty canvas to create a connected state. One Undo removes both the state and its new arrow.
+
+Use **Select (V)** to drag a selection box, or **Shift-click** items to add/remove them. Drag a selected state or comment to move the whole group. Internal transitions follow their states. **Ctrl/Cmd+A** selects everything; **Ctrl/Cmd+C/X/V** copies, cuts, and pastes (toolbar buttons also work). Pasted states get new IDs, copied portal destinations get unique labels, and the existing initial state stays assigned. **Pan (H)** restores drag-to-pan.
+
+Use **Comment (C)** to add a comment label. Double-click a comment to edit its text; drag it to reposition it. Comments support multiple lines, group selection, copy/paste, deletion, and undo/redo. They save with JSON and appear in SVG and TikZ exports without affecting lexer behavior.
