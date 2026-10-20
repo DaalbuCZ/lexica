@@ -70,3 +70,24 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 [data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#ffffff}
 [data-theme=dark] .token:focus-visible{outline-color:#edf3f6}
 [data-theme=dark] #toast{background:#dce6eb;color:#20282d}
+
+/* Light blue is the accent for dark mode controls and graph highlights. */
+:root[data-theme=dark]{--green:#a9d5ff}
+[data-theme=dark] .primary{background:#b8ddff;color:#183047;border-color:#d7edff}
+[data-theme=dark] .primary:hover{background:#cbe7ff}
+[data-theme=dark] button:focus-visible,[data-theme=dark] input:focus-visible,[data-theme=dark] textarea:focus-visible,[data-theme=dark] select:focus-visible{outline-color:#a9d5ff}
+[data-theme=dark] .toolbar button[aria-pressed=true]{background:#3c566c;color:#e5f3ff}
+[data-theme=dark] .selected-edge,[data-theme=dark] .connection-preview{stroke:#a9d5ff}
+[data-theme=dark] .node.selected circle{fill:#3d566b;stroke:#c7e5ff}
+[data-theme=dark] .node.connecting circle{stroke:#b8ddff}
+[data-theme=dark] .token{background:#34414a;border-color:#7997af;color:#edf7ff}
+[data-theme=dark] .token b{color:#c9e5ff}
+[data-theme=dark] .portal path{fill:#344958;stroke:#b7ddfa}
+[data-theme=dark] .portal text{fill:#e2f2ff}
+[data-theme=dark] .portal-wire{stroke:#b7ddfa}
+[data-theme=dark] .node.trace-highlight circle{stroke:#c5e4ff;filter:drop-shadow(0 0 6px #75bfffaa)}
+[data-theme=dark] .node.trace-highlight text{fill:#e7f5ff}
+[data-theme=dark] [data-edge].trace-highlight .edge{stroke:#c5e4ff;filter:drop-shadow(0 0 4px #75bfffaa)}
+[data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#e7f5ff}
+[data-theme=dark] .token:focus-visible{outline-color:#a9d5ff}
+[data-theme=dark] #toast{background:#b8ddff;color:#183047}
