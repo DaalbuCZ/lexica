@@ -10,4 +10,4 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 
 .tool-icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.toolbar #layout-mode,.toolbar #layout-density{border:1px solid var(--line);border-radius:5px;background:white;color:#48564b;font-size:11px;padding:6px 4px;width:66px;height:30px}.toolbar{max-width:calc(100vw - 36px);overflow-x:auto}
 
-.toolbar #layout-density{width:88px}
+.toolbar #layout-density{width:110px}

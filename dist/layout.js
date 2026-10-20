@@ -2,7 +2,7 @@ import {commentLayout} from './comments.js';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {
- spacing=Number.isFinite(spacing)?Math.max(.75,Math.min(2,spacing)):1;
+ spacing=Number.isFinite(spacing)?Math.max(.5,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
