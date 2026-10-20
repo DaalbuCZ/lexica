@@ -44,3 +44,8 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 [data-theme=dark] .edge-text{stroke:#343a3e}[data-theme=dark] .edge-label-box{fill:#444d52;stroke:#c3d0d7}
 [data-theme=dark] .node circle{fill:#465157;stroke:#d1dce5}[data-theme=dark] .node.selected circle{fill:#365343}
 [data-theme=dark] #modehint,[data-theme=dark] .canvas-status button{background:#3e4549ed}
+.node.trace-highlight circle{stroke:#14864d;stroke-width:4;filter:drop-shadow(0 0 5px #42cc8066)}.node.trace-highlight text{fill:#146a3d;font-weight:700}
+[data-edge].trace-highlight .edge{stroke:#159653;stroke-width:4;filter:drop-shadow(0 0 3px #42cc8066)}[data-edge].trace-highlight .edge-text{fill:#145f39;font-weight:700}
+.token{cursor:help}.token:focus-visible{outline:2px solid #32875a;outline-offset:2px}
+[data-theme=dark] .node.trace-highlight circle{stroke:#7ff0aa;filter:drop-shadow(0 0 6px #62e995aa)}[data-theme=dark] .node.trace-highlight text{fill:#c7ffda}
+[data-theme=dark] [data-edge].trace-highlight .edge{stroke:#7ff0aa;filter:drop-shadow(0 0 4px #62e995aa)}[data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#d4ffe1}
