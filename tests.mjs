@@ -134,3 +134,10 @@ test('opaque TeX label boxes render after every transition arrow',()=>{
  assert.ok(tex.indexOf('node[fill=white,draw=gray,rounded corners=1pt')>tex.lastIndexOf('draw[->]'));
  assert.equal((tex.match(/node\[fill=white,draw=gray/g)||[]).length,m.edges.length);
 });
+
+import {stateLabel} from './dist/labels.js';
+test('state names wrap at whitespace only when too long, stay centered, and escape TeX',()=>{
+ assert.deepEqual(stateLabel('  text in   string ').lines,['text in','string']);assert.deepEqual(stateLabel('a b').lines,['a b']);assert.deepEqual(stateLabel('identifier').lines,['identifier']);
+ const label=stateLabel('one two three four five six seven eight nine ten eleven twelve');assert.ok(label.fontSize<12);assert.ok(label.lineHeight*label.lines.length<50);
+ const m=example();m.states[1].name='string with ID_%';const before=JSON.stringify(m),tex=toTikz(m);assert.ok(tex.includes('\\shortstack{\\strut string\\\\\\strut with ID\\_\\%}'));assert.equal(JSON.stringify(m),before);
+});

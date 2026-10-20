@@ -32,3 +32,5 @@ Use **Comment (C)** to add a comment label. Double-click a comment to edit its t
 **Ctrl-drag** from a state onto another state inserts an intermediary: parent → new state → destination. Drop on blank canvas to place the intermediary there and continue connecting from it to your next destination. Ctrl also works with right-drag. Each insertion is one undo step; both new rules start blank.
 
 Use **Box transition labels** in the toolbar to toggle borders around regex labels. The setting saves with the machine, supports Undo, and is included in SVG and TikZ exports.
+
+State names wrap at spaces only when too long to fit on one line, on the canvas and in SVG/TikZ exports. Long names scale to fit inside the state.
