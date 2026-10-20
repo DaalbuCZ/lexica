@@ -81,3 +81,22 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const context={source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
+
+test('tree layout keeps a shared destination with its specific parent instead of a distant root shortcut',()=>{
+ const m={start:'root',states:['root','integer','other','dot','double','underscore'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','integer'],['root','other'],['integer','dot'],['dot','double'],['integer','underscore'],['underscore','integer'],['root','dot']].map(([from,to])=>({from,to,label:'x'}))};
+ const edges=JSON.stringify(m.edges);autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
+ assert.ok(get('dot').x>get('integer').x);assert.ok(Math.abs(get('dot').y-get('integer').y)<300);
+ assert.ok(get('other').y>Math.max(get('integer').y,get('dot').y,get('double').y,get('underscore').y));
+ assert.equal(JSON.stringify(m.edges),edges);validate(m);
+});
+test('circular layout spaces states on one circle and preserves graph and export',()=>{
+ for(const count of [1,2,8,40]){
+  const m={start:'q0',states:Array.from({length:count},(_,i)=>({id:'q'+i,name:'q'+i,token:'TOKEN_'+i,x:0,y:0})),edges:Array.from({length:count},(_,i)=>({from:'q'+i,to:'q'+((i+1)%count),label:'x'}))};
+  const edges=JSON.stringify(m.edges);autoLayout(m,'circle');
+  const center=m.states.reduce((p,s)=>({x:p.x+s.x/count,y:p.y+s.y/count}),{x:0,y:0}),r=Math.hypot(m.states[0].x-center.x,m.states[0].y-center.y);
+  for(const s of m.states)assert.ok(Math.abs(Math.hypot(s.x-center.x,s.y-center.y)-r)<.00001);
+  for(let i=0;i<count;i++)for(let j=i+1;j<count;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=319.99);
+  assert.equal(JSON.stringify(m.edges),edges);validate(m);assert.doesNotThrow(()=>toTikz(m));const first=JSON.stringify(m);autoLayout(m,'circle');assert.equal(JSON.stringify(m),first);
+ }
+ assert.doesNotThrow(()=>autoLayout({states:[],edges:[],start:null},'circle'));
+});
