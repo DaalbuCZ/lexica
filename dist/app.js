@@ -20,7 +20,7 @@ async function pasteItems(){let text=clipboardText;try{text=await navigator.clip
 try{const saved=localStorage.getItem('lexica-machine');if(saved)machine=validate(JSON.parse(saved))}catch{toast('Could not restore saved machine. Example loaded.')}
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500)}
 function checkpoint(){history.push(JSON.stringify(machine));if(history.length>80)history.shift();future=[]}
-function save(){try{localStorage.setItem('lexica-machine',JSON.stringify(machine));document.querySelector('.local').innerHTML='<i></i> Saved locally'}catch{document.querySelector('.local').textContent='Storage unavailable — export to save'}}
+function save(){try{localStorage.setItem('lexica-machine',JSON.stringify(machine));document.querySelector('.local').innerHTML='<i></i> Saved locally'}catch{document.querySelector('.local').textContent='Storage unavailable - export to save'}}
 function changed(){save();render()}
 function render(){pruneSelection();$('label-boxes').setAttribute('aria-pressed',String(!!machine.labelBoxes));$('machine-info').textContent=`${machine.states.length} states · ${machine.edges.length} transitions`;
  draw();drawMap();properties();test();$('toggle-properties').disabled=selection.type==='none';$('copy-selection').disabled=selection.type==='none';$('undo').disabled=!history.length;$('redo').disabled=!future.length;
