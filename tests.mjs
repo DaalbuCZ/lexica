@@ -43,7 +43,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  for(const target of ['s2',null]){
   let pointerup,inserted;
   const context={source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
-   point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},$:()=>({}),
+   point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{}}),
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
    document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'?(target?{dataset:{node:target}}:null):{}}),body:{classList:{remove:()=>{}}}}};
@@ -63,4 +63,21 @@ test('tree layout reserves separate bands for uneven subtrees and centers each p
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
  assert.ok(m.comments[0].y>Math.max(...m.states.map(s=>s.y))+100);
  const first=JSON.stringify(m);autoLayout(m);assert.equal(JSON.stringify(m),first);validate(m);
+});
+
+test('Ctrl-drag can start from the active connection source without inserting a self-loop immediately',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
+ const start=app.slice(app.indexOf('function startDrag('),app.indexOf('function view('));
+ let captured=false,inserted=false;
+ const context={source:'s0',space:false,point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{captured=true}}),insertBetween:()=>{inserted=true}};
+ runInNewContext(start,context);
+ context.startDrag({button:0,ctrlKey:true,pointerId:1,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}},'s0');
+ assert.equal(inserted,false);assert.equal(captured,true);assert.equal(context.rightStart.insert,true);assert.equal(context.source,'s0');
+});
+test('Ctrl pressed during an arrow drag stays latched until release',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
+ const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
+ let pointermove;
+ const context={source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
