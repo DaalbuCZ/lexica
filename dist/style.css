@@ -15,23 +15,23 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 .edge-label-box{fill:#fff;stroke:#798b79;stroke-width:1;cursor:pointer}.edge-text.boxed{stroke:none}
 
 :root{color-scheme:light}.theme-sun{display:none}#theme-toggle{display:flex;align-items:center;justify-content:center;padding:8px}
-:root[data-theme=dark]{color-scheme:dark;color:#dce6dd;background:#141c17;--green:#79bc91;--line:#364a3d;--panel:#1d2821f5;scrollbar-color:#526959 #1d2821}
+:root[data-theme=dark]{color-scheme:dark;color:#edf1f5;background:#151719;--green:#8bd5a5;--line:#46515a;--panel:#24292ef5;scrollbar-color:#687783 #24292e}
 [data-theme=dark] .theme-moon{display:none}[data-theme=dark] .theme-sun{display:block}
-[data-theme=dark] button{background:#202d25;color:#d9e5da}[data-theme=dark] button:hover{background:#304436}[data-theme=dark] .primary{background:#376c4c;color:#f2fff5;border-color:#548966}[data-theme=dark] .primary:hover{background:#457e59}
-[data-theme=dark] .brand{color:#e0eddf}[data-theme=dark] .local,[data-theme=dark] .canvas-status,[data-theme=dark] .minimap span{color:#a2b5a0}
-[data-theme=dark] .canvas-wrap{background-color:#141d18;background-image:radial-gradient(#344b3a .8px,transparent .8px)}
-[data-theme=dark] .toolbar button,[data-theme=dark] .tester-actions button,[data-theme=dark] .inspector-title button{background:transparent}[data-theme=dark] .toolbar button:hover{background:#304436}[data-theme=dark] .toolbar button[aria-pressed=true]{background:#344e3b;color:#b4e2bb}
-[data-theme=dark] .inspector,[data-theme=dark] .minimap,[data-theme=dark] .tester,[data-theme=dark] dialog{background:#1b2720;color:#dce6dd;border-color:var(--line)}
-[data-theme=dark] .inspector-title,[data-theme=dark] .transitions-title{border-color:var(--line);color:#b0c1ac}
-[data-theme=dark] textarea,[data-theme=dark] .prop-field input,[data-theme=dark] .prop-field select,[data-theme=dark] .export-options select,[data-theme=dark] .toolbar #layout-mode,[data-theme=dark] .toolbar #layout-density,[data-theme=dark] #export-preview{background:#121c16;color:#d7e5d6;border-color:#405647}
-[data-theme=dark] .prop-field,[data-theme=dark] .check,[data-theme=dark] .skip-label,[data-theme=dark] .field-label,[data-theme=dark] .output-label span,[data-theme=dark] .export-help,[data-theme=dark] .prop-note,[data-theme=dark] .empty,[data-theme=dark] .selection-summary{color:#b0c2aa}
-[data-theme=dark] .transition-item,[data-theme=dark] kbd{background:#293b2d;color:#c8ddc0;border-color:var(--line)}[data-theme=dark] .danger{color:#f1a694}
-[data-theme=dark] .edge{stroke:#a2b79f}[data-theme=dark] .selected-edge,[data-theme=dark] .connection-preview{stroke:#a9dfb3}[data-theme=dark] #arrow path{fill:#a2b79f}
-[data-theme=dark] .edge-text{fill:#c8dcbc;stroke:#141d18}[data-theme=dark] .edge-label-box{fill:#1b2920;stroke:#9cb496}[data-theme=dark] .edge-text.boxed{stroke:none}
-[data-theme=dark] .node circle{fill:#1f3025;stroke:#a0b692}[data-theme=dark] .node.selected circle{fill:#36523c;stroke:#c0e4a9}[data-theme=dark] .node.connecting circle{stroke:#a9dfb3}[data-theme=dark] .node .inner{fill:none}[data-theme=dark] .node text{fill:#e0edd7}[data-theme=dark] .node .token-label{fill:#b2c69d}
-[data-theme=dark] #modehint,[data-theme=dark] .canvas-status button{background:#1d2a21ed;color:#b5c9ac}
-[data-theme=dark] #tokens{background:#131f17;border-color:var(--line)}[data-theme=dark] .token{background:#263d2b;border-color:#456246;color:#e1edda}[data-theme=dark] .token b{color:#b2c5a5}[data-theme=dark] .token.number{background:#403622;border-color:#71613a;color:#f1db9b}[data-theme=dark] .token.error{background:#422a25;border-color:#805146;color:#ffc7b9}
-[data-theme=dark] .portal path{fill:#28412e;stroke:#a3d3a7}[data-theme=dark] .portal text{fill:#d0edc7}[data-theme=dark] .portal-wire{stroke:#a3d3a7}[data-theme=dark] .portal.invalid path{fill:#442c26;stroke:#f2a28d}[data-theme=dark] .portal.invalid text{fill:#ffc3ad}
-[data-theme=dark] .comment-label rect{fill:#3c3720;stroke:#a99755}[data-theme=dark] .comment-label text{fill:#f3e3a5}[data-theme=dark] .comment-label.selected rect{stroke:#d2dea0}
-[data-theme=dark] .minimap path{stroke:#9bb692}[data-theme=dark] .minimap circle{fill:#b2cb9b}[data-theme=dark] .map-viewport{fill:#97c88725;stroke:#9dc78d}[data-theme=dark] .minimap .map-comment{fill:#62572b;stroke:#c4b064}
-[data-theme=dark] .selection-box{fill:#a5d18c20;stroke:#badca6}[data-theme=dark] dialog::backdrop{background:#050b07aa}[data-theme=dark] #toast{background:#34563e;color:#efffe9}
+[data-theme=dark] button{background:#292f35;color:#e9eff5}[data-theme=dark] button:hover{background:#39434c}[data-theme=dark] .primary{background:#326746;color:#f4fff8;border-color:#73af88}[data-theme=dark] .primary:hover{background:#3f7b54}
+[data-theme=dark] .brand{color:#f1f5f9}[data-theme=dark] .local,[data-theme=dark] .canvas-status,[data-theme=dark] .minimap span{color:#c0cbd5}
+[data-theme=dark] .canvas-wrap{background-color:#15191d;background-image:radial-gradient(#30383e .8px,transparent .8px)}
+[data-theme=dark] .toolbar button,[data-theme=dark] .tester-actions button,[data-theme=dark] .inspector-title button{background:transparent}[data-theme=dark] .toolbar button:hover{background:#39434c}[data-theme=dark] .toolbar button[aria-pressed=true]{background:#334a3d;color:#c5f5d3}
+[data-theme=dark] .inspector,[data-theme=dark] .minimap,[data-theme=dark] .tester,[data-theme=dark] dialog{background:#22282e;color:#edf1f5;border-color:var(--line)}
+[data-theme=dark] .inspector-title,[data-theme=dark] .transitions-title{border-color:var(--line);color:#ccd5df}
+[data-theme=dark] textarea,[data-theme=dark] .prop-field input,[data-theme=dark] .prop-field select,[data-theme=dark] .export-options select,[data-theme=dark] .toolbar #layout-mode,[data-theme=dark] .toolbar #layout-density,[data-theme=dark] #export-preview{background:#171c21;color:#eff4f8;border-color:#596975}
+[data-theme=dark] .prop-field,[data-theme=dark] .check,[data-theme=dark] .skip-label,[data-theme=dark] .field-label,[data-theme=dark] .output-label span,[data-theme=dark] .export-help,[data-theme=dark] .prop-note,[data-theme=dark] .empty,[data-theme=dark] .selection-summary{color:#c5d0da}
+[data-theme=dark] .transition-item,[data-theme=dark] kbd{background:#303940;color:#e2eaf1;border-color:var(--line)}[data-theme=dark] .danger{color:#ffb5a5}
+[data-theme=dark] .edge{stroke:#bdcbd7;stroke-width:1.9}[data-theme=dark] .selected-edge,[data-theme=dark] .connection-preview{stroke:#adf0c4}[data-theme=dark] #arrow path{fill:#bdcbd7}
+[data-theme=dark] .edge-text{fill:#f1f5f9;stroke:#15191d}[data-theme=dark] .edge-label-box{fill:#242d35;stroke:#adbdcb}[data-theme=dark] .edge-text.boxed{stroke:none}
+[data-theme=dark] .node circle{fill:#29323a;stroke:#d1dce5;stroke-width:2}[data-theme=dark] .node.selected circle{fill:#365343;stroke:#c0f2d1}[data-theme=dark] .node.connecting circle{stroke:#adf0c4}[data-theme=dark] .node .inner{fill:none}[data-theme=dark] .node text{fill:#ffffff}[data-theme=dark] .node .token-label{fill:#d2dce6}
+[data-theme=dark] #modehint,[data-theme=dark] .canvas-status button{background:#242d35ed;color:#cbd5df}
+[data-theme=dark] #tokens{background:#171d22;border-color:var(--line)}[data-theme=dark] .token{background:#2a3931;border-color:#65816d;color:#edf6ed}[data-theme=dark] .token b{color:#c5d2c6}[data-theme=dark] .token.number{background:#403622;border-color:#71613a;color:#f1db9b}[data-theme=dark] .token.error{background:#422a25;border-color:#805146;color:#ffc7b9}
+[data-theme=dark] .portal path{fill:#2c3d35;stroke:#a7debb}[data-theme=dark] .portal text{fill:#e8f9ed}[data-theme=dark] .portal-wire{stroke:#a7debb}[data-theme=dark] .portal.invalid path{fill:#442c26;stroke:#f2a28d}[data-theme=dark] .portal.invalid text{fill:#ffc3ad}
+[data-theme=dark] .comment-label rect{fill:#3c3720;stroke:#a99755}[data-theme=dark] .comment-label text{fill:#f3e3a5}[data-theme=dark] .comment-label.selected rect{stroke:#eddfb2}
+[data-theme=dark] .minimap path{stroke:#a9bccb}[data-theme=dark] .minimap circle{fill:#d5e4ef}[data-theme=dark] .map-viewport{fill:#a3c9e025;stroke:#c0d8e9}[data-theme=dark] .minimap .map-comment{fill:#62572b;stroke:#c4b064}
+[data-theme=dark] .selection-box{fill:#a3c9e020;stroke:#b5d8ef}[data-theme=dark] dialog::backdrop{background:#06090cbb}[data-theme=dark] #toast{background:#365344;color:#f2fff6}
