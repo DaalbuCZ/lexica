@@ -38,3 +38,5 @@ Use **Box transition labels** in the toolbar to toggle borders around regex labe
 State names wrap at spaces only when too long to fit on one line, on the canvas and in SVG/TikZ exports. Long names scale to fit inside the state.
 
 Use the moon/sun button beside Import to switch between light and dark mode. The editor initially follows your system theme, then remembers your manual choice. SVG and TeX exports retain their paper-friendly light styling.
+
+Use **Import** to paste a complete machine JSON document or choose a `.json` file. Imported data is validated before replacing the graph; Undo restores the previous machine.

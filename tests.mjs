@@ -223,3 +223,20 @@ test('dashed comment links terminate on the state circle and the comment box bor
   assert.ok(Math.min(Math.abs(link.from.x-note.x),Math.abs(link.from.x-note.x-size.w),Math.abs(link.from.y-note.y),Math.abs(link.from.y-note.y-size.h))<1e-8);
  }
 });
+
+import {parseMachine} from './dist/lexer.js';
+test('pasted machine JSON shares file validation and enforces the 1 MB limit',()=>{
+ const machine=example();machine.comments=[{id:'note',text:'Imported note',nodeIds:['s1'],x:450,y:100}];
+ assert.deepEqual(parseMachine(JSON.stringify(machine)),machine);
+ assert.throws(()=>parseMachine('   '),/Paste machine JSON/);assert.throws(()=>parseMachine('{broken'),/Invalid JSON/);
+ assert.throws(()=>parseMachine(JSON.stringify({...machine,start:'missing'})),/start state/);
+ assert.throws(()=>parseMachine('é'.repeat(500001)),/too large/);
+});
+test('invalid pasted imports preserve the graph and valid imports can be undone',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function importMachine('),app.indexOf("$('import').onclick"));
+ const original=example(),history=[],fields={'import-dialog':{open:true,close(){this.open=false}},'import-json':{value:'pasted JSON'}};
+ const context={machine:original,parseMachine,$:id=>fields[id],checkpoint:()=>history.push(JSON.stringify(context.machine)),cancelConnect:()=>{},clearSelection:()=>{},showProperties:()=>{},changed:()=>{},fit:()=>{},toast:()=>{}};
+ runInNewContext(script,context);assert.throws(()=>context.importMachine('{broken'),/Invalid JSON/);assert.equal(context.machine,original);assert.equal(history.length,0);assert.equal(fields['import-dialog'].open,true);
+ const next=example();next.states[1].name='Imported identifier';context.importMachine(JSON.stringify(next));
+ assert.deepEqual(context.machine,next);assert.equal(fields['import-dialog'].open,false);assert.equal(fields['import-json'].value,'');assert.deepEqual(JSON.parse(history.pop()),original);
+});

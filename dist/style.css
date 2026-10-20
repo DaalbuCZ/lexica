@@ -144,3 +144,5 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 [data-theme=dark] .comment-link{opacity:1}
 @media(max-width:650px){.toolbar{max-width:calc(100% - 20px)}.top-actions .primary span{display:inline}}
 @media(max-width:430px){.brand{font-size:0;gap:0;letter-spacing:0}.top-actions{gap:4px}.top-actions button{gap:4px;padding:8px}}
+
+#import-json{height:260px;resize:vertical}#import-error{min-height:1.5em;margin:8px 0;font-size:12px;color:#b54f3c}[data-theme=dark] #import-error{color:#ffc7b9}

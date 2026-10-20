@@ -1,8 +1,8 @@
 import {stateLabel} from './labels.js';
-import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=7';
+import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=8';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=7';
+import {routeEdges} from './layout.js?v=8';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
@@ -12,6 +12,12 @@ export function validate(m){
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
  for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label)}return m;
+}
+export function parseMachine(text){
+ if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
+ if(!text.trim())throw Error('Paste machine JSON to import.');
+ let machine;try{machine=JSON.parse(text)}catch{throw Error('Invalid JSON. Paste an exported machine JSON document.')}
+ return validate(machine);
 }
 export function matcher(label){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>r.test(c)}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
