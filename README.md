@@ -5,7 +5,7 @@ A browser-local DFA editor for lexer design, with TikZ/LaTeX export.
 Run `npm run dev` and open http://localhost:5173. No install step or build required.
 
 - Double-click the canvas or use + State. Drag states to arrange them.
-- Right-click a source state, then click a destination (same state creates a loop). Right-drag also connects. Escape cancels. Edit the expression in Properties.
+- Right-click a source state, then click a destination (same state creates a loop). Right-drag also connects. Escape cancels. New self-loops prefill the last valid transition expression you edited in this session (default `[a-z]`). Edit the expression in Properties.
 - Drag empty canvas to pan; scroll to zoom. Space-drag or middle-drag also pans. The minimap supports click/drag navigation, and Fit shows the whole graph. State positions are unrestricted.
 - Auto layout arranges states in layers and routes transition labels around states and other labels. Undo restores the previous layout. Dense graphs may still have crossing edges.
 - Double-click a state or transition to open its properties popover. Single-click selects; Escape or clicking the canvas dismisses properties.
