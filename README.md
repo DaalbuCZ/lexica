@@ -4,6 +4,8 @@ A browser-local DFA editor for lexer design, with TikZ/LaTeX export.
 
 Run `npm run dev` and open http://localhost:5173. No install step or build required.
 
+To serve it with Docker, run `docker build -t lexica .` followed by `docker run --rm -p 8080:80 lexica`, then open http://localhost:8080.
+
 - Double-click the canvas or use + State. Drag states to arrange them.
 - Right-click a source state, then click a destination (same state creates a loop). Right-drag also connects. Escape cancels. New self-loops prefill the last valid transition expression you edited in this session (blank until a rule has been edited). Other new transitions start blank. Edit the expression in Properties; blank rules can be saved/exported, but must be filled before testing.
 - Drag empty canvas to pan; scroll to zoom. Space-drag or middle-drag also pans. The minimap supports click/drag navigation, and Fit shows the whole graph. State positions are unrestricted.
