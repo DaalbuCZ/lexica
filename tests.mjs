@@ -42,11 +42,11 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const target of ['s2',null]){
   let pointerup,inserted;
-  const context={source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
+  const context={commentSource:null,source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
    point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{}}),
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
-   document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'?(target?{dataset:{node:target}}:null):{}}),body:{classList:{remove:()=>{}}}}};
+   document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'?(target?{dataset:{node:target}}:null):selector==='[data-comment]'?null:{}}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(start+release,context);
   context.startDrag({button:0,ctrlKey:true,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}},'s0');
   assert.equal(context.source,'s0');
@@ -61,7 +61,7 @@ test('tree layout reserves separate bands for uneven subtrees and centers each p
  assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
  assert.equal(get('root').y,(get('a').y+get('b').y)/2);
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
- assert.equal(m.comments[0].nodeId,'root');assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
+ assert.deepEqual(m.comments[0].nodeIds,['root']);assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
  const first=JSON.stringify(m);autoLayout(m);assert.equal(JSON.stringify(m),first);validate(m);
 });
 
@@ -69,7 +69,7 @@ test('Ctrl-drag can start from the active connection source without inserting a 
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const start=app.slice(app.indexOf('function startDrag('),app.indexOf('function view('));
  let captured=false,inserted=false;
- const context={source:'s0',space:false,point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{captured=true}}),insertBetween:()=>{inserted=true}};
+ const context={commentSource:null,source:'s0',space:false,point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{captured=true}}),insertBetween:()=>{inserted=true}};
  runInNewContext(start,context);
  context.startDrag({button:0,ctrlKey:true,pointerId:1,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}},'s0');
  assert.equal(inserted,false);assert.equal(captured,true);assert.equal(context.rightStart.insert,true);assert.equal(context.source,'s0');
@@ -78,7 +78,7 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
  let pointermove;
- const context={source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ const context={commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
 
@@ -152,8 +152,8 @@ test('theme follows the system until overridden and remembers a manual choice',(
 import {makeComment} from './dist/comments.js';
 test('comments begin exactly at the cursor and attach to the nearest state',()=>{
  const m=example(),p={x:450,y:100},c=makeComment(m,p,'cursor-note');
- assert.equal(c.x,p.x);assert.equal(c.y,p.y);assert.equal(c.nodeId,'s1');
- assert.equal(makeComment({states:[]},p,'free').nodeId,null);
+ assert.equal(c.x,p.x);assert.equal(c.y,p.y);assert.deepEqual(c.nodeIds,['s1']);
+ assert.deepEqual(makeComment({states:[]},p,'free').nodeIds,[]);
 });
 test('tree and radial layouts preserve note offsets and leave detached notes in place',()=>{
  for(const mode of ['tree','circle'])for(const spacing of [.35,.75,1]){
@@ -166,8 +166,39 @@ test('copying states carries attached notes and remaps attachments, while notes 
  const m=example();m.comments=[makeComment(m,{x:450,y:100},'note')];
  const group=copySelection(m,new Set(['s1']),new Set(),new Set());assert.equal(group.comments.length,1);
  let n=0;pasteSelection(m,group,{x:40,y:40},()=>`attached-copy${n++}`);
- assert.equal(m.comments.at(-1).nodeId,'attached-copy0');assert.equal(m.comments.at(-1).x,490);
- const noteOnly=copySelection(m,new Set(),new Set(),new Set(['note']));assert.equal(noteOnly.comments[0].nodeId,null);
- const empty={start:null,states:[],edges:[]};pasteSelection(empty,noteOnly,{x:0,y:0},()=> 'free-copy');validate(empty);assert.equal(empty.comments[0].nodeId,null);
- m.comments[0].nodeId='missing';assert.throws(()=>validate(m),/attachment/);
+ assert.deepEqual(m.comments.at(-1).nodeIds,['attached-copy0']);assert.equal(m.comments.at(-1).x,490);
+ const noteOnly=copySelection(m,new Set(),new Set(),new Set(['note']));assert.deepEqual(noteOnly.comments[0].nodeIds,[]);
+ const empty={start:null,states:[],edges:[]};pasteSelection(empty,noteOnly,{x:0,y:0},()=> 'free-copy');validate(empty);assert.deepEqual(empty.comments[0].nodeIds,[]);
+ m.comments[0].nodeIds=['missing'];assert.throws(()=>validate(m),/attachment/);
+});
+
+import {commentAnchors,positionComments,commentLinks,toggleCommentNode} from './dist/comments.js';
+test('several states share one comment with toggleable dashed attachments and centroid movement',()=>{
+ const m=example();m.comments=[makeComment(m,{x:600,y:100},'note')];m.comments[0].nodeIds=['s0'];
+ toggleCommentNode(m,'note','s1');assert.deepEqual(m.comments[0].nodeIds,['s0','s1']);
+ const links=commentLinks(m);assert.equal(links.length,2);assert.ok(links.every(link=>Number.isFinite(link.from.x)&&Number.isFinite(link.to.y)));
+ const anchors=commentAnchors(m);m.states[0].x+=100;positionComments(anchors);assert.equal(m.comments[0].x,650);
+ const before=tokenize(m,'hi 42');assert.ok(toTikz(m).includes('draw[dashed,gray]'));assert.deepEqual(tokenize(m,'hi 42'),before);
+ toggleCommentNode(m,'note','s0');assert.deepEqual(m.comments[0].nodeIds,['s1']);validate(m);
+ m.comments[0].nodeIds=['s1','s1'];assert.throws(()=>validate(m),/attachment/);
+});
+test('many-state comment layouts preserve the centroid offset and copies remap only copied connections',()=>{
+ for(const mode of ['tree','circle']){
+  const m=example();m.comments=[{id:'note',text:'Shared explanation',x:700,y:50,nodeIds:['s0','s1']}];
+  const center=()=>({x:(m.states[0].x+m.states[1].x)/2,y:(m.states[0].y+m.states[1].y)/2});const c=center(),dx=700-c.x,dy=50-c.y;
+  autoLayout(m,mode);const after=center();assert.ok(Math.abs(m.comments[0].x-after.x-dx)<1e-8);assert.ok(Math.abs(m.comments[0].y-after.y-dy)<1e-8);
+  const fragment=copySelection(m,new Set(['s1']),new Set(),new Set());assert.deepEqual(fragment.comments[0].nodeIds,['s1']);
+  let n=0;pasteSelection(m,fragment,{x:40,y:40},()=>`multi-copy${n++}`);assert.deepEqual(m.comments.at(-1).nodeIds,['multi-copy0']);validate(m);
+ }
+});
+
+test('right-clicking a comment starts a many-state connection session without creating transitions',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),handlers=app.slice(app.indexOf('function startCommentConnection('),app.indexOf('function view('));
+ const m=example();m.comments=[makeComment(m,{x:500,y:100},'note')];let checkpoints=0;
+ const context={machine:m,source:null,commentSource:null,space:false,connectPoint:null,point:e=>({x:e.clientX,y:e.clientY}),toggleCommentNode,checkpoint:()=>checkpoints++,changed:()=>{},draw:()=>{},showProperties:()=>{},$:()=>({textContent:''}),cancelConnect:()=>{context.source=null;context.commentSource=null}};
+ runInNewContext(handlers,context);const event=button=>({button,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}});
+ const before=m.edges.length;context.startCommentConnection(event(2),'note');assert.equal(context.commentSource,'note');
+ context.startDrag(event(0),'s0');assert.ok(m.comments[0].nodeIds.includes('s0'));assert.equal(context.commentSource,'note');
+ context.startDrag(event(0),'s0');assert.ok(!m.comments[0].nodeIds.includes('s0'));assert.equal(m.edges.length,before);assert.equal(checkpoints,2);
+ context.source='s2';context.commentSource=null;context.startCommentConnection(event(2),'note');assert.ok(m.comments[0].nodeIds.includes('s2'));assert.equal(context.source,null);assert.equal(context.commentSource,null);
 });

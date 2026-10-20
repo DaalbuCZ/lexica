@@ -1,10 +1,10 @@
-import {commentLayout,commentAnchors} from './comments.js?v=5';
+import {commentLayout,commentAnchors,positionComments} from './comments.js?v=6';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
- const anchors=commentAnchors(machine),placeComments=()=>{for(const {comment,state,dx,dy} of anchors){comment.x=state.x+dx;comment.y=state.y+dy}};
+ const anchors=commentAnchors(machine);
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
  for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
@@ -42,7 +42,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
    for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
    left+=radius*2+step;
   }
-  placeComments();
+  positionComments(anchors);
   return machine;
  }
  let forestTop=100;
@@ -57,7 +57,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
   }
   forestTop+=heights.get(root)+120*spacing;
  }
- placeComments();
+ positionComments(anchors);
  return machine;
 }
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
