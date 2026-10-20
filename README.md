@@ -34,3 +34,5 @@ Use **Comment (C)** to add a comment label. Double-click a comment to edit its t
 Use **Box transition labels** in the toolbar to toggle borders around regex labels. The setting saves with the machine, supports Undo, and is included in SVG and TikZ exports.
 
 State names wrap at spaces only when too long to fit on one line, on the canvas and in SVG/TikZ exports. Long names scale to fit inside the state.
+
+Use the moon/sun button beside Import to switch between light and dark mode. The editor initially follows your system theme, then remembers your manual choice. SVG and TeX exports retain their paper-friendly light styling.

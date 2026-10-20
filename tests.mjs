@@ -141,3 +141,10 @@ test('state names wrap at whitespace only when too long, stay centered, and esca
  const label=stateLabel('one two three four five six seven eight nine ten eleven twelve');assert.ok(label.fontSize<12);assert.ok(label.lineHeight*label.lines.length<50);
  const m=example();m.states[1].name='string with ID_%';const before=JSON.stringify(m),tex=toTikz(m);assert.ok(tex.includes('\\shortstack{\\strut string\\\\\\strut with ID\\_\\%}'));assert.equal(JSON.stringify(m),before);
 });
+
+test('theme follows the system until overridden and remembers a manual choice',()=>{
+ const script=readFileSync(new URL('./dist/theme.js',import.meta.url),'utf8');
+ function run(saved,blocked=false){let systemChange,ready;const attrs={},savedValues={},button={setAttribute:(key,value)=>{attrs[key]=value}},root={dataset:{}};const media={matches:true,addEventListener:(_,fn)=>{systemChange=fn}};const context={matchMedia:()=>media,localStorage:{getItem:()=>{if(blocked)throw Error('blocked');return saved},setItem:(key,value)=>{if(blocked)throw Error('blocked');savedValues[key]=value}},document:{documentElement:root,getElementById:()=>button,addEventListener:(_,fn)=>{ready=fn}}};runInNewContext(script,context);ready();return {root,button,attrs,media,change:()=>systemChange(),savedValues}}
+ const theme=run(null);assert.equal(theme.root.dataset.theme,'dark');theme.media.matches=false;theme.change();assert.equal(theme.root.dataset.theme,'light');theme.button.onclick();assert.equal(theme.root.dataset.theme,'dark');assert.equal(theme.attrs['aria-pressed'],'true');assert.equal(theme.savedValues['lexica-theme'],'dark');theme.media.matches=false;theme.change();assert.equal(theme.root.dataset.theme,'dark');
+ assert.equal(run('light').root.dataset.theme,'light');assert.equal(run('dark').root.dataset.theme,'dark');const blocked=run(null,true);assert.doesNotThrow(()=>blocked.button.onclick());assert.equal(blocked.root.dataset.theme,'light');
+});
