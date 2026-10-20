@@ -20,9 +20,27 @@ export function autoLayout(machine,mode='tree') {
  }
  const step=Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)));
  if(mode==='circle'){
-  const count=order.length,radius=count===1?0:Math.max(180,step/(2*Math.sin(Math.PI/count))),center=160+radius;
-  order.forEach((id,i)=>{const angle=-Math.PI/2+2*Math.PI*i/count,s=states.get(id);s.x=center+radius*Math.cos(angle);s.y=center+radius*Math.sin(angle)});
-  let noteTop=center+radius+180;for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40}
+  let left=160,bottom=100;
+  for(const root of roots){
+   const queue=[{id:root,depth:0,start:-Math.PI/2,span:2*Math.PI}],layers=new Map();
+   for(let i=0;i<queue.length;i++){
+    const item=queue[i],branches=children.get(item.id);item.angle=item.start+item.span/2;
+    if(!layers.has(item.depth))layers.set(item.depth,[]);layers.get(item.depth).push(item);
+    const weight=branches.reduce((sum,id)=>sum+heights.get(id)+gap,0);let angle=item.start;
+    for(const id of branches){const span=item.span*(heights.get(id)+gap)/weight;queue.push({id,depth:item.depth+1,start:angle,span});angle+=span}
+   }
+   const radii=new Map([[0,0]]);let radius=0;
+   for(const [depth,items] of layers){
+    if(!depth)continue;
+    const angles=items.map(item=>item.angle).sort((a,b)=>a-b);let separation=Infinity;
+    if(angles.length>1)for(let i=0;i<angles.length;i++)separation=Math.min(separation,(angles[(i+1)%angles.length]-angles[i]+2*Math.PI)%(2*Math.PI));
+    radius=Math.max(radius+step,Number.isFinite(separation)?step/(2*Math.sin(separation/2)):0);radii.set(depth,radius);
+   }
+   const center={x:left+radius,y:160+radius};
+   for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
+   left+=radius*2+step;bottom=Math.max(bottom,center.y+radius);
+  }
+  let noteTop=bottom+180;for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40}
   return machine;
  }
  let forestTop=100;
