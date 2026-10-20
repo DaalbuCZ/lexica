@@ -61,7 +61,7 @@ test('tree layout reserves separate bands for uneven subtrees and centers each p
  assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
  assert.equal(get('root').y,(get('a').y+get('b').y)/2);
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
- assert.ok(m.comments[0].y>Math.max(...m.states.map(s=>s.y))+100);
+ assert.equal(m.comments[0].nodeId,'root');assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
  const first=JSON.stringify(m);autoLayout(m);assert.equal(JSON.stringify(m),first);validate(m);
 });
 
@@ -147,4 +147,27 @@ test('theme follows the system until overridden and remembers a manual choice',(
  function run(saved,blocked=false){let systemChange,ready;const attrs={},savedValues={},button={setAttribute:(key,value)=>{attrs[key]=value}},root={dataset:{}};const media={matches:true,addEventListener:(_,fn)=>{systemChange=fn}};const context={matchMedia:()=>media,localStorage:{getItem:()=>{if(blocked)throw Error('blocked');return saved},setItem:(key,value)=>{if(blocked)throw Error('blocked');savedValues[key]=value}},document:{documentElement:root,getElementById:()=>button,addEventListener:(_,fn)=>{ready=fn}}};runInNewContext(script,context);ready();return {root,button,attrs,media,change:()=>systemChange(),savedValues}}
  const theme=run(null);assert.equal(theme.root.dataset.theme,'dark');theme.media.matches=false;theme.change();assert.equal(theme.root.dataset.theme,'light');theme.button.onclick();assert.equal(theme.root.dataset.theme,'dark');assert.equal(theme.attrs['aria-pressed'],'true');assert.equal(theme.savedValues['lexica-theme'],'dark');theme.media.matches=false;theme.change();assert.equal(theme.root.dataset.theme,'dark');
  assert.equal(run('light').root.dataset.theme,'light');assert.equal(run('dark').root.dataset.theme,'dark');const blocked=run(null,true);assert.doesNotThrow(()=>blocked.button.onclick());assert.equal(blocked.root.dataset.theme,'light');
+});
+
+import {makeComment} from './dist/comments.js';
+test('comments begin exactly at the cursor and attach to the nearest state',()=>{
+ const m=example(),p={x:450,y:100},c=makeComment(m,p,'cursor-note');
+ assert.equal(c.x,p.x);assert.equal(c.y,p.y);assert.equal(c.nodeId,'s1');
+ assert.equal(makeComment({states:[]},p,'free').nodeId,null);
+});
+test('tree and radial layouts preserve note offsets and leave detached notes in place',()=>{
+ for(const mode of ['tree','circle'])for(const spacing of [.35,.75,1]){
+  const m=example(),s=m.states[1];m.comments=[{id:'attached',text:'About identifiers',nodeId:s.id,x:s.x+80,y:s.y-100},{id:'free',text:'Free note',nodeId:null,x:-300,y:-500}];
+  autoLayout(m,mode,spacing);assert.equal(m.comments[0].x-s.x,80);assert.equal(m.comments[0].y-s.y,-100);assert.equal(m.comments[1].x,-300);assert.equal(m.comments[1].y,-500);
+  const first=JSON.stringify(m);autoLayout(m,mode,spacing);assert.equal(JSON.stringify(m),first);validate(m);
+ }
+});
+test('copying states carries attached notes and remaps attachments, while notes alone detach',()=>{
+ const m=example();m.comments=[makeComment(m,{x:450,y:100},'note')];
+ const group=copySelection(m,new Set(['s1']),new Set(),new Set());assert.equal(group.comments.length,1);
+ let n=0;pasteSelection(m,group,{x:40,y:40},()=>`attached-copy${n++}`);
+ assert.equal(m.comments.at(-1).nodeId,'attached-copy0');assert.equal(m.comments.at(-1).x,490);
+ const noteOnly=copySelection(m,new Set(),new Set(),new Set(['note']));assert.equal(noteOnly.comments[0].nodeId,null);
+ const empty={start:null,states:[],edges:[]};pasteSelection(empty,noteOnly,{x:0,y:0},()=> 'free-copy');validate(empty);assert.equal(empty.comments[0].nodeId,null);
+ m.comments[0].nodeId='missing';assert.throws(()=>validate(m),/attachment/);
 });

@@ -1,9 +1,10 @@
-import {commentLayout} from './comments.js';
+import {commentLayout,commentAnchors} from './comments.js?v=5';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
+ const anchors=commentAnchors(machine),placeComments=()=>{for(const {comment,state,dx,dy} of anchors){comment.x=state.x+dx;comment.y=state.y+dy}};
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
  for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
@@ -21,7 +22,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
  }
  const step=Math.max(120,Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
  if(mode==='circle'){
-  let left=160,bottom=100;
+  let left=160;
   for(const root of roots){
    const queue=[{id:root,depth:0,start:-Math.PI/2,span:2*Math.PI}],layers=new Map();
    for(let i=0;i<queue.length;i++){
@@ -39,9 +40,9 @@ export function autoLayout(machine,mode='tree',spacing=1) {
    }
    const center={x:left+radius,y:160+radius};
    for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
-   left+=radius*2+step;bottom=Math.max(bottom,center.y+radius);
+   left+=radius*2+step;
   }
-  let noteTop=bottom+180*spacing;for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40*spacing}
+  placeComments();
   return machine;
  }
  let forestTop=100;
@@ -56,8 +57,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
   }
   forestTop+=heights.get(root)+120*spacing;
  }
- let noteTop=forestTop+40*spacing;
- for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40*spacing}
+ placeComments();
  return machine;
 }
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});

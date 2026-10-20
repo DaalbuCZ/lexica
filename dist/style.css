@@ -127,3 +127,5 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 [data-theme=dark] .input-wrap:focus-within{outline-color:#a9d5ff}
 [data-theme=dark] #input{background:transparent;color:#eff4f8;caret-color:#eff4f8}
 [data-theme=dark] .input-highlights .token-mark.error{background:#4a2d27;box-shadow:inset 0 -1.5px 0 #e08a74}
+
+.placing-comment #canvas,.placing-comment .node,.placing-comment .comment-label{cursor:crosshair}
