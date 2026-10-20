@@ -49,3 +49,24 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 .token{cursor:help}.token:focus-visible{outline:2px solid #32875a;outline-offset:2px}
 [data-theme=dark] .node.trace-highlight circle{stroke:#7ff0aa;filter:drop-shadow(0 0 6px #62e995aa)}[data-theme=dark] .node.trace-highlight text{fill:#c7ffda}
 [data-theme=dark] [data-edge].trace-highlight .edge{stroke:#7ff0aa;filter:drop-shadow(0 0 4px #62e995aa)}[data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#d4ffe1}
+
+/* Use a soft neutral as the dark theme's interface and graph accent. */
+:root[data-theme=dark]{--green:#e1e9ed}
+[data-theme=dark] .primary{background:#dce6eb;color:#20282d;border-color:#f0f5f7}
+[data-theme=dark] .primary:hover{background:#f0f5f7}
+[data-theme=dark] button:focus-visible,[data-theme=dark] input:focus-visible,[data-theme=dark] textarea:focus-visible,[data-theme=dark] select:focus-visible{outline-color:#e1e9ed}
+[data-theme=dark] .toolbar button[aria-pressed=true]{background:#56636a;color:#f5f8fa}
+[data-theme=dark] .selected-edge,[data-theme=dark] .connection-preview{stroke:#e1e9ed}
+[data-theme=dark] .node.selected circle{fill:#59666d;stroke:#e7eef2}
+[data-theme=dark] .node.connecting circle{stroke:#f0f5f7}
+[data-theme=dark] .token{background:#3c454a;border-color:#849198;color:#f0f4f6}
+[data-theme=dark] .token b{color:#d6e0e5}
+[data-theme=dark] .portal path{fill:#3d484e;stroke:#dbe5e9}
+[data-theme=dark] .portal text{fill:#f2f6f8}
+[data-theme=dark] .portal-wire{stroke:#dbe5e9}
+[data-theme=dark] .node.trace-highlight circle{stroke:#f3f7f9;filter:drop-shadow(0 0 6px #e4edf288)}
+[data-theme=dark] .node.trace-highlight text{fill:#ffffff}
+[data-theme=dark] [data-edge].trace-highlight .edge{stroke:#f3f7f9;filter:drop-shadow(0 0 4px #e4edf288)}
+[data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#ffffff}
+[data-theme=dark] .token:focus-visible{outline-color:#edf3f6}
+[data-theme=dark] #toast{background:#dce6eb;color:#20282d}
