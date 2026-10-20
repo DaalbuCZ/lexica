@@ -30,3 +30,27 @@ test('comments can be copied and pasted without states, including into an empty 
 test('invalid clipboard data and comments are rejected before changing the machine',()=>{const m=example(),before=JSON.stringify(m);assert.throws(()=>pasteSelection(m,{kind:'wrong'}));assert.equal(JSON.stringify(m),before);m.comments=[{id:'bad',text:'bad',x:NaN,y:0}];assert.throws(()=>validate(m),/comment/)});
 
 test('unfinished blank transition rules survive saves and exports but cannot run as epsilon',()=>{const m=example();m.edges[0].label='';assert.deepEqual(validate(JSON.parse(JSON.stringify(m))),m);assert.doesNotThrow(()=>toTikz(m));assert.throws(()=>tokenize(m,'hello'),/Transition cannot be empty/)});
+
+import {insertState} from './dist/transitions.js';
+test('inserting an intermediary connects parent to new state to destination',()=>{const m=example(),before=structuredClone(m),s=insertState(m,'s0','s2',undefined,'middle');assert.equal(m.states.length,before.states.length+1);assert.deepEqual(m.edges.slice(-2),[{from:'s0',to:'middle',label:''},{from:'middle',to:'s2',label:''}]);assert.equal(s.x,(before.states[0].x+before.states[2].x)/2);assert.deepEqual(m.edges.slice(0,-2),before.edges);assert.equal(m.start,before.start);validate(m)});
+test('inserting on blank canvas leaves a connected state for continuing the arrow',()=>{const m=example();insertState(m,'s0',null,{x:-150,y:900},'middle');assert.deepEqual(m.edges.at(-1),{from:'s0',to:'middle',label:''});assert.equal(m.states.at(-1).x,-150);validate(m);const before=JSON.stringify(m);assert.throws(()=>insertState(m,'s0','missing'));assert.equal(JSON.stringify(m),before)});
+
+import {runInNewContext} from 'node:vm';
+test('Ctrl-left-drag release inserts between states or continues from blank canvas',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
+ const start=app.slice(app.indexOf('function startDrag('),app.indexOf('function view('));
+ const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
+ for(const target of ['s2',null]){
+  let pointerup,inserted;
+  const context={source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
+   point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},$:()=>({}),
+   insertBetween:(...args)=>{inserted=args},
+   window:{addEventListener:(_,fn)=>{pointerup=fn}},
+   document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'?(target?{dataset:{node:target}}:null):{}}),body:{classList:{remove:()=>{}}}}};
+  runInNewContext(start+release,context);
+  context.startDrag({button:0,ctrlKey:true,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}},'s0');
+  assert.equal(context.source,'s0');
+  pointerup({clientX:200,clientY:100,ctrlKey:false});
+  assert.deepEqual(inserted,target?['s2']:[null,{x:200,y:100}]);
+ }
+});

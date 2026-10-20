@@ -28,3 +28,5 @@ Right-drag an arrow from a state and release on empty canvas to create a connect
 Use **Select (V)** to drag a selection box, or **Shift-click** items to add/remove them. Drag a selected state or comment to move the whole group. Internal transitions follow their states. **Ctrl/Cmd+A** selects everything; **Ctrl/Cmd+C/X/V** copies, cuts, and pastes (toolbar buttons also work). Pasted states get new IDs, copied portal destinations get unique labels, and the existing initial state stays assigned. **Pan (H)** restores drag-to-pan.
 
 Use **Comment (C)** to add a comment label. Double-click a comment to edit its text; drag it to reposition it. Comments support multiple lines, group selection, copy/paste, deletion, and undo/redo. They save with JSON and appear in SVG and TikZ exports without affecting lexer behavior.
+
+**Ctrl-drag** from a state onto another state inserts an intermediary: parent → new state → destination. Drop on blank canvas to place the intermediary there and continue connecting from it to your next destination. Ctrl also works with right-drag. Each insertion is one undo step; both new rules start blank.
