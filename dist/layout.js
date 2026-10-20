@@ -1,7 +1,8 @@
 import {commentLayout} from './comments.js';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
-export function autoLayout(machine,mode='tree') {
+export function autoLayout(machine,mode='tree',spacing=1) {
+ spacing=Number.isFinite(spacing)?Math.max(.75,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
@@ -11,14 +12,14 @@ export function autoLayout(machine,mode='tree') {
   roots.push(root);const stack=[{id:root,parent:null}];
   while(stack.length){const {id,parent}=stack.pop();if(seen.has(id))continue;seen.add(id);order.push(id);if(parent!==null)children.get(parent).push(id);for(const next of [...outgoing.get(id)].reverse())if(!seen.has(next))stack.push({id:next,parent:id})}
  }
- const heights=new Map(),gap=60;
+ const heights=new Map(),gap=60*spacing;
  for(const id of [...order].reverse()){
   const loops=machine.edges.filter(e=>e.from===id&&e.to===id&&e.portal==null).length;
-  const own=220+Math.max(0,loops-1)*55;
+  const own=(220+Math.max(0,loops-1)*55)*spacing;
   const branches=children.get(id);
   heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
  }
- const step=Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)));
+ const step=Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing;
  if(mode==='circle'){
   let left=160,bottom=100;
   for(const root of roots){
@@ -40,7 +41,7 @@ export function autoLayout(machine,mode='tree') {
    for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
    left+=radius*2+step;bottom=Math.max(bottom,center.y+radius);
   }
-  let noteTop=bottom+180;for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40}
+  let noteTop=bottom+180*spacing;for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40*spacing}
   return machine;
  }
  let forestTop=100;
@@ -53,10 +54,10 @@ export function autoLayout(machine,mode='tree') {
    let childTop=top+(heights.get(id)-childHeight)/2;
    for(const child of branches){queue.push({id:child,depth:depth+1,top:childTop});childTop+=heights.get(child)+gap}
   }
-  forestTop+=heights.get(root)+120;
+  forestTop+=heights.get(root)+120*spacing;
  }
- let noteTop=forestTop+40;
- for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40}
+ let noteTop=forestTop+40*spacing;
+ for(const c of machine.comments??[]){c.x=160;c.y=noteTop;noteTop+=commentLayout(c).h+40*spacing}
  return machine;
 }
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
