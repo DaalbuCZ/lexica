@@ -1,66 +1,26 @@
 # Lexica
 
-A visual finite-state machine editor for lexer design, with editable TikZ export. The Flutter rewrite targets web, Linux, macOS, and Windows. The original browser editor is preserved in [`legacy/`](legacy/).
+A browser-local DFA editor for lexer design, with TikZ/LaTeX export.
 
-## Run the Flutter app
+Run `npm run dev` and open http://localhost:5173. No install step or build required.
 
-Requires Flutter 3.47 / Dart 3.13 or newer, plus the native toolchain for your desktop OS.
+- Double-click the canvas or use + State. Drag states to arrange them.
+- Right-click a source state, then click a destination (same state creates a loop). Right-drag also connects. Escape cancels. Edit the expression in Properties.
+- Drag empty canvas to pan; scroll to zoom. Space-drag or middle-drag also pans. The minimap supports click/drag navigation, and Fit shows the whole graph. State positions are unrestricted.
+- Auto layout arranges states in layers and routes transition labels around states and other labels. Undo restores the previous layout. Dense graphs may still have crossing edges.
+- Double-click a state or transition to open its properties popover. Single-click selects; Escape or clicking the canvas dismisses properties.
+- Transition expressions match one Unicode character at a time: `[a-zA-Z_]`, `[0-9]`, `\s`, `\+`. Epsilon transitions are not supported. Ambiguous outgoing transitions are reported on tested input.
+- Input uses longest-match tokenization, falling back to the last accepting state. Errors consume one Unicode code point. Token offsets use UTF-16 indices.
+- Export offers a complete `.tex` document or a TikZ snippet. The complete document needs `standalone`, `tikz`, and the `automata`, `positioning`, and `arrows` libraries. Snippets need `\usepackage{tikz,graphicx}` and `\usetikzlibrary{automata,positioning,arrows}` in the host document. Labels are exported literally with TeX escaping.
+- JSON import/export preserves the editable machine. SVG export produces a portable diagram.
+- Machines save in localStorage. Export JSON for a portable backup. Undo/redo works within the current session.
 
-```sh
-flutter pub get
-flutter run -d chrome
-# Or on the corresponding host:
-flutter run -d linux
-flutter run -d macos
-flutter run -d windows
-```
+Run `npm test` for lexer, portal resolution, import validation, and TeX serialization checks. PDF compilation requires a LaTeX installation with the packages above.
 
-To use another browser locally:
+Shortcuts: select a state and press **A** to toggle accepting status (its token name is preserved); **Delete** removes the selection, **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** redoes, and **Escape** dismisses properties or cancels connecting. Shortcuts do not change states while typing in fields.
 
-```sh
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174
-```
+Only one initial state can be assigned. Its toggle is hidden on other states. Uncheck the current initial state, then open another state's properties to assign it. Machines without an initial state can be saved/exported; testing prompts you to assign one.
 
-## First working Flutter pass
+Portal labels are supported: enable **Connect via portal** on an arrow, or use **New portal transition** on a state. Matching labels resolve to one destination state without an extra input-consuming step. Missing or duplicate destinations are reported by the tester. Renaming a unique destination updates references. Portal JSON is stored with the machine; TikZ and SVG preserve the labels.
 
-- Infinite canvas: drag empty space to pan, scroll to zoom, or use the zoom and Fit buttons. State positions are unrestricted.
-- Minimap: click or drag to navigate. Compact auto layout separates states and routes labels around nodes and other labels.
-- Double-click empty canvas to add a state. Double-click a state or transition for its properties popover. Drag states to move them.
-- Right-click a source, then click a destination to connect. Choose the same state to create a loop. Escape cancels.
-- Select a state and press **A** to toggle accepting status, preserving its token name. **Delete** removes the selection; **Ctrl/Cmd+Z** undoes; **Ctrl/Cmd+Shift+Z** redoes.
-- Exactly one initial state can be assigned. Its toggle is hidden on other states. Uncheck the current initial state to assign another.
-- The bottom tester uses longest-match lexing, accepts Unicode input, emits UTF-16 offsets, supports skipped tokens, and reports ambiguous transitions.
-- Export copies a standalone LaTeX document, TikZ snippet, or editable machine JSON. TikZ uses the same geometry as the canvas.
-- Import accepts pasted machine JSON from either version. Machine data automatically saves to local platform storage.
-
-Transition expressions match one Unicode character per step, such as `[a-zA-Z_]`, `[0-9]`, `\s`, or `\+`. Epsilon transitions are not supported. Dense graphs may still have crossing edges.
-
-For complete TeX documents, install `standalone`, `graphicx`, and TikZ with its `automata`, `positioning`, and `arrows` libraries. For snippets, add `\usepackage{tikz,graphicx}` and `\usetikzlibrary{automata,positioning,arrows}` to your document.
-
-## Validate and build
-
-```sh
-flutter analyze
-flutter test
-flutter build web --release --no-web-resources-cdn
-flutter build linux --release
-# Run on the corresponding OS:
-flutter build macos --release
-flutter build windows --release
-```
-
-Verified on Linux: all 11 Flutter tests, all 10 preserved JavaScript tests, static analysis, and release builds for web and Linux.
-
-Web output is in `build/web/`. Linux output is in `build/linux/x64/release/bundle/`; run `lexica` from that bundle with the accompanying libraries and data.
-
-The first migration pass uses clipboard export and pasted JSON import on every platform. Native file dialogs, SVG export, touch pinch gestures, and packaged desktop installers have not been ported yet. Windows and macOS runners are generated but require verification on their respective hosts. TeX output is serialization-tested; PDF compilation requires a separate LaTeX installation.
-
-To run the preserved browser app:
-
-```sh
-cd legacy
-npm run dev
-npm test
-```
-
-No Sites deployment is configured or performed by this repository.
+Right-drag an arrow from a state and release on empty canvas to create a connected state. One Undo removes both the state and its new arrow.

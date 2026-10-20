@@ -1,0 +1,68 @@
+{
+  "start": "s0",
+  "states": [
+    {
+      "id": "s0",
+      "name": "start",
+      "token": "",
+      "x": 140,
+      "y": 250
+    },
+    {
+      "id": "s1",
+      "name": "identifier",
+      "token": "IDENT",
+      "x": 400,
+      "y": 145,
+      "portal": "IDENTIFIER"
+    },
+    {
+      "id": "s2",
+      "name": "number",
+      "token": "NUMBER",
+      "x": 400,
+      "y": 355
+    },
+    {
+      "id": "s3",
+      "name": "whitespace",
+      "token": "WS",
+      "skip": true,
+      "x": 665,
+      "y": 250
+    }
+  ],
+  "edges": [
+    {
+      "from": "s0",
+      "to": "s1",
+      "label": "[a-zA-Z_]",
+      "portal": "IDENTIFIER"
+    },
+    {
+      "from": "s1",
+      "to": "s1",
+      "label": "[a-zA-Z0-9_]"
+    },
+    {
+      "from": "s0",
+      "to": "s2",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s2",
+      "to": "s2",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s0",
+      "to": "s3",
+      "label": "\\s"
+    },
+    {
+      "from": "s3",
+      "to": "s3",
+      "label": "\\s"
+    }
+  ]
+}
