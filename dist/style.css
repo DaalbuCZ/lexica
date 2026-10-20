@@ -91,3 +91,4 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 [data-theme=dark] [data-edge].trace-highlight .edge-text{fill:#e7f5ff}
 [data-theme=dark] .token:focus-visible{outline-color:#a9d5ff}
 [data-theme=dark] #toast{background:#b8ddff;color:#183047}
+[data-theme=dark] .logo{background:#b8ddff;color:#183047}
