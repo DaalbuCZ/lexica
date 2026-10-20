@@ -133,3 +133,14 @@ kbd{font:9px 'IBM Plex Mono',monospace;border:1px solid #dfe7d8;border-radius:3p
 .comment-link{fill:none;stroke:#948559;stroke-width:1.4;stroke-dasharray:6 5;pointer-events:none}
 [data-theme=dark] .comment-link{stroke:#a9d5ff;opacity:.8}
 .comment-preview{opacity:.7}
+
+/* Keep file actions and diagram controls in separate rows at every width. */
+.toolbar{top:76px;left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 36px);overflow-x:auto}
+.toolbar>*{flex-shrink:0}
+.tool-icon{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.top-actions button{display:inline-flex;align-items:center;gap:6px}
+.selecting-mode #canvas{cursor:default}
+.comment-link{stroke-width:1.8;vector-effect:non-scaling-stroke}
+[data-theme=dark] .comment-link{opacity:1}
+@media(max-width:650px){.toolbar{max-width:calc(100% - 20px)}.top-actions .primary span{display:inline}}
+@media(max-width:430px){.brand{font-size:0;gap:0;letter-spacing:0}.top-actions{gap:4px}.top-actions button{gap:4px;padding:8px}}

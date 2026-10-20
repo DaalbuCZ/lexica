@@ -202,3 +202,24 @@ test('right-clicking a comment starts a many-state connection session without cr
  context.startDrag(event(0),'s0');assert.ok(!m.comments[0].nodeIds.includes('s0'));assert.equal(m.edges.length,before);assert.equal(checkpoints,2);
  context.source='s2';context.commentSource=null;context.startCommentConnection(event(2),'note');assert.ok(m.comments[0].nodeIds.includes('s2'));assert.equal(context.source,null);assert.equal(context.commentSource,null);
 });
+
+test('both layout dropdowns persist across reloads and reject invalid saved choices',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function restoreLayoutSettings('),app.indexOf("$('label-boxes').onclick"));
+ const saved={'lexica-layout-mode':'circle','lexica-layout-density':'0.35'};
+ const boot=()=>{const fields={'layout-mode':{value:'tree'},'layout-density':{value:'0.75'}};runInNewContext(script,{$:id=>fields[id],localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}});return fields};
+ let fields=boot();assert.equal(fields['layout-mode'].value,'circle');assert.equal(fields['layout-density'].value,'0.35');
+ fields['layout-mode'].value='tree';fields['layout-mode'].onchange();fields['layout-density'].value='0.5';fields['layout-density'].onchange();
+ fields=boot();assert.equal(fields['layout-mode'].value,'tree');assert.equal(fields['layout-density'].value,'0.5');
+ saved['lexica-layout-mode']='unknown';saved['lexica-layout-density']='1.5';fields=boot();assert.equal(fields['layout-mode'].value,'tree');assert.equal(fields['layout-density'].value,'1');
+ const fallback={'layout-mode':{value:'tree'},'layout-density':{value:'0.75'}};
+ assert.doesNotThrow(()=>runInNewContext(script,{$:id=>fallback[id],localStorage:{getItem:()=>{throw Error('blocked')},setItem:()=>{throw Error('blocked')}}}));
+ assert.doesNotThrow(()=>fallback['layout-mode'].onchange());
+});
+test('dashed comment links terminate on the state circle and the comment box border',()=>{
+ const m=example();m.comments=[{id:'note',text:'Explanation',x:650,y:50,nodeIds:['s0','s1']}];
+ for(const link of commentLinks(m)){
+  const state=m.states.find(s=>s.id===link.nodeId),note=m.comments[0],size=commentLayout(note);
+  assert.ok(Math.abs(Math.hypot(link.to.x-state.x,link.to.y-state.y)-36)<1e-8);
+  assert.ok(Math.min(Math.abs(link.from.x-note.x),Math.abs(link.from.x-note.x-size.w),Math.abs(link.from.y-note.y),Math.abs(link.from.y-note.y-size.h))<1e-8);
+ }
+});

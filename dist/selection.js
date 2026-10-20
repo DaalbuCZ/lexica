@@ -1,5 +1,5 @@
-import {commentNodeIds} from './comments.js?v=6';
-import {validate} from './lexer.js?v=6';
+import {commentNodeIds} from './comments.js?v=7';
+import {validate} from './lexer.js?v=7';
 export function copySelection(machine,stateIds,edgeIndices,commentIds){
  const ids=new Set(stateIds);
  for(const i of edgeIndices){const e=machine.edges[i];if(!e)continue;ids.add(e.from);if(e.portal==null)ids.add(e.to)}
