@@ -42,3 +42,13 @@ export function commentLinks(machine){
   });
  });
 }
+
+export const commentLinkKey=(commentId,nodeId)=>JSON.stringify([commentId,nodeId]);
+export function connectCommentNode(machine,commentId,nodeId){
+ const comment=machine.comments?.find(c=>c.id===commentId);
+ if(!comment||!machine.states.some(s=>s.id===nodeId))throw Error('Invalid comment attachment.');
+ comment.nodeIds=[...new Set([...commentNodeIds(comment),nodeId])];delete comment.nodeId;
+}
+export function removeCommentLinks(machine,keys){
+ for(const comment of machine.comments??[]){comment.nodeIds=commentNodeIds(comment).filter(id=>!keys.has(commentLinkKey(comment.id,id)));delete comment.nodeId}
+}

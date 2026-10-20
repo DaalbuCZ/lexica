@@ -1,12 +1,13 @@
-import {commentNodeIds} from './comments.js?v=8';
-import {validate} from './lexer.js?v=8';
-export function copySelection(machine,stateIds,edgeIndices,commentIds){
- const ids=new Set(stateIds);
+import {commentNodeIds,commentLinkKey} from './comments.js?v=9';
+import {validate} from './lexer.js?v=9';
+export function copySelection(machine,stateIds,edgeIndices,commentIds,linkIds=new Set()){
+ const ids=new Set(stateIds),notes=new Set(commentIds);
+ for(const c of machine.comments??[])for(const id of commentNodeIds(c))if(linkIds.has(commentLinkKey(c.id,id))){ids.add(id);notes.add(c.id)}
  for(const i of edgeIndices){const e=machine.edges[i];if(!e)continue;ids.add(e.from);if(e.portal==null)ids.add(e.to)}
  return structuredClone({kind:'lexica-selection',version:1,start:ids.has(machine.start)?machine.start:null,
   states:machine.states.filter(s=>ids.has(s.id)),
   edges:machine.edges.filter((e,i)=>edgeIndices.has(i)||(ids.has(e.from)&&(e.portal!=null||ids.has(e.to)))),
-  comments:(machine.comments??[]).filter(c=>commentIds.has(c.id)||commentNodeIds(c).some(id=>ids.has(id))).map(({nodeId,...c})=>({...c,nodeIds:commentNodeIds({...c,nodeId}).filter(id=>ids.has(id))}))});
+  comments:(machine.comments??[]).filter(c=>notes.has(c.id)||commentNodeIds(c).some(id=>ids.has(id))).map(({nodeId,...c})=>({...c,nodeIds:commentNodeIds({...c,nodeId}).filter(id=>ids.has(id))}))});
 }
 export function pasteSelection(machine,fragment,offset={x:40,y:40},idFactory=()=>crypto.randomUUID()){
  if(fragment?.kind!=='lexica-selection'||fragment.version!==1||!Array.isArray(fragment.states)||!Array.isArray(fragment.edges)||!Array.isArray(fragment.comments))throw Error('Clipboard does not contain a Lexica selection.');

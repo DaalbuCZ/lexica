@@ -192,15 +192,15 @@ test('many-state comment layouts preserve the centroid offset and copies remap o
  }
 });
 
-test('right-clicking a comment starts a many-state connection session without creating transitions',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),handlers=app.slice(app.indexOf('function startCommentConnection('),app.indexOf('function view('));
- const m=example();m.comments=[makeComment(m,{x:500,y:100},'note')];let checkpoints=0;
- const context={machine:m,source:null,commentSource:null,space:false,connectPoint:null,point:e=>({x:e.clientX,y:e.clientY}),toggleCommentNode,checkpoint:()=>checkpoints++,changed:()=>{},draw:()=>{},showProperties:()=>{},$:()=>({textContent:''}),cancelConnect:()=>{context.source=null;context.commentSource=null}};
- runInNewContext(handlers,context);const event=button=>({button,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}});
+test('comment joining finishes after one destination, in either direction, like state joining',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),handlers=app.slice(app.indexOf('function connectComment('),app.indexOf('function view('));
+ const m=example();m.comments=[makeComment(m,{x:500,y:100},'note')];let checkpoints=0,chosen;
+ const context={machine:m,source:null,commentSource:null,space:false,connectPoint:null,point:e=>({x:e.clientX,y:e.clientY}),connectCommentNode,commentLinkKey,checkpoint:()=>checkpoints++,choose:(...args)=>chosen=args,changed:()=>{},draw:()=>{},showProperties:()=>{},$:()=>({textContent:'',setPointerCapture:()=>{}}),cancelConnect:()=>{context.source=null;context.commentSource=null}};
+ runInNewContext(handlers,context);const event=button=>({button,pointerId:1,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}});
  const before=m.edges.length;context.startCommentConnection(event(2),'note');assert.equal(context.commentSource,'note');
- context.startDrag(event(0),'s0');assert.ok(m.comments[0].nodeIds.includes('s0'));assert.equal(context.commentSource,'note');
- context.startDrag(event(0),'s0');assert.ok(!m.comments[0].nodeIds.includes('s0'));assert.equal(m.edges.length,before);assert.equal(checkpoints,2);
- context.source='s2';context.commentSource=null;context.startCommentConnection(event(2),'note');assert.ok(m.comments[0].nodeIds.includes('s2'));assert.equal(context.source,null);assert.equal(context.commentSource,null);
+ context.startDrag(event(0),'s0');assert.ok(m.comments[0].nodeIds.includes('s0'));assert.equal(context.commentSource,null);assert.equal(chosen[0],'comment-link');
+ context.source='s2';context.startCommentConnection(event(2),'note');assert.ok(m.comments[0].nodeIds.includes('s2'));assert.equal(context.source,null);assert.equal(context.commentSource,null);assert.equal(m.edges.length,before);assert.equal(checkpoints,2);
+ context.source='s2';context.startCommentConnection(event(0),'note');assert.equal(m.comments[0].nodeIds.filter(id=>id==='s2').length,1);
 });
 
 test('both layout dropdowns persist across reloads and reject invalid saved choices',()=>{
@@ -239,4 +239,32 @@ test('invalid pasted imports preserve the graph and valid imports can be undone'
  runInNewContext(script,context);assert.throws(()=>context.importMachine('{broken'),/Invalid JSON/);assert.equal(context.machine,original);assert.equal(history.length,0);assert.equal(fields['import-dialog'].open,true);
  const next=example();next.states[1].name='Imported identifier';context.importMachine(JSON.stringify(next));
  assert.deepEqual(context.machine,next);assert.equal(fields['import-dialog'].open,false);assert.equal(fields['import-json'].value,'');assert.deepEqual(JSON.parse(history.pop()),original);
+});
+
+import {commentLinkKey,connectCommentNode,removeCommentLinks} from './dist/comments.js';
+test('deleting selected dashed lines preserves their endpoints and unrelated connections',()=>{
+ const m=example();m.comments=[{id:'note',text:'Shared note',x:550,y:50,nodeIds:['s0','s1']},{id:'note-two',text:'Second note',x:10,y:30,nodeIds:['s1']}];
+ const before=structuredClone(m),keys=new Set([commentLinkKey('note','s1')]);removeCommentLinks(m,keys);
+ assert.deepEqual(m.states,before.states);assert.deepEqual(m.edges,before.edges);assert.equal(m.comments.length,2);assert.deepEqual(m.comments[0].nodeIds,['s0']);assert.deepEqual(m.comments[1].nodeIds,['s1']);
+ removeCommentLinks(m,new Set([commentLinkKey('note','s0')]));assert.deepEqual(m.comments[0].nodeIds,[]);commentAnchors(m);assert.deepEqual(m.comments[0].nodeIds,[]);validate(m);
+});
+test('selecting a dashed line can be copied with its comment and state endpoint',()=>{
+ const m=example();m.comments=[{id:'note',text:'Note',x:550,y:50,nodeIds:['s0','s1']}];
+ const fragment=copySelection(m,new Set(),new Set(),new Set(),new Set([commentLinkKey('note','s1')]));assert.deepEqual(fragment.states.map(s=>s.id),['s1']);assert.deepEqual(fragment.comments[0].nodeIds,['s1']);
+ let n=0;pasteSelection(m,fragment,{x:40,y:40},()=>`connection-copy${n++}`);assert.deepEqual(m.comments.at(-1).nodeIds,['connection-copy0']);validate(m);
+});
+test('comment connection identities do not collide with arbitrary imported IDs',()=>{
+ assert.notEqual(commentLinkKey('a:b','c'),commentLinkKey('a','b:c'));
+ const m=example();m.comments=[{id:'note',text:'Note',x:500,y:80,nodeIds:[]}];
+ connectCommentNode(m,'note','s1');connectCommentNode(m,'note','s1');assert.deepEqual(m.comments[0].nodeIds,['s1']);assert.throws(()=>connectCommentNode(m,'missing','s1'),/attachment/);
+});
+
+test('right-drag release joins comments and states in either direction and creates attached states on blank canvas',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
+ for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
+  let release,joined,added;
+  const context={marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>{},window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
+  if(scenario==='comment-to-blank')assert.deepEqual(added,[200,100,null,'note']);else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
+ }
 });
