@@ -109,12 +109,12 @@ test('radial layout centers the parent and spreads children around it with desce
 test('layout density adjusts spacing in both modes without changing connections',()=>{
  for(const mode of ['tree','circle']){
   const source=example(),edges=JSON.stringify(source.edges),sizes=[];
-  for(const spacing of [.5,.75,1,1.5]){
+  for(const spacing of [.35,.5,.75,1]){
    const m=autoLayout(structuredClone(source),mode,spacing),xs=m.states.map(s=>s.x),ys=m.states.map(s=>s.y);sizes.push((Math.max(...xs)-Math.min(...xs))+(Math.max(...ys)-Math.min(...ys)));
    assert.equal(JSON.stringify(m.edges),edges);assert.equal(m.start,source.start);validate(m);
-   for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>130);
+   for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>110);
   }
-  assert.ok(sizes.every((size,i)=>i===0||size>sizes[i-1]));assert.ok(sizes[0]<=sizes[1]*.7);
+  assert.ok(sizes.every((size,i)=>i===0||size>sizes[i-1]));assert.ok(sizes[0]<=sizes[1]*.9);
   assert.deepEqual(autoLayout(structuredClone(source),mode,NaN),autoLayout(structuredClone(source),mode));
  }
 });

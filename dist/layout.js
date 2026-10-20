@@ -2,7 +2,7 @@ import {commentLayout} from './comments.js';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {
- spacing=Number.isFinite(spacing)?Math.max(.5,Math.min(2,spacing)):1;
+ spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
@@ -15,11 +15,11 @@ export function autoLayout(machine,mode='tree',spacing=1) {
  const heights=new Map(),gap=60*spacing;
  for(const id of [...order].reverse()){
   const loops=machine.edges.filter(e=>e.from===id&&e.to===id&&e.portal==null).length;
-  const own=(220+Math.max(0,loops-1)*55)*spacing;
+  const own=Math.max(100,(220+Math.max(0,loops-1)*55)*spacing);
   const branches=children.get(id);
   heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
  }
- const step=Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing;
+ const step=Math.max(120,Math.max(320,...machine.edges.map(e=>e.label.length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
  if(mode==='circle'){
   let left=160,bottom=100;
   for(const root of roots){
