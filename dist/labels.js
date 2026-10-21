@@ -5,3 +5,5 @@ export function stateLabel(name){
  const fontSize=Math.min(12,44/lines.length),lineHeight=fontSize*1.1;
  return {lines,fontSize,lineHeight,y:fontSize/3-(lines.length-1)*lineHeight/2,width:lines.length>1?52:60};
 }
+
+export function transitionLabel(edge){return edge.invert?'not ('+edge.label+')':edge.label}

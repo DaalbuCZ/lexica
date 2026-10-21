@@ -316,3 +316,14 @@ test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch z
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
  wheel({...event,ctrlKey:true});assert.ok(zoomed[0]>1);
 });
+
+test('inverted transitions complement one-character matches and survive saves, copies, and TeX',async()=>{
+ const {matcher}=await import('./dist/lexer.js');
+ const exceptEol=matcher('[\\r\\n\\u2028\\u2029]',true);for(const ch of ['a','😀',' '])assert.equal(exceptEol(ch),true);for(const ch of ['\r','\n','\u2028','\u2029'])assert.equal(exceptEol(ch),false);
+ assert.throws(()=>matcher('',true),/empty/);assert.throws(()=>matcher('[',true),/Invalid/);
+ const m={start:'a',states:[{id:'a',name:'start',token:'',x:0,y:0},{id:'b',name:'text',token:'TEXT',x:200,y:0}],edges:[{from:'a',to:'b',label:'[\\r\\n]',invert:true}]};
+ assert.equal(tokenize(m,'a')[0].token,'TEXT');assert.equal(tokenize(m,'\n')[0].token,'ERROR');
+ assert.equal(parseMachine(JSON.stringify(m)).edges[0].invert,true);assert.match(toTikz(m),/not \(/);
+ const fragment=copySelection(m,new Set(['a','b']),new Set(),new Set());let n=0;pasteSelection(m,fragment,{x:10,y:10},()=>`inverted${n++}`);assert.equal(m.edges.at(-1).invert,true);
+ m.edges[0].invert='yes';assert.throws(()=>validate(m),/Invalid transition/);
+});

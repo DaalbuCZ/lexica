@@ -1,8 +1,8 @@
-import {stateLabel} from './labels.js';
-import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=14';
+import {stateLabel,transitionLabel} from './labels.js?v=16';
+import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=14';
+import {routeEdges} from './layout.js?v=16';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
@@ -11,7 +11,7 @@ export function validate(m){
  const ids=new Set();for(const s of m.states){if(typeof s.id!=='string'||ids.has(s.id)||!Number.isFinite(s.x)||!Number.isFinite(s.y)||typeof s.name!=='string'||typeof s.token!=='string'||(s.portal!==undefined&&typeof s.portal!=='string')||(s.accepting!==undefined&&typeof s.accepting!=='boolean'))throw Error('Invalid or duplicate state.');ids.add(s.id)}
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
- for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label)}return m;
+ for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert)}return m;
 }
 export function parseMachine(text){
  if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
@@ -19,11 +19,11 @@ export function parseMachine(text){
  let machine;try{machine=JSON.parse(text)}catch{throw Error('Invalid JSON. Paste an exported machine JSON document.')}
  return validate(machine);
 }
-export function matcher(label){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>r.test(c)}
-export function transitionError(m,e){try{matcher(e.label);destination(m,e);return ''}catch(error){return error.message}}
+export function matcher(label,invert=false){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>invert?!r.test(c):r.test(c)}
+export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
-export function tokenize(m,input){validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');const edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label)}));const result=[];let pos=0;while(pos<input.length){let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];while(end<input.length){const c=String.fromCodePoint(input.codePointAt(end));const next=edges.filter(e=>e.from===state&&e.test(c));if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+m.states.find(s=>s.id===state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});if(!next.length)break;state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);end+=c.length;const s=m.states.find(s=>s.id===state);if(isAccepting(s))last={end,state:s,pathStates:[...pathStates],pathEdges:[...pathEdges]}}if(!last){result.push({token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state});pos+=result.at(-1).value.length}else{result.push({token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges});pos=last.end}}return result}
+export function tokenize(m,input){validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');const edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));const result=[];let pos=0;while(pos<input.length){let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];while(end<input.length){const c=String.fromCodePoint(input.codePointAt(end));const next=edges.filter(e=>e.from===state&&e.test(c));if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+m.states.find(s=>s.id===state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});if(!next.length)break;state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);end+=c.length;const s=m.states.find(s=>s.id===state);if(isAccepting(s))last={end,state:s,pathStates:[...pathStates],pathEdges:[...pathEdges]}}if(!last){result.push({token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state});pos+=result.at(-1).value.length}else{result.push({token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges});pos=last.end}}return result}
 const tex=s=>s.replace(/[\\{}$&#%_^~]/g,c=>({'\\':'\\textbackslash{}','{':'\\{','}':'\\}','$':'\\$','&':'\\&','#':'\\#','%':'\\%','_':'\\_','^':'\\textasciicircum{}','~':'\\textasciitilde{}'}[c]));
 export function toTikz(m,standalone=true){
  validate(m);const names=new Map(m.states.map((s,i)=>[s.id,'q'+i]));
@@ -35,7 +35,7 @@ export function toTikz(m,standalone=true){
  const portalTag=(name,box)=>{const left=box.x-box.w/2,right=box.x+box.w/2,top=box.y-box.h/2,bottom=box.y+box.h/2;lines.push('  \\draw[fill=white] '+coord({x:left,y:box.y})+' -- '+coord({x:left+7,y:top})+' -- '+coord({x:right,y:top})+' -- '+coord({x:right,y:bottom})+' -- '+coord({x:left+7,y:bottom})+' -- cycle;');lines.push('  \\node[font=\\scriptsize,inner sep=0pt] at '+coord(box)+' {\\texttt{'+tex(name)+'}};')};
  for(const state of m.states)if(state.portal){const box=statePortalBox(state);portalTag(state.portal,box);lines.push('  \\draw '+coord({x:box.x,y:box.y+box.h/2})+' -- '+coord({x:state.x,y:state.y-36})+';')}
  const routes=routeEdges(m),edgeLabels=[];
- m.edges.forEach((e,i)=>{const r=routes[i];if(r.portalBox)portalTag(e.portal||'?',r.portalBox);lines.push('  \\draw[->] '+coord(r.p0)+' .. controls '+coord(r.c1)+' and '+coord(r.c2)+' .. '+coord(r.p3)+';');edgeLabels.push('  \\node[fill=white,'+(m.labelBoxes&&e.label?'draw=gray,rounded corners=1pt,':'')+'inner sep=2pt,font=\\scriptsize] at '+coord({...r.label,y:r.label.y-4})+' {\\texttt{'+tex(e.label)+'}};')});
+ m.edges.forEach((e,i)=>{const r=routes[i];if(r.portalBox)portalTag(e.portal||'?',r.portalBox);lines.push('  \\draw[->] '+coord(r.p0)+' .. controls '+coord(r.c1)+' and '+coord(r.c2)+' .. '+coord(r.p3)+';');edgeLabels.push('  \\node[fill=white,'+(m.labelBoxes&&e.label?'draw=gray,rounded corners=1pt,':'')+'inner sep=2pt,font=\\scriptsize] at '+coord({...r.label,y:r.label.y-4})+' {\\texttt{'+tex(transitionLabel(e))+'}};')});
  lines.push(...edgeLabels);
  for(const c of m.comments??[]){const layout=commentLayout(c);lines.push('  \\node[draw=gray,fill=yellow!10,anchor=north west,align=left,font=\\tiny,text width='+((layout.w-24)/60).toFixed(3)+'cm,inner sep=4pt] at '+coord(c)+' {'+layout.lines.map(tex).join('\\\\')+'};')}
  lines.push('\\end{tikzpicture}');const body=lines.join('\n');return standalone?'\\documentclass[tikz,border=10pt]{standalone}\n\\usepackage[T1]{fontenc}\n\\usepackage{graphicx}\n\\usetikzlibrary{automata,positioning,arrows}\n\\begin{document}\n'+body+'\n\\end{document}\n':body;
