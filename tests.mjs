@@ -307,3 +307,12 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
  const [failed]=tokenize(m,'x');assert.equal(failed.failureState,'b');assert.deepEqual(failed.traceStates,['a','b']);assert.deepEqual(failed.traceEdges,[0]);
  m.edges.push({...m.edges[0]});assert.throws(()=>tokenize(m,'x'),error=>error.stateId==='a'&&error.edgeIndices.join(',')==='0,1');
 });
+
+test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch zooms',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf("$('zoom-in').onclick="),app.indexOf('\n',app.indexOf("$('zoom-in').onclick=")));
+ let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
+ runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math});
+ const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
+ wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
+ wheel({...event,ctrlKey:true});assert.ok(zoomed[0]>1);
+});
