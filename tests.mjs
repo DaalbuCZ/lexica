@@ -259,12 +259,30 @@ test('comment connection identities do not collide with arbitrary imported IDs',
  connectCommentNode(m,'note','s1');connectCommentNode(m,'note','s1');assert.deepEqual(m.comments[0].nodeIds,['s1']);assert.throws(()=>connectCommentNode(m,'missing','s1'),/attachment/);
 });
 
-test('right-drag release joins comments and states in either direction and creates attached states on blank canvas',()=>{
+test('right-drag joins comments and states in either direction and cancels on blank canvas',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
-  let release,joined,added;
-  const context={marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>{},window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  let release,joined,added,cancelled=0;
+  const context={marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
-  if(scenario==='comment-to-blank')assert.deepEqual(added,[200,100,null,'note']);else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
+  if(scenario==='comment-to-blank'){assert.equal(added,undefined);assert.equal(cancelled,1)}else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
  }
+});
+
+test('direct links to shared destinations keep sibling branches close in tree and radial layouts',()=>{
+ const punctuation=Array.from({length:18},(_,i)=>'punctuation'+i),ids=['root','integer','decimal','double',...punctuation,'period'];
+ const source={start:'root',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','integer'],['integer','decimal'],['decimal','double'],...punctuation.map(id=>['root',id]),['root','period'],['period','double']].map(([from,to])=>({from,to,label:'x'}))};
+ for(const mode of ['tree','circle'])for(const density of [.35,.5,.75,1]){
+  const m=autoLayout(structuredClone(source),mode,density),get=id=>m.states.find(s=>s.id===id),step=Math.max(120,320*density);
+  assert.ok(Math.hypot(get('period').x-get('double').x,get('period').y-get('double').y)<step*4);
+  assert.deepEqual(m.edges,source.edges);assert.equal(m.states.length,source.states.length);
+  for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=72);
+  const first=JSON.stringify(m);autoLayout(m,mode,density);assert.equal(JSON.stringify(m),first);
+ }
+});
+test('clicking blank canvas during comment joining cancels without creating a state',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("$('canvas').onpointerdown="),app.indexOf("$('canvas').oncontextmenu="));
+ const canvas={};let cancelled=0,added=0;
+ const context={$:()=>canvas,source:null,commentSource:'note',cancelConnect:()=>cancelled++,add:()=>added++};runInNewContext(script,context);
+ canvas.onpointerdown({button:0,target:{closest:()=>null}});assert.equal(cancelled,1);assert.equal(added,0);
 });

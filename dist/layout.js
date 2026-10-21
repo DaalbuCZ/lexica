@@ -1,17 +1,33 @@
-import {commentLayout,commentAnchors,positionComments} from './comments.js?v=9';
+import {commentLayout,commentAnchors,positionComments} from './comments.js?v=10';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const anchors=commentAnchors(machine);
- const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[];
+ const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[],parents=new Map();
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
  for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
  for(const root of [machine.start,...states.keys()]){
   if(!states.has(root)||seen.has(root))continue;
   roots.push(root);const stack=[{id:root,parent:null}];
-  while(stack.length){const {id,parent}=stack.pop();if(seen.has(id))continue;seen.add(id);order.push(id);if(parent!==null)children.get(parent).push(id);for(const next of [...outgoing.get(id)].reverse())if(!seen.has(next))stack.push({id:next,parent:id})}
+  while(stack.length){const {id,parent}=stack.pop();if(seen.has(id))continue;seen.add(id);order.push(id);parents.set(id,parent);if(parent!==null)children.get(parent).push(id);for(const next of [...outgoing.get(id)].reverse())if(!seen.has(next))stack.push({id:next,parent:id})}
+ }
+ // Cross-branch transitions should not span unrelated sibling subtrees.
+ const paths=new Map(),related=new Map();
+ const pathTo=id=>{if(!paths.has(id)){const path=[];for(let p=id;p!=null;p=parents.get(p))path.push(p);paths.set(id,path.reverse())}return paths.get(id)};
+ for(const [from,targets] of outgoing)for(const to of targets){
+  const a=pathTo(from),b=pathTo(to);let i=0;while(i<Math.min(a.length,b.length)&&a[i]===b[i])i++;
+  if(!i||i===a.length||i===b.length)continue;
+  for(const [left,right] of [[a[i],b[i]],[b[i],a[i]]]){if(!related.has(left))related.set(left,new Map());const links=related.get(left);links.set(right,(links.get(right)??0)+1)}
+ }
+ for(const [parent,branches] of children){
+  const positions=new Map(branches.map((id,i)=>[id,i])),placed=new Set(),ordered=[];
+  for(const first of branches){const stack=[first];while(stack.length){const id=stack.pop();if(placed.has(id))continue;placed.add(id);ordered.push(id);
+   const neighbors=[...(related.get(id)??[])].filter(([next])=>positions.has(next)&&!placed.has(next)).sort((a,b)=>b[1]-a[1]||positions.get(a[0])-positions.get(b[0]));
+   for(const [next] of neighbors.reverse())stack.push(next);
+  }}
+  children.set(parent,ordered);
  }
  const heights=new Map(),gap=60*spacing;
  for(const id of [...order].reverse()){
