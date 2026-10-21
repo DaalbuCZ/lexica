@@ -1,8 +1,8 @@
 import {stateLabel} from './labels.js';
-import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=11';
+import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=12';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=11';
+import {routeEdges} from './layout.js?v=12';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');

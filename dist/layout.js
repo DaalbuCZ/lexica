@@ -1,4 +1,4 @@
-import {commentLayout,commentAnchors,positionComments} from './comments.js?v=11';
+import {commentLayout,commentAnchors,positionComments} from './comments.js?v=12';
 import {destination,statePortalBox} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1) {

@@ -286,3 +286,14 @@ test('clicking blank canvas during comment joining cancels without creating a st
  const context={$:()=>canvas,source:null,commentSource:'note',cancelConnect:()=>cancelled++,add:()=>added++};runInNewContext(script,context);
  canvas.onpointerdown({button:0,target:{closest:()=>null}});assert.equal(cancelled,1);assert.equal(added,0);
 });
+
+test('tips can be hidden, restored, and remember the choice without requiring storage',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setTipsVisible('),app.indexOf("$('fit').onclick="));
+ for(const unavailable of [false,true]){
+  const elements={'tips-panel':{hidden:false},'show-tips':{hidden:true},'hide-tips':{}},saved={};
+  const context={$:id=>elements[id],localStorage:{getItem:key=>{if(unavailable)throw Error();return saved[key]},setItem:(key,value)=>{if(unavailable)throw Error();saved[key]=value}}};
+  runInNewContext(script,context);elements['hide-tips'].onclick();assert.equal(elements['tips-panel'].hidden,true);assert.equal(elements['show-tips'].hidden,false);
+  if(!unavailable){runInNewContext(script,context);assert.equal(elements['tips-panel'].hidden,true)}
+  elements['show-tips'].onclick();assert.equal(elements['tips-panel'].hidden,false);assert.equal(elements['show-tips'].hidden,true);
+ }
+});
