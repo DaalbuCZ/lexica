@@ -166,3 +166,11 @@ header .top-actions{display:none}.toolbar{top:16px;left:164px;right:auto;transfo
 @media(hover:none){#hide-tips{opacity:1}}
 .canvas-status #tips-panel{max-width:calc(100% - 190px)}
 @media(max-width:650px){.canvas-status #tips-panel{max-width:calc(100% - 132px)}}
+
+:root{--error:#b73232}[data-theme=dark]{--error:#ff9999}
+[data-edge].transition-error .edge,[data-edge].runtime-error .edge,[data-edge].trace-error .edge{stroke:var(--error);stroke-width:3}
+[data-edge].transition-error .edge-text,[data-edge].runtime-error .edge-text,[data-edge].trace-error .edge-text{fill:var(--error);font-weight:700}
+[data-edge].transition-error .edge-label-box,[data-edge].runtime-error .edge-label-box{stroke:var(--error)}
+.node.failure-state circle,.node.trace-error circle{stroke:var(--error);stroke-width:3}
+.node.trace-error text,.lexer-error{color:var(--error);fill:var(--error)}
+.lexer-error{font-size:12px;line-height:1.5}

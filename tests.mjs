@@ -297,3 +297,13 @@ test('tips can be hidden, restored, and remember the choice without requiring st
   elements['show-tips'].onclick();assert.equal(elements['tips-panel'].hidden,false);assert.equal(elements['show-tips'].hidden,true);
  }
 });
+
+test('transition diagnostics identify unfinished rules and failed tokens retain the attempted path',async()=>{
+ const {transitionError}=await import('./dist/lexer.js');
+ const m={start:'a',states:[{id:'a',name:'start',token:'',x:0,y:0},{id:'b',name:'pending',token:'',x:100,y:0}],edges:[{from:'a',to:'b',label:'x'}]};
+ assert.equal(transitionError(m,m.edges[0]),'');
+ assert.match(transitionError(m,{...m.edges[0],label:''}),/empty/);
+ assert.match(transitionError(m,{...m.edges[0],label:'['}),/Invalid/);
+ const [failed]=tokenize(m,'x');assert.equal(failed.failureState,'b');assert.deepEqual(failed.traceStates,['a','b']);assert.deepEqual(failed.traceEdges,[0]);
+ m.edges.push({...m.edges[0]});assert.throws(()=>tokenize(m,'x'),error=>error.stateId==='a'&&error.edgeIndices.join(',')==='0,1');
+});

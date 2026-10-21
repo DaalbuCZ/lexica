@@ -1,8 +1,8 @@
 import {stateLabel} from './labels.js';
-import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=12';
+import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=14';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=12';
+import {routeEdges} from './layout.js?v=14';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
@@ -20,9 +20,10 @@ export function parseMachine(text){
  return validate(machine);
 }
 export function matcher(label){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>r.test(c)}
+export function transitionError(m,e){try{matcher(e.label);destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
-export function tokenize(m,input){validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');const edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label)}));const result=[];let pos=0;while(pos<input.length){let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];while(end<input.length){const c=String.fromCodePoint(input.codePointAt(end));const next=edges.filter(e=>e.from===state&&e.test(c));if(next.length>1)throw Error('Ambiguous transitions from '+m.states.find(s=>s.id===state).name+' on '+JSON.stringify(c));if(!next.length)break;state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);end+=c.length;const s=m.states.find(s=>s.id===state);if(isAccepting(s))last={end,state:s,pathStates:[...pathStates],pathEdges:[...pathEdges]}}if(!last){result.push({token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[m.start],traceEdges:[]});pos+=result.at(-1).value.length}else{result.push({token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges});pos=last.end}}return result}
+export function tokenize(m,input){validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');const edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label)}));const result=[];let pos=0;while(pos<input.length){let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];while(end<input.length){const c=String.fromCodePoint(input.codePointAt(end));const next=edges.filter(e=>e.from===state&&e.test(c));if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+m.states.find(s=>s.id===state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});if(!next.length)break;state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);end+=c.length;const s=m.states.find(s=>s.id===state);if(isAccepting(s))last={end,state:s,pathStates:[...pathStates],pathEdges:[...pathEdges]}}if(!last){result.push({token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state});pos+=result.at(-1).value.length}else{result.push({token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges});pos=last.end}}return result}
 const tex=s=>s.replace(/[\\{}$&#%_^~]/g,c=>({'\\':'\\textbackslash{}','{':'\\{','}':'\\}','$':'\\$','&':'\\&','#':'\\#','%':'\\%','_':'\\_','^':'\\textasciicircum{}','~':'\\textasciitilde{}'}[c]));
 export function toTikz(m,standalone=true){
  validate(m);const names=new Map(m.states.map((s,i)=>[s.id,'q'+i]));
