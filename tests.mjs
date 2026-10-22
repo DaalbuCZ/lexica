@@ -367,3 +367,12 @@ test('properties use the full canvas height with a side-docked tester and stay i
   assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
  }
 });
+
+test('clicking a token selects its exact UTF-16 input range, including errors and skipped gaps',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function syncInputLayout('));
+ let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range},tokens={};
+ const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
+ runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,syncInputLayout:()=>synced++});
+ tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
+ let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
+});

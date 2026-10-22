@@ -211,3 +211,5 @@ body[data-toolbar-dock=bottom] .canvas-status{bottom:calc(var(--dock-bottom) + 6
 .dock-preview[data-panel=tester]:is([data-side=top],[data-side=bottom]){height:190px}.dock-preview[data-panel=tester]:is([data-side=left],[data-side=right]){width:min(320px,45vw)}
 @media(max-width:650px){header{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 10px)}.toolbar{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 140px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 150px)}.minimap{left:calc(var(--dock-left) + 10px)}body[data-toolbar-dock=bottom] .toolbar{left:calc(var(--dock-left) + 146px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 156px)}}
 @media(max-width:430px){.toolbar{left:calc(var(--dock-left) + 66px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 76px)}}
+
+.token[data-token-index]{cursor:pointer}
