@@ -2,9 +2,11 @@
 
 A browser-local DFA editor for lexer design, with TikZ/LaTeX export.
 
-Run `npm run dev` and open http://localhost:5173. No install step or build required.
+Install dependencies with `pnpm install`, then run `pnpm dev` and open http://localhost:5173. Vite automatically reloads changes. Use Node.js 22.12+ and pnpm 12.14.0.
 
-To serve it with Docker, run `docker build -t lexica .` followed by `docker run --rm -p 8080:80 lexica`, then open http://localhost:8080.
+Run `pnpm test` for regression tests. `pnpm build` writes the production site to `build/`; `pnpm preview` serves that build locally. The source files remain in `dist/`.
+
+The Dockerfile installs with the pnpm lockfile, builds with Vite, and serves the production files through Nginx on port 80. No Node.js or pnpm installation is needed on the deployment host. To serve it with Docker, run `docker build -t lexica .` followed by `docker run --rm -p 8080:80 lexica`, then open http://localhost:8080.
 
 - Double-click the canvas or use + State. Drag states to arrange them.
 - Right-click a source state, then click a destination (same state creates a loop). Right-drag also connects. Escape cancels. New self-loops prefill the last valid transition expression you edited in this session (blank until a rule has been edited). Other new transitions start blank. Edit the expression in Properties; blank rules can be saved/exported, but must be filled before testing.
