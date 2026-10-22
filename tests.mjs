@@ -408,3 +408,15 @@ test('input caret and selections highlight matching tokens and traces without mo
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
  input.selectionStart=7;input.selectionEnd=7;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[2]);assert.equal(traced.token,'ERROR');
 });
+
+test('canvas resizing updates the minimap view while preserving zoom and graph center',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let canvasSize='),app.indexOf('new ResizeObserver(resizeCanvas)'));
+ const canvas={clientWidth:800,clientHeight:600};let current={x:100,y:200,width:1600,height:1200},maps=0;
+ const context={$:()=>canvas,view:()=>current,setView:v=>{current=v;maps++},syncInputLayout(){},document:{body:{classList:{contains:()=>true}}}};
+ runInNewContext(script,context);
+ for(const [width,height] of [[500,600],[500,850],[900,850],[900,500],[800,600]]){
+  canvas.clientWidth=width;canvas.clientHeight=height;runInNewContext('resizeCanvas();',context);
+  assert.equal(current.width/width,2);assert.equal(current.height/height,2);assert.equal(current.x+current.width/2,900);assert.equal(current.y+current.height/2,800);
+ }
+ assert.equal(maps,5);runInNewContext('resizeCanvas();',context);assert.equal(maps,5);
+});
