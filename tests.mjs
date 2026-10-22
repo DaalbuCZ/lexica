@@ -357,3 +357,13 @@ test('toolbar popovers open beside vertical docks and stay within the viewport',
   runInNewContext(script+"setupPopover('toggle','menu');",context);handlers.beforetoggle({newState:'open'});assert.equal(menu.style.left,expected);assert.equal(menu.style.top,'400px');
  }
 });
+
+test('properties use the full canvas height with a side-docked tester and stay inside the canvas',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\n',app.indexOf('function showProperties(')));
+ for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
+  const panel={style:{},offsetWidth:240,offsetHeight:500};
+  const context={selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
+  runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
+  assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
+ }
+});
