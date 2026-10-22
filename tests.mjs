@@ -348,3 +348,12 @@ test('panel grips persist keyboard and drag docking, and cancel without changing
  grips['toolbar-grip'].onkeydown({...event,key:'ArrowRight'});assert.equal(body.dataset.toolbarDock,'right');
  grips['toolbar-grip'].onpointerdown(event);grips['toolbar-grip'].onpointermove({...event,clientX:400,clientY:0});grips['toolbar-grip'].onpointercancel(event);assert.equal(body.dataset.toolbarDock,'right');
 });
+
+test('toolbar popovers open beside vertical docks and stay within the viewport',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setupPopover('),app.indexOf("setupPopover('layout-toggle'"));
+ for(const [dock,left,expected] of [['left',18,'74px'],['right',680,'432px']]){
+  const handlers={},menu={style:{},addEventListener:(name,fn)=>handlers[name]=fn},toggle={getBoundingClientRect:()=>({left,top:400,bottom:432})};
+  const context={$:id=>id==='menu'?menu:toggle,document:{body:{dataset:{toolbarDock:dock}},querySelector:()=>({getBoundingClientRect:()=>({left,right:left+48,top:76})})},window:{innerWidth:745,innerHeight:919}};
+  runInNewContext(script+"setupPopover('toggle','menu');",context);handlers.beforetoggle({newState:'open'});assert.equal(menu.style.left,expected);assert.equal(menu.style.top,'400px');
+ }
+});

@@ -79,7 +79,7 @@ $('undo').onclick=()=>{if(!history.length)return;source=null;commentSource=null;
 function fit(){const box=$('diagram').getBBox(),canvas=$('canvas'),panel=0,availableWidth=Math.max(220,canvas.clientWidth-panel-70),availableHeight=Math.max(180,canvas.clientHeight-180);const scale=Math.max((box.width+100)/availableWidth,(box.height+70)/availableHeight);setView({x:box.x+box.width/2-(canvas.clientWidth-panel)/2*scale,y:box.y+box.height/2-(canvas.clientHeight/2+20)*scale,width:canvas.clientWidth*scale,height:canvas.clientHeight*scale})}
 function setupPopover(toggleId,menuId,height=270){
  $(toggleId).onclick=()=>$(menuId).togglePopover();
- $(menuId).addEventListener('beforetoggle',e=>{if(e.newState==='open'){const box=$(toggleId).getBoundingClientRect();$(menuId).style.left=Math.max(12,Math.min(box.left,window.innerWidth-252))+'px';$(menuId).style.top=Math.max(12,Math.min(box.bottom+8,window.innerHeight-height))+'px'}});
+ $(menuId).addEventListener('beforetoggle',e=>{if(e.newState==='open'){const box=$(toggleId).getBoundingClientRect(),dock=document.body.dataset.toolbarDock,bar=document.querySelector('.toolbar').getBoundingClientRect(),vertical=dock==='left'||dock==='right';let left=dock==='left'?bar.right+8:dock==='right'?bar.left-248:box.left;const top=vertical?box.top:dock==='bottom'?bar.top-height-8:box.bottom+8;$(menuId).style.left=Math.max(12,Math.min(left,window.innerWidth-252))+'px';$(menuId).style.top=Math.max(12,Math.min(top,window.innerHeight-height))+'px'}});
  $(menuId).addEventListener('toggle',e=>$(toggleId).setAttribute('aria-expanded',String(e.newState==='open')));
 }
 setupPopover('layout-toggle','layout-menu');setupPopover('app-menu-toggle','app-menu',180);
