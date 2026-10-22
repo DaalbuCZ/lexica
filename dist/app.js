@@ -3,9 +3,9 @@ import {setupDocking} from './docking.js?v=17';
 import {stateLabel,transitionLabel} from './labels.js?v=16';
 import {insertState} from './transitions.js';
 import {commentLayout,makeComment,commentAnchors,commentNodeIds,positionComments,commentLinks,commentLinkKey,connectCommentNode,removeCommentLinks} from './comments.js?v=16';
-import {copySelection,pasteSelection} from './selection.js?v=16';
-import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=16';
-import {autoLayout,routeEdges} from './layout.js?v=16';
+import {copySelection,pasteSelection} from './selection.js?v=32';
+import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=32';
+import {autoLayout,routeEdges} from './layout.js?v=32';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let machine=example(),selection={type:'state',id:'s1'},source=null,history=[],future=[];
 let selectedStates=new Set(['s1']),selectedEdges=new Set(),selectedComments=new Set(),selectedCommentLinks=new Set(),toolMode='pan',marquee=null,clipboardText='',pasteCount=0,lastTransitionRule='';
 function clearSelection(){selectedStates.clear();selectedEdges.clear();selectedComments.clear();selectedCommentLinks.clear();selection={type:'none'}}

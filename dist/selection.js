@@ -1,5 +1,5 @@
 import {commentNodeIds,commentLinkKey} from './comments.js?v=16';
-import {validate} from './lexer.js?v=16';
+import {validate} from './lexer.js?v=32';
 export function copySelection(machine,stateIds,edgeIndices,commentIds,linkIds=new Set()){
  const ids=new Set(stateIds),notes=new Set(commentIds);
  for(const c of machine.comments??[])for(const id of commentNodeIds(c))if(linkIds.has(commentLinkKey(c.id,id))){ids.add(id);notes.add(c.id)}

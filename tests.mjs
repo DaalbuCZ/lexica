@@ -439,3 +439,14 @@ test('grid pans and scales with world coordinates, including centered SVG viewpo
  v={x:0,y:0,width:800,height:400};runInNewContext('syncGrid();',context);assert.equal(grid.style.backgroundPosition,'-50px 50px');
  v={x:0,y:0,width:30000,height:22500};runInNewContext('syncGrid();',context);assert.ok(Math.abs(parseFloat(grid.style.backgroundSize)-100*800/30000)<.001);
 });
+
+test('self loops evaluate all four orientations and choose the unobstructed side',()=>{
+ const directions=[[0,-1],[1,0],[0,1],[-1,0]];
+ for(let open=0;open<4;open++){
+  const states=[{id:'root',name:'root',token:'',x:0,y:0},...directions.filter((_,i)=>i!==open).map(([x,y],i)=>({id:'block'+i,name:'block',token:'',x:x*105,y:y*105}))];
+  const m={start:'root',states,edges:[{from:'root',to:'root',label:'x'}]},r=routeEdges(m)[0],x=(r.c1.x+r.c2.x)/2,y=(r.c1.y+r.c2.y)/2;
+  assert.ok(x*directions[open][0]+y*directions[open][1]>0);assert.equal(Math.round(Math.abs(directions[open][0]?y:x)),0);
+  assert.deepEqual(routeEdges(m),routeEdges(m));
+ }
+ const orientations=new Set();for(const id of ['a','b','c','d']){const r=routeEdges({start:id,states:[{id,name:id,token:'',x:0,y:0}],edges:[{from:id,to:id,label:'x'}]})[0];orientations.add(Math.round(Math.atan2(r.c1.y+r.c2.y,r.c1.x+r.c2.x)*180/Math.PI))}assert.equal(orientations.size,4);
+});
