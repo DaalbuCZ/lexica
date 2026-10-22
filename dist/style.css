@@ -227,3 +227,6 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .token.input-active{outline:2px solid var(--green);outline-offset:1px;box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 18%,transparent)}
 
 .show-skipped{display:flex;align-items:center;gap:5px;font-size:10px;white-space:nowrap}.output-label{align-items:center;margin-bottom:5px}.output-label .field-label{margin-bottom:0}.show-skipped input{margin:0}.token-skipped{border-style:dashed}
+.dock-grip:hover{background:#edf3e8}
+[data-theme=dark] .dock-grip{background:transparent;color:#e9eff5}
+[data-theme=dark] .dock-grip:hover{background:#39434c}
