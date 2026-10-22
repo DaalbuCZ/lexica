@@ -450,3 +450,13 @@ test('self loops evaluate all four orientations and choose the unobstructed side
  }
  const orientations=new Set();for(const id of ['a','b','c','d']){const r=routeEdges({start:id,states:[{id,name:id,token:'',x:0,y:0}],edges:[{from:id,to:id,label:'x'}]})[0];orientations.add(Math.round(Math.atan2(r.c1.y+r.c2.y,r.c1.x+r.c2.x)*180/Math.PI))}assert.equal(orientations.size,4);
 });
+
+test('connection preview stays a routed self loop inside its source and becomes an arrow outside',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function connectionPreviewPath('),app.indexOf('function draw(){'));
+ const machine=example(),a=machine.states[0],original=JSON.stringify(machine),context={machine,lastTransitionRule:'[0-9]',routeEdges};runInNewContext(script,context);
+ const expected=routeEdges({...machine,edges:[...machine.edges,{from:a.id,to:a.id,label:'[0-9]'}]}).at(-1).d;
+ context.a=a;context.p={x:a.x,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),expected);
+ context.p={x:a.x+36,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),expected);
+ context.p={x:a.x+37,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),`M ${a.x} ${a.y} L ${a.x+37} ${a.y}`);
+ context.p={x:a.x,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),expected);assert.equal(JSON.stringify(machine),original);
+});
