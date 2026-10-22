@@ -78,7 +78,7 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
  let pointermove;
- const context={commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ const context={commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
 
@@ -459,4 +459,17 @@ test('connection preview stays a routed self loop inside its source and becomes 
  context.p={x:a.x+36,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),expected);
  context.p={x:a.x+37,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),`M ${a.x} ${a.y} L ${a.x+37} ${a.y}`);
  context.p={x:a.x,y:a.y};assert.equal(runInNewContext('connectionPreviewPath(a,p)',context),expected);assert.equal(JSON.stringify(machine),original);
+});
+
+test('routing reuses unchanged graph geometry and invalidates when nodes, rules or comments change',()=>{
+ const m=example(),initial=routeEdges(m);assert.equal(routeEdges(m),initial);
+ m.states[0].x+=25;const moved=routeEdges(m);assert.notEqual(moved,initial);assert.equal(routeEdges(m),moved);
+ m.edges[0].label='[a-zA-Z0-9_]';const edited=routeEdges(m);assert.notEqual(edited,moved);
+ m.comments=[{id:'note',text:'Note',x:200,y:100}];const noted=routeEdges(m);assert.notEqual(noted,edited);m.comments[0].x+=30;assert.notEqual(routeEdges(m),noted);
+});
+test('pointer redraws are coalesced into one animation frame using the latest model',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let drawFrame='),app.indexOf('function render(){'));
+ let frames=[],draws=0,maps=0;const context={requestAnimationFrame:fn=>{frames.push(fn);return frames.length},draw:()=>draws++,drawMap:()=>maps++};runInNewContext(script,context);
+ runInNewContext('queueDraw();queueDraw();queueDraw();',context);assert.equal(frames.length,1);assert.equal(draws,0);frames[0]();assert.equal(draws,1);assert.equal(maps,1);
+ runInNewContext('queueDraw();',context);assert.equal(frames.length,2);
 });
