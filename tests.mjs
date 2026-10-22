@@ -420,3 +420,11 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
  }
  assert.equal(maps,5);runInNewContext('resizeCanvas();',context);assert.equal(maps,5);
 });
+
+test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
+ const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
+ const context={$:id=>elements[id],machine:m,tokenize,traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
+ elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
+});
