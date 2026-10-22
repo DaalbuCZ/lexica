@@ -174,3 +174,40 @@ header .top-actions{display:none}.toolbar{top:16px;left:164px;right:auto;transfo
 .node.failure-state circle,.node.trace-error circle{stroke:var(--error);stroke-width:3}
 .node.trace-error text,.lexer-error{color:var(--error);fill:var(--error)}
 .lexer-error{font-size:12px;line-height:1.5}
+
+/* Dock panels reserve space; the graph and its controls stay in the remaining area. */
+body{--dock-top:0px;--dock-bottom:var(--tester);--dock-left:0px;--dock-right:0px}
+body[data-tester-dock=top]{--dock-top:var(--tester);--dock-bottom:0px}
+body[data-tester-dock=left]{--dock-left:min(320px,45vw);--dock-bottom:0px}
+body[data-tester-dock=right]{--dock-right:min(320px,45vw);--dock-bottom:0px}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed{--dock-left:0px;--dock-right:0px}
+body[data-tester-dock=left].tester-collapsed{--dock-left:48px}
+body[data-tester-dock=right].tester-collapsed{--dock-right:48px}
+.canvas-wrap{inset:var(--dock-top) var(--dock-right) var(--dock-bottom) var(--dock-left)}
+header{top:calc(var(--dock-top) + 16px);left:calc(var(--dock-left) + 18px);right:calc(var(--dock-right) + 18px)}
+body[data-tester-dock=top] .tester{top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line)}
+body:is([data-tester-dock=left],[data-tester-dock=right]) .tester{top:0;bottom:0;height:100%;width:min(320px,45vw);padding:12px;border-top:0}
+body[data-tester-dock=left] .tester{left:0;right:auto;border-right:1px solid var(--line)}
+body[data-tester-dock=right] .tester{right:0;left:auto;border-left:1px solid var(--line)}
+body:is([data-tester-dock=left],[data-tester-dock=right]) .test-grid{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:16px}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .tester{width:48px;padding:8px}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .panel-title{flex-direction:column;height:auto;gap:12px}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .panel-title h2{writing-mode:vertical-rl}
+.panel-title{gap:8px}.panel-title h2{flex:1}.tester-actions{flex-shrink:0}
+.toolbar{top:calc(var(--dock-top) + 16px);left:calc(var(--dock-left) + 164px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 182px)}
+body[data-toolbar-dock=bottom] .toolbar{top:auto;bottom:calc(var(--dock-bottom) + 12px);left:calc(var(--dock-left) + 202px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 220px)}
+body:is([data-toolbar-dock=left],[data-toolbar-dock=right]) .toolbar{top:calc(var(--dock-top) + 76px);bottom:auto;flex-direction:column;max-height:calc(100% - var(--dock-top) - var(--dock-bottom) - 260px);width:46px;max-width:46px;overflow:auto}
+body[data-toolbar-dock=left] .toolbar{left:calc(var(--dock-left) + 18px)}
+body[data-toolbar-dock=right] .toolbar{left:auto;right:calc(var(--dock-right) + 18px)}
+body:is([data-toolbar-dock=left],[data-toolbar-dock=right]) .toolbar .separator{height:1px;width:24px;margin:3px}
+body:is([data-toolbar-dock=left],[data-toolbar-dock=right]) .layout-chevron{display:none}
+.toolbar .dock-grip,.dock-grip{display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;background:transparent;border:0;padding:4px;color:inherit;flex-shrink:0}
+.docking,.docking .dock-grip{cursor:grabbing;user-select:none}
+.minimap{left:calc(var(--dock-left) + 18px);bottom:calc(var(--dock-bottom) + 12px)}
+.canvas-status{left:calc(var(--dock-left) + 20px);right:calc(var(--dock-right) + 20px);bottom:calc(var(--dock-bottom) + 12px)}
+body[data-toolbar-dock=bottom] .canvas-status{bottom:calc(var(--dock-bottom) + 66px)}
+.dock-preview{position:fixed;z-index:20;pointer-events:none;background:color-mix(in srgb,var(--green) 20%,transparent);border:2px solid var(--green);border-radius:8px}
+.dock-preview[data-side=top]{inset:0 0 auto;height:80px}.dock-preview[data-side=bottom]{inset:auto 0 0;height:80px}.dock-preview[data-side=left]{inset:0 auto 0 0;width:80px}.dock-preview[data-side=right]{inset:0 0 0 auto;width:80px}
+.dock-preview[data-panel=tester]:is([data-side=top],[data-side=bottom]){height:190px}.dock-preview[data-panel=tester]:is([data-side=left],[data-side=right]){width:min(320px,45vw)}
+@media(max-width:650px){header{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 10px)}.toolbar{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 140px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 150px)}.minimap{left:calc(var(--dock-left) + 10px)}body[data-toolbar-dock=bottom] .toolbar{left:calc(var(--dock-left) + 146px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 156px)}}
+@media(max-width:430px){.toolbar{left:calc(var(--dock-left) + 66px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 76px)}}

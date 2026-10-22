@@ -327,3 +327,24 @@ test('inverted transitions complement one-character matches and survive saves, c
  const fragment=copySelection(m,new Set(['a','b']),new Set(),new Set());let n=0;pasteSelection(m,fragment,{x:10,y:10},()=>`inverted${n++}`);assert.equal(m.edges.at(-1).invert,true);
  m.edges[0].invert='yes';assert.throws(()=>validate(m),/Invalid transition/);
 });
+
+test('docking chooses the nearest edge and validates saved panel positions',async()=>{
+ const {nearestDock,dockSettings}=await import('./dist/docking.js');
+ for(const [x,y,side] of [[400,5,'top'],[400,590,'bottom'],[5,300,'left'],[795,300,'right']])assert.equal(nearestDock(x,y,800,600),side);
+ assert.deepEqual(dockSettings({toolbar:'right',tester:'left'}),{toolbar:'right',tester:'left'});
+ assert.deepEqual(dockSettings({toolbar:'bad',tester:null}),{toolbar:'top',tester:'bottom'});
+ assert.deepEqual(dockSettings(null),{toolbar:'top',tester:'bottom'});
+});
+
+test('panel grips persist keyboard and drag docking, and cancel without changing layout',()=>{
+ const script=readFileSync(new URL('./dist/docking.js',import.meta.url),'utf8').replaceAll('export ','')+'\nsetupDocking();';
+ const grip=()=>({setPointerCapture(){},hasPointerCapture:()=>false}),grips={'toolbar-grip':grip(),'tester-grip':grip()},preview={setAttribute(){},dataset:{}},saved={};
+ const body={dataset:{},append(){},classList:{add(){},remove(){}}};
+ const context={document:{body,createElement:()=>preview,getElementById:id=>grips[id]},window:{innerWidth:800,innerHeight:600,dispatchEvent(){}},Event:class{},localStorage:{getItem:()=>null,setItem:(k,v)=>saved[k]=v}};
+ runInNewContext(script,context);assert.equal(body.dataset.testerDock,'bottom');
+ const event={button:0,pointerId:1,clientX:400,clientY:580,preventDefault(){},stopPropagation(){}};
+ grips['tester-grip'].onpointerdown(event);grips['tester-grip'].onpointermove({...event,clientX:5,clientY:300});assert.equal(preview.dataset.side,'left');assert.equal(preview.hidden,false);
+ grips['tester-grip'].onpointerup(event);assert.equal(body.dataset.testerDock,'left');assert.equal(JSON.parse(saved['lexica-docks']).tester,'left');assert.equal(preview.hidden,true);
+ grips['toolbar-grip'].onkeydown({...event,key:'ArrowRight'});assert.equal(body.dataset.toolbarDock,'right');
+ grips['toolbar-grip'].onpointerdown(event);grips['toolbar-grip'].onpointermove({...event,clientX:400,clientY:0});grips['toolbar-grip'].onpointercancel(event);assert.equal(body.dataset.toolbarDock,'right');
+});
