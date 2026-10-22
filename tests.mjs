@@ -314,7 +314,10 @@ test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch z
  runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
- wheel({...event,ctrlKey:true});assert.ok(zoomed[0]>1);
+ wheel({...event,ctrlKey:true});assert.equal(zoomed[0],1.25);
+ wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],.8);
+ elements['zoom-in'].onclick();assert.equal(zoomed[0],.8);elements['zoom-out'].onclick();assert.equal(zoomed[0],1.25);
+ wheel({...event,deltaY:1000,ctrlKey:true});assert.equal(zoomed[0],1.25);
 });
 
 test('inverted transitions complement one-character matches and survive saves, copies, and TeX',async()=>{
