@@ -223,3 +223,5 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize{top:0;b
 body[data-tester-dock=right] #tester-resize{left:-4px;right:auto}
 body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{inset:0 3px}
 .tester-collapsed #tester-resize{display:none}.resizing-tester{user-select:none}
+
+.token.input-active{outline:2px solid var(--green);outline-offset:1px;box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 18%,transparent)}

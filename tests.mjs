@@ -369,10 +369,10 @@ test('properties use the full canvas height with a side-docked tester and stay i
 });
 
 test('clicking a token selects its exact UTF-16 input range, including errors and skipped gaps',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function syncInputLayout('));
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function focusInputToken('));
  let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range},tokens={};
  const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
- runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,syncInputLayout:()=>synced++});
+ runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,focusInputToken(){},syncInputLayout:()=>synced++});
  tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
  let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
 });
@@ -392,4 +392,16 @@ test('tester resize clamps dimensions, supports every dock, persists and cancels
   assert.equal(JSON.parse(saved['lexica-tester-size'])[key],expected);assert.equal(attributes['aria-orientation'],vertical?'vertical':'horizontal');
   handle.onpointerdown(event);handle.onpointermove({...event,clientX:500,clientY:400});handle.onpointercancel(event);assert.equal(parseFloat(css[vertical?'--tester-width':'--tester-height']),expected);
  }
+});
+
+test('input caret and selections highlight matching tokens and traces without moving focus',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusInputToken('),app.indexOf("$('input').onclick=focusInputToken"));
+ const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
+ const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
+ const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
+ const context={visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
+ input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
+ input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
+ input.selectionStart=7;input.selectionEnd=7;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[2]);assert.equal(traced.token,'ERROR');
 });
