@@ -428,3 +428,14 @@ test('show skipped tokens restores skipped cards without changing lexer output o
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
+
+test('grid pans and scales with world coordinates, including centered SVG viewports',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function syncGrid('),app.indexOf('function setView('));
+ let v={x:0,y:0,width:800,height:600};const grid={style:{}},canvas={clientWidth:800,clientHeight:600};
+ const context={$:()=>canvas,view:()=>v,document:{querySelector:()=>grid}};runInNewContext(script+'syncGrid();',context);
+ assert.equal(grid.style.backgroundSize,'100px 100px');assert.equal(grid.style.backgroundPosition,'-50px -50px');
+ v={...v,x:30,y:50};runInNewContext('syncGrid();',context);assert.equal(grid.style.backgroundPosition,'-80px -100px');
+ v={x:30,y:50,width:640,height:480};runInNewContext('syncGrid();',context);assert.equal(grid.style.backgroundSize,'125px 125px');assert.equal(grid.style.backgroundPosition,'-100px -125px');
+ v={x:0,y:0,width:800,height:400};runInNewContext('syncGrid();',context);assert.equal(grid.style.backgroundPosition,'-50px 50px');
+ v={x:0,y:0,width:30000,height:22500};runInNewContext('syncGrid();',context);assert.ok(Math.abs(parseFloat(grid.style.backgroundSize)-100*800/30000)<.001);
+});

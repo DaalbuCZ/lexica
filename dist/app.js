@@ -67,7 +67,13 @@ function startCommentConnection(e,id){
 function startGroupDrag(e,type,key){e.stopPropagation();if(e.button!==0)return;if(space){startPan(e);return}const already=selectionSet(type).has(key);choose(type,key,{toggle:e.shiftKey,keep:!e.shiftKey&&already});showProperties(false);markSelection();properties();if(!selectionSet(type).has(key))return;drag={start:point(e),moved:false,anchors:commentAnchors(machine).filter(a=>!selectedComments.has(a.comment.id)),items:[...machine.states.filter(s=>selectedStates.has(s.id)),...(machine.comments??[]).filter(c=>selectedComments.has(c.id))].map(item=>({item,x:item.x,y:item.y}))}}
 function startDrag(e,id){e.stopPropagation();if(commentSource&&(e.button===0||e.button===2)){e.preventDefault();connectComment(commentSource,id);return}if(space||e.button===1){startPan(e);return}if(e.button===2||(e.button===0&&e.ctrlKey)){e.preventDefault();if(source&&!(e.ctrlKey&&source===id)){if(e.ctrlKey)insertBetween(id);else connectTo(id)}else{showProperties(false);$('canvas').setPointerCapture(e.pointerId);source=id;connectPoint=point(e);rightStart={id,x:e.clientX,y:e.clientY,insert:e.ctrlKey};$('modehint').textContent='Click a destination state · Same state for a loop · Esc to cancel';draw()}return}if(e.button!==0)return;if(source){connectTo(id);return}startGroupDrag(e,'state',id)}
 function view(){const v=$('canvas').viewBox.baseVal;return {x:v.x,y:v.y,width:v.width,height:v.height}}
-function setView(v){$('canvas').setAttribute('viewBox',`${v.x} ${v.y} ${v.width} ${v.height}`);drawMap()}
+function syncGrid(){
+ const canvas=$('canvas'),v=view(),scale=Math.min(canvas.clientWidth/v.width,canvas.clientHeight/v.height);if(!(scale>0))return;
+ const size=100*scale;
+ const x=(canvas.clientWidth-v.width*scale)/2-v.x*scale-size/2,y=(canvas.clientHeight-v.height*scale)/2-v.y*scale-size/2;
+ const grid=document.querySelector('.canvas-wrap');grid.style.backgroundSize=`${size}px ${size}px`;grid.style.backgroundPosition=`${x}px ${y}px`;
+}
+function setView(v){$('canvas').setAttribute('viewBox',`${v.x} ${v.y} ${v.width} ${v.height}`);syncGrid();drawMap()}
 function startPan(e){e.preventDefault();showProperties(false);pan={x:e.clientX,y:e.clientY,v:view()};document.body.classList.add('panning')}
 $('canvas').onpointerdown=e=>{if((source||commentSource)&&e.button===0&&!e.target.closest('[data-node],[data-edge],[data-comment],[data-comment-link]')){if(commentSource){cancelConnect();return}const p=point(e);add(p.x,p.y,source);return}if(e.button===1||space){startPan(e);return}if(e.button===0&&!e.target.closest('[data-node],[data-edge],[data-comment],[data-comment-link]')){showProperties(false);if(toolMode==='select'){if(!e.shiftKey)clearSelection();marquee={start:point(e),end:point(e)};draw()}else{clearSelection();markSelection();startPan(e)}}};
 $('canvas').oncontextmenu=e=>e.preventDefault();
