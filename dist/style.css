@@ -181,8 +181,6 @@ body[data-tester-dock=top]{--dock-top:var(--tester);--dock-bottom:0px}
 body[data-tester-dock=left]{--dock-left:var(--tester-width, min(320px,45vw));--dock-bottom:0px}
 body[data-tester-dock=right]{--dock-right:var(--tester-width, min(320px,45vw));--dock-bottom:0px}
 body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed{--dock-left:0px;--dock-right:0px}
-body[data-tester-dock=left].tester-collapsed{--dock-left:48px}
-body[data-tester-dock=right].tester-collapsed{--dock-right:48px}
 .canvas-wrap{inset:var(--dock-top) var(--dock-right) var(--dock-bottom) var(--dock-left)}
 header{top:calc(var(--dock-top) + 16px);left:calc(var(--dock-left) + 18px);right:calc(var(--dock-right) + 18px)}
 body[data-tester-dock=top] .tester{top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line)}
@@ -190,9 +188,9 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) .tester{top:0;bottom:0
 body[data-tester-dock=left] .tester{left:0;right:auto;border-right:1px solid var(--line)}
 body[data-tester-dock=right] .tester{right:0;left:auto;border-left:1px solid var(--line)}
 body:is([data-tester-dock=left],[data-tester-dock=right]) .test-grid{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:16px}
-body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .tester{width:48px;padding:8px}
-body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .panel-title{flex-direction:column;height:auto;gap:12px}
-body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .panel-title h2{writing-mode:vertical-rl}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .tester{top:auto;bottom:0;height:48px;width:var(--tester-width,320px);padding:8px 12px;border-top:1px solid var(--line)}
+body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed .panel-title{flex-direction:row;height:29px;gap:8px}
+body[data-tester-dock=left].tester-collapsed .minimap,body[data-tester-dock=right].tester-collapsed .canvas-status{bottom:60px}
 .panel-title{gap:8px}.panel-title h2{flex:1}.tester-actions{flex-shrink:0}
 .toolbar{top:calc(var(--dock-top) + 16px);left:calc(var(--dock-left) + 164px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 182px)}
 body[data-toolbar-dock=bottom] .toolbar{top:auto;bottom:calc(var(--dock-bottom) + 12px);left:calc(var(--dock-left) + 202px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 220px)}
