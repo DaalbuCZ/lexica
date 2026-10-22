@@ -178,15 +178,15 @@ header .top-actions{display:none}.toolbar{top:16px;left:164px;right:auto;transfo
 /* Dock panels reserve space; the graph and its controls stay in the remaining area. */
 body{--dock-top:0px;--dock-bottom:var(--tester);--dock-left:0px;--dock-right:0px}
 body[data-tester-dock=top]{--dock-top:var(--tester);--dock-bottom:0px}
-body[data-tester-dock=left]{--dock-left:min(320px,45vw);--dock-bottom:0px}
-body[data-tester-dock=right]{--dock-right:min(320px,45vw);--dock-bottom:0px}
+body[data-tester-dock=left]{--dock-left:var(--tester-width, min(320px,45vw));--dock-bottom:0px}
+body[data-tester-dock=right]{--dock-right:var(--tester-width, min(320px,45vw));--dock-bottom:0px}
 body:is([data-tester-dock=left],[data-tester-dock=right]).tester-collapsed{--dock-left:0px;--dock-right:0px}
 body[data-tester-dock=left].tester-collapsed{--dock-left:48px}
 body[data-tester-dock=right].tester-collapsed{--dock-right:48px}
 .canvas-wrap{inset:var(--dock-top) var(--dock-right) var(--dock-bottom) var(--dock-left)}
 header{top:calc(var(--dock-top) + 16px);left:calc(var(--dock-left) + 18px);right:calc(var(--dock-right) + 18px)}
 body[data-tester-dock=top] .tester{top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line)}
-body:is([data-tester-dock=left],[data-tester-dock=right]) .tester{top:0;bottom:0;height:100%;width:min(320px,45vw);padding:12px;border-top:0}
+body:is([data-tester-dock=left],[data-tester-dock=right]) .tester{top:0;bottom:0;height:100%;width:var(--tester-width, min(320px,45vw));padding:12px;border-top:0}
 body[data-tester-dock=left] .tester{left:0;right:auto;border-right:1px solid var(--line)}
 body[data-tester-dock=right] .tester{right:0;left:auto;border-left:1px solid var(--line)}
 body:is([data-tester-dock=left],[data-tester-dock=right]) .test-grid{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:16px}
@@ -208,8 +208,18 @@ body:is([data-toolbar-dock=left],[data-toolbar-dock=right]) .layout-chevron{disp
 body[data-toolbar-dock=bottom] .canvas-status{bottom:calc(var(--dock-bottom) + 66px)}
 .dock-preview{position:fixed;z-index:20;pointer-events:none;background:color-mix(in srgb,var(--green) 20%,transparent);border:2px solid var(--green);border-radius:8px}
 .dock-preview[data-side=top]{inset:0 0 auto;height:80px}.dock-preview[data-side=bottom]{inset:auto 0 0;height:80px}.dock-preview[data-side=left]{inset:0 auto 0 0;width:80px}.dock-preview[data-side=right]{inset:0 0 0 auto;width:80px}
-.dock-preview[data-panel=tester]:is([data-side=top],[data-side=bottom]){height:190px}.dock-preview[data-panel=tester]:is([data-side=left],[data-side=right]){width:min(320px,45vw)}
+.dock-preview[data-panel=tester]:is([data-side=top],[data-side=bottom]){height:var(--tester-height,190px)}.dock-preview[data-panel=tester]:is([data-side=left],[data-side=right]){width:var(--tester-width,min(320px,45vw))}
 @media(max-width:650px){header{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 10px)}.toolbar{top:calc(var(--dock-top) + 10px);left:calc(var(--dock-left) + 140px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 150px)}.minimap{left:calc(var(--dock-left) + 10px)}body[data-toolbar-dock=bottom] .toolbar{left:calc(var(--dock-left) + 146px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 156px)}}
 @media(max-width:430px){.toolbar{left:calc(var(--dock-left) + 66px);max-width:calc(100% - var(--dock-left) - var(--dock-right) - 76px)}}
 
 .token[data-token-index]{cursor:pointer}
+
+body{--tester:var(--tester-height,190px)}body.tester-collapsed{--tester:48px}
+#tester-resize{position:absolute;z-index:6;left:0;right:0;top:-4px;height:9px;cursor:ns-resize;touch-action:none}
+#tester-resize::after{content:"";position:absolute;inset:3px 0;background:transparent;transition:background .15s}
+#tester-resize:hover::after,#tester-resize:focus-visible::after,.resizing-tester #tester-resize::after{background:var(--green)}
+body[data-tester-dock=top] #tester-resize{top:auto;bottom:-4px}
+body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize{top:0;bottom:0;left:auto;right:-4px;height:auto;width:9px;cursor:ew-resize}
+body[data-tester-dock=right] #tester-resize{left:-4px;right:auto}
+body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{inset:0 3px}
+.tester-collapsed #tester-resize{display:none}.resizing-tester{user-select:none}
