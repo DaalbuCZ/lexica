@@ -5,6 +5,7 @@ export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js
 import {routeEdges} from './layout.js?v=41';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
+ if(m.machineType!==undefined&&!['fsm','extended'].includes(m.machineType))throw Error('Invalid machine type.');
  if(m.cells!==undefined&&!Array.isArray(m.cells))throw Error('Memory cells must be an array.');
  const cells=new Map();for(const cell of m.cells??[]){if(!cell||typeof cell.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name)||cells.has(cell.name)||!Number.isSafeInteger(cell.initial??0))throw Error('Invalid or duplicate memory cell.');cells.set(cell.name,cell)}
  if(m.tester!==undefined&&(!m.tester||typeof m.tester!=='object'||Array.isArray(m.tester)||typeof m.tester.input!=='string'||(m.tester.showSkipped!==undefined&&typeof m.tester.showSkipped!=='boolean')))throw Error('Invalid lexer tester data.');
@@ -29,9 +30,10 @@ export function setAccepting(state,value){state.accepting=value;if(value&&!state
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
- const initialMemory=Object.fromEntries((m.cells??[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
- const enabled=(edge,mem)=>!edge.guard||({'==':mem[edge.guard.cell]===edge.guard.value,'!=':mem[edge.guard.cell]!==edge.guard.value,'>':mem[edge.guard.cell]>edge.guard.value,'>=':mem[edge.guard.cell]>=edge.guard.value,'<':mem[edge.guard.cell]<edge.guard.value,'<=':mem[edge.guard.cell]<=edge.guard.value})[edge.guard.op];
- const apply=(edge,mem)=>{if(!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
+ const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
+ const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
+ const enabled=(edge,mem)=>!extended||!edge.guard||({'==':mem[edge.guard.cell]===edge.guard.value,'!=':mem[edge.guard.cell]!==edge.guard.value,'>':mem[edge.guard.cell]>edge.guard.value,'>=':mem[edge.guard.cell]>=edge.guard.value,'<':mem[edge.guard.cell]<edge.guard.value,'<=':mem[edge.guard.cell]<=edge.guard.value})[edge.guard.op];
+ const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
