@@ -519,3 +519,13 @@ test('step controls move forward and backward, reset on edits, and expose matchi
  listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
  machine.edges[0].label='';elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Transition cannot be empty/);assert.equal(elements['step-next'].disabled,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);
 });
+
+test('stepping gives only the current state and latest transition a distinct highlight',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function traceToken('),app.indexOf("$('tokens').onpointerover="));
+ const element=dataset=>{const classes=new Set();return {dataset,classes,classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)}}},nodes=[element({node:'a'}),element({node:'b'})],edges=[element({edge:'0'}),element({edge:'1'})];
+ const context={document:{querySelectorAll:selector=>selector==='[data-node]'?nodes:edges}};runInNewContext(script,context);
+ context.frame={kind:'character',state:'b',traceStates:['a','b'],traceEdges:[0,1]};runInNewContext('traceToken(frame)',context);
+ assert.equal(nodes[0].classes.has('trace-highlight'),true);assert.equal(nodes[0].classes.has('step-current'),false);assert.equal(nodes[1].classes.has('step-current'),true);assert.equal(edges[0].classes.has('step-current'),false);assert.equal(edges[1].classes.has('step-current'),true);
+ context.frame={traceStates:['a','b'],traceEdges:[0,1]};runInNewContext('traceToken(frame)',context);assert.ok([...nodes,...edges].every(el=>!el.classes.has('step-current')));
+ runInNewContext('traceToken(null)',context);assert.ok([...nodes,...edges].every(el=>el.classes.size===0));
+});
