@@ -58,7 +58,11 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   const changed = changes => { updateEditorSettings(changes); sync(); onChange(); };
   button.onclick = () => { menu.hidePopover(); sync(); dialog.showModal(); };
   dialog.querySelector('#settings-close').onclick = () => dialog.close();
-  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('click', event => {
+    if (event.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
+  });
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
   dialog.querySelector('#pinch-sensitivity').oninput = e => {
