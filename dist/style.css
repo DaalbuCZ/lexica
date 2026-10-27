@@ -305,3 +305,50 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .simple-memory[open]{padding-bottom:4px}
 .inspector-title{display:flex;align-items:center;justify-content:space-between}
 [data-theme=dark] .simple-memory{border-color:var(--line)}
+
+/* Simplified view: one consistent form surface instead of nested cards. */
+.simplified-view .inspector{padding:14px 16px 16px}
+.simplified-view .inspector-title{margin:0 0 14px;padding:0 0 10px;font-size:12px}
+.simple-editor{display:flex;flex-direction:column;gap:12px}
+.simple-note,.simple-empty{margin:0;color:#819087;font-size:11px;line-height:1.5}
+.simple-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:11px;font-weight:600;color:#59675d}
+.simple-field input,.simple-field select{display:block;width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;font-size:12px}
+.simple-field input[type=number]{font-family:'IBM Plex Mono',monospace}
+.simple-field small,.simple-toggle small{font-size:10px;font-weight:400;line-height:1.4;color:#87938b}
+.simple-field code{font-family:'IBM Plex Mono',monospace}
+.simple-toggle{display:flex;align-items:flex-start;gap:9px;margin:0;padding:10px 0;border-top:1px solid var(--line);font-size:11px;cursor:pointer}
+.simple-toggle>input{margin:2px 0 0;flex:0 0 auto}
+.simple-toggle>span{display:grid;gap:3px}
+.simple-toggle strong{font-size:11px;font-weight:600;color:#46564b}
+.simple-route{display:flex;align-items:center;gap:10px;min-width:0;font-size:12px;font-weight:600}
+.simple-route span{min-width:0;overflow-wrap:anywhere}
+.simple-route b{color:var(--green);flex:0 0 auto}
+.simple-editor .danger{align-self:flex-start;margin:2px 0 0}
+.simple-section{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.simple-memory{border-top:1px solid var(--line);margin:0;padding-top:10px}
+.simple-memory summary{display:flex;justify-content:space-between;gap:8px;cursor:pointer;font-size:11px;font-weight:600;padding:2px 0}
+.simple-memory summary span{font-size:10px;font-weight:400;color:#839087}
+.simple-memory-content{display:flex;flex-direction:column;gap:10px;padding-top:12px}
+.simple-memory-content .simple-note{padding:0 0 2px}
+.memory-rule-section{display:flex;flex-direction:column;gap:9px}
+.memory-rule-section+ .memory-rule-section{border-top:1px solid var(--line);padding-top:12px}
+.memory-rule-section h3{margin:0;font-size:11px;font-weight:600;color:#526157}
+.simple-rule-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.simple-rule-fields .simple-field:first-child{grid-column:1/-1}
+.simple-rule-fields .simple-field input,.simple-rule-fields .simple-field select{font-size:11px}
+.simple-memory-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);align-items:end;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.simple-memory-row .danger{grid-column:1/-1;justify-self:start;margin:0;padding:5px 0}
+.simple-editor #add-memory-cell{align-self:flex-start}
+.top-actions{display:flex!important;align-items:center;gap:8px}
+.top-actions #memory-cells{display:inline-flex;align-items:center;gap:6px;height:36px;padding:7px 11px;background:var(--panel);border-color:var(--line);box-shadow:0 3px 12px #3040220a;font-size:11px}
+.top-actions #memory-cells>span:first-child{font-family:'IBM Plex Mono',monospace;font-size:16px}
+.toolbar #memory-cells{display:none!important}
+.toolbar{max-width:calc(100% - 310px)}
+.zoom-settings input[type=range]{width:100%;margin:6px 0 0}
+.zoom-settings output{margin-left:auto;color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:11px}
+.zoom-settings label{width:100%}
+.zoom-settings p{margin-bottom:2px}
+[data-theme=dark] .simple-note,[data-theme=dark] .simple-empty,[data-theme=dark] .simple-field small,[data-theme=dark] .simple-toggle small,[data-theme=dark] .simple-memory summary span{color:#aebac3}
+[data-theme=dark] .simple-field,[data-theme=dark] .simple-toggle strong,[data-theme=dark] .memory-rule-section h3{color:#e0e8ee}
+@media(max-width:650px){.toolbar{max-width:calc(100% - 250px)}.top-actions #memory-cells{height:34px;padding:6px 8px}.simplified-view .inspector{padding:12px}}
+@media(max-width:430px){.toolbar{max-width:calc(100% - 200px)}}

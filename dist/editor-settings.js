@@ -3,9 +3,10 @@ const STORAGE_KEY = 'lexica-editor-settings';
 function readSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return {simplified: saved.simplified === true};
+    const sensitivity = Number(saved.pinchSensitivity);
+    return {simplified: saved.simplified === true, pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 0.4};
   } catch {
-    return {simplified: false};
+    return {simplified: false, pinchSensitivity: 0.4};
   }
 }
 
@@ -43,6 +44,11 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     <fieldset class="settings-group"><legend>Editing style</legend>
       <label><input type="checkbox" id="simplified-setting"> Simplified view</label>
       <p>Click a state or transition to edit it. Drag a + handle to connect states. Character sets replace regex.</p>
+    </fieldset>
+    <fieldset class="settings-group zoom-settings"><legend>Pinch zoom</legend>
+      <label for="pinch-sensitivity">Sensitivity <output id="pinch-sensitivity-value"></output></label>
+      <input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1">
+      <p>Adjust trackpad and touchscreen pinching. Mouse wheel and trackpad scrolling stay unchanged.</p>
     </fieldset>`;
   document.body.append(dialog);
 
@@ -50,12 +56,19 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     dialog.querySelector(`[name="machine-type"][value="${getMachineType()}"]`).checked = true;
     dialog.querySelector('#simplified-setting').checked = editorSettings.simplified;
     dialog.querySelector('#label-boxes').checked = getLabelBoxes();
+    dialog.querySelector('#pinch-sensitivity').value = editorSettings.pinchSensitivity;
+    dialog.querySelector('#pinch-sensitivity-value').value = `${editorSettings.pinchSensitivity.toFixed(1)}×`;
   };
   const changed = changes => { updateEditorSettings(changes); sync(); onChange(); };
   button.onclick = () => { menu.hidePopover(); sync(); dialog.showModal(); };
   dialog.querySelector('#settings-close').onclick = () => dialog.close();
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
+  dialog.querySelector('#pinch-sensitivity').oninput = e => {
+    editorSettings.pinchSensitivity = Number(e.target.value);
+    dialog.querySelector('#pinch-sensitivity-value').value = `${editorSettings.pinchSensitivity.toFixed(1)}×`;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(editorSettings)); } catch {}
+  };
   document.body.classList.toggle('simplified-view', editorSettings.simplified);
   const hint = document.getElementById('modehint');
   if (hint && editorSettings.simplified) hint.textContent = 'Click a state or transition to edit · Drag + to connect';
