@@ -1,12 +1,14 @@
+import {forceSimulation,forceManyBody,forceLink,forceX,forceY,forceCollide} from 'd3-force';
+import {springSettings} from './spring-settings.js';
 import {transitionLabel} from './labels.js?v=16';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
 import {destination,statePortalBox,enablePortal} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
-export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
+export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const anchors=commentAnchors(machine);
- if(mode==='spring'){springLayout(machine,spacing);if(portals)portalizeCrossings(machine);positionComments(anchors);return machine}
+ if(mode==='spring'){springLayout(machine,spacing,forces);if(portals)portalizeCrossings(machine);positionComments(anchors);return machine}
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[],parents=new Map();
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
  for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
@@ -81,85 +83,36 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  positionComments(anchors);
  return machine;
 }
-export function springSubtrees(machine){
- const children=new Map(machine.states.map(s=>[s.id,[]])),outgoing=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),edges=[];
- for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&target!==e.from&&outgoing.has(e.from)){outgoing.get(e.from).push(target);edges.push([e.from,target])}}
- for(const root of [machine.start,...children.keys()]){
-  if(!children.has(root)||seen.has(root))continue;const stack=[{id:root,parent:null}];
-  while(stack.length){const {id,parent}=stack.pop();if(seen.has(id))continue;seen.add(id);if(parent!==null)children.get(parent).push(id);for(const next of [...outgoing.get(id)].reverse())if(!seen.has(next))stack.push({id:next,parent:id})}
+export function springLayout(machine,spacing=1,options={}){
+ if(!machine.states.length)return machine;
+ const settings=springSettings(options),anchors=commentAnchors(machine),ideal=Math.max(80,settings.distance*spacing);
+ const cx=machine.states.reduce((sum,s)=>sum+s.x,0)/machine.states.length,cy=machine.states.reduce((sum,s)=>sum+s.y,0)/machine.states.length;
+ const spread=machine.states.some(s=>Math.hypot(s.x-cx,s.y-cy)>1),looped=new Set(machine.edges.filter(e=>e.portal==null&&e.from===e.to).map(e=>e.from));
+ const nodes=machine.states.map(s=>({id:s.id,x:spread?s.x:NaN,y:spread?s.y:NaN,radius:Math.max(Math.max(88,160*spacing)/2,looped.has(s.id)?100:0,s.portal?80:0,s.token?Math.max(65,s.token.length*3.5):0)}));
+ const ids=new Set(nodes.map(s=>s.id)),links=new Map();
+ for(const e of machine.edges){let to;try{to=destination(machine,e)?.id}catch{continue}if(!to||!ids.has(e.from)||e.from===to)continue;
+  const key=JSON.stringify([e.from,to].sort()),length=Math.max(ideal,transitionLabel(e).length*7+90),existing=links.get(key);
+  if(existing)existing.length=Math.max(existing.length,length);else links.set(key,{source:e.from,target:to,length});
  }
- const descendants=id=>{const result=[],stack=[id];while(stack.length){const next=stack.pop();result.push(next);stack.push(...children.get(next))}return result};
- return [...children].filter(([,branches])=>branches.length>1).map(([parent,branches])=>{
-  const groups=branches.map(descendants),owner=new Map(groups.flatMap((ids,i)=>ids.map(id=>[id,i]))),interactions=groups.map(()=>groups.map(()=>0));
-  for(const [from,to] of edges){const a=owner.get(from),b=owner.get(to);if(a!==undefined&&b!==undefined&&a!==b){interactions[a][b]++;interactions[b][a]++}}
-  return {parent,groups,interactions};
- });
-}
-
-export function springLayout(machine,spacing=1){
- const anchors=commentAnchors(machine),starts=['tree','circle'].map(mode=>new Map(autoLayout(structuredClone(machine),mode,spacing).states.map(s=>[s.id,{x:s.x,y:s.y}])));
- const states=new Map(machine.states.map(s=>[s.id,s])),neighbors=new Map(machine.states.map(s=>[s.id,[]]));
- const ideal=Math.max(130,320*spacing),links=[];
- for(const e of machine.edges){let to;try{to=destination(machine,e)}catch{continue}const from=states.get(e.from);if(!from||!to||from===to)continue;links.push({from,to,length:Math.max(ideal,transitionLabel(e).length*7+90)});neighbors.get(from.id).push(to.id);neighbors.get(to.id).push(from.id)}
- const seen=new Set(),components=[];
- for(const root of [machine.start,...[...states.keys()].sort()]){
-  if(!states.has(root)||seen.has(root))continue;const ids=[root];seen.add(root);
-  for(let i=0;i<ids.length;i++)for(const next of neighbors.get(ids[i]))if(!seen.has(next)){seen.add(next);ids.push(next)}
-  const nodes=ids.map(id=>states.get(id));components.push({nodes,links:links.filter(e=>ids.includes(e.from.id))});
- }
- const hierarchy=springSubtrees(machine);
- const looped=new Set(machine.edges.filter(e=>e.portal==null&&e.from===e.to).map(e=>e.from));
- const radius=s=>Math.max(Math.max(88,160*spacing)/2,looped.has(s.id)?100:0,s.portal?80:0,s.token?Math.max(65,s.token.length*3.5):0);
- let best=null;
- // Try eight deterministic starting arrangements; prefer fewer crossings, then shorter links.
- for(let seed=0;seed<8;seed++){
-  let left=160;
-  for(const component of components){
-   const nodes=component.nodes,index=new Map(nodes.map((s,i)=>[s.id,i]));
-   const families=hierarchy.filter(h=>index.has(h.parent)).map(h=>({...h,groups:h.groups.map(ids=>ids.map(id=>index.get(id)))}));
-   const initial=starts[seed],origin=initial?.get(nodes[0].id);
-   nodes.forEach((s,i)=>{if(initial){const p=initial.get(s.id);s.x=p.x-origin.x;s.y=p.y-origin.y}else{const angle=i*(2.3999632297+(seed-2)*.51),r=i?ideal*Math.sqrt(i):0;s.x=Math.cos(angle)*r;s.y=Math.sin(angle)*r}});
-   for(let iteration=0;iteration<320;iteration++){
-    const forces=nodes.map(()=>({x:0,y:0}));
-    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
-     const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<.01){dx=1;dy=0;d=1}
-     const minimum=radius(a)+radius(b),repel=ideal*ideal*5/(d*d)+Math.max(0,minimum-d)*.8,fx=dx/d*repel,fy=dy/d*repel;
-     forces[i].x-=fx;forces[i].y-=fy;forces[j].x+=fx;forces[j].y+=fy;
-    }
-    for(const e of component.links){const dx=e.to.x-e.from.x,dy=e.to.y-e.from.y,d=Math.hypot(dx,dy)||1,force=(d-e.length)*.08,fx=dx/d*force,fy=dy/d*force,a=index.get(e.from.id),b=index.get(e.to.id);forces[a].x+=fx;forces[a].y+=fy;forces[b].x-=fx;forces[b].y-=fy}
-    // Translate each subtree together: interacting siblings attract, unrelated siblings repel.
-    for(const family of families){
-     const centers=family.groups.map(group=>{const x=group.reduce((n,i)=>n+nodes[i].x,0)/group.length,y=group.reduce((n,i)=>n+nodes[i].y,0)/group.length;return {x,y,radius:Math.sqrt(group.reduce((n,i)=>n+(nodes[i].x-x)**2+(nodes[i].y-y)**2,0)/group.length)+group.reduce((n,i)=>n+radius(nodes[i]),0)/group.length}});
-     for(let a=0;a<centers.length;a++)for(let b=a+1;b<centers.length;b++){
-      const p=centers[a],q=centers[b];let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy);if(d<.01){dx=Math.cos(a+b+seed);dy=Math.sin(a+b+seed);d=1}
-      const weight=family.interactions[a][b],rest=p.radius+q.radius+ideal*(weight?0.65:1.3),force=(weight?(d-rest)*.055*Math.sqrt(weight):-ideal*ideal*8/(d*d)-Math.max(0,rest-d)*.25)/Math.sqrt(centers.length);
-      const fx=dx/d*force,fy=dy/d*force;
-      for(const i of family.groups[a]){forces[i].x+=fx;forces[i].y+=fy}for(const i of family.groups[b]){forces[i].x-=fx;forces[i].y-=fy}
-     }
-     for(let g=0;g<family.groups.length;g++)if(family.groups[g].length>1)for(const i of family.groups[g]){forces[i].x+=(centers[g].x-nodes[i].x)*.006;forces[i].y+=(centers[g].y-nodes[i].y)*.006}
-    }
-    const temperature=ideal*.25*(1-iteration/320)**2+.1;
-    for(let i=1;i<nodes.length;i++){const s=nodes[i],f=forces[i];f.x-=s.x*.001;f.y-=s.y*.001;const scale=Math.min(1,temperature/(Math.hypot(f.x,f.y)||1));s.x+=f.x*scale;s.y+=f.y*scale}
-   }
-   // Resolve residual collisions after the cooled simulation without changing graph topology.
-   for(let pass=0;pass<200;pass++){
-    let overlap=false;
-    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
-     const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<.01){dx=1;dy=0;d=1}const minimum=radius(a)+radius(b)+1;if(d>=minimum)continue;
-     overlap=true;const shift=(minimum-d)/2+.01;a.x-=dx/d*shift;a.y-=dy/d*shift;b.x+=dx/d*shift;b.y+=dy/d*shift;
-    }
-    if(!overlap)break;
-   }
-   const minX=Math.min(...nodes.map(s=>s.x-radius(s))),minY=Math.min(...nodes.map(s=>s.y-radius(s)));
-   for(const s of nodes){s.x+=left-minX;s.y+=120-minY}
-   left=Math.max(...nodes.map(s=>s.x+radius(s)))+ideal;
+ let random=1;
+ const simulation=forceSimulation(nodes).stop().randomSource(()=>((random=Math.imul(1664525,random)+1013904223>>>0)/4294967296))
+  .force('charge',forceManyBody().strength(-settings.repel*1200*spacing*spacing))
+  .force('link',forceLink([...links.values()]).id(s=>s.id).distance(e=>e.length).strength(settings.link))
+  .force('x',forceX(cx).strength(settings.center*settings.center*.1))
+  .force('y',forceY(cy).strength(settings.center*settings.center*.1))
+  .force('collide',forceCollide(s=>s.radius+1).iterations(4)).velocityDecay(.4);
+ simulation.tick(400);
+ // Enforce final collision clearance without attaching simulation fields to the saved model.
+ for(let pass=0;pass<200;pass++){
+  let overlap=false;
+  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+   const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<.01){dx=1;dy=0;d=1}const minimum=a.radius+b.radius+1;if(d>=minimum)continue;
+   overlap=true;const shift=(minimum-d)/2+.01;a.x-=dx/d*shift;a.y-=dy/d*shift;b.x+=dx/d*shift;b.y+=dy/d*shift;
   }
-  positionComments(anchors);
-  const crossings=crossingPairs(machine,true).length,length=routeEdges(machine).reduce((sum,e)=>sum+Math.hypot(e.c1.x-e.p0.x,e.c1.y-e.p0.y)+Math.hypot(e.c2.x-e.c1.x,e.c2.y-e.c1.y)+Math.hypot(e.p3.x-e.c2.x,e.p3.y-e.c2.y),0);
-  if(!best||crossings<best.crossings||crossings===best.crossings&&length<best.length)best={crossings,length,positions:machine.states.map(s=>({x:s.x,y:s.y}))};
+  if(!overlap)break;
  }
- if(best)machine.states.forEach((s,i)=>Object.assign(s,best.positions[i]));
- positionComments(anchors);
+ const ox=cx-nodes.reduce((sum,s)=>sum+s.x,0)/nodes.length,oy=cy-nodes.reduce((sum,s)=>sum+s.y,0)/nodes.length;
+ machine.states.forEach((s,i)=>{s.x=nodes[i].x+ox;s.y=nodes[i].y+oy});positionComments(anchors);
  return machine;
 }
 function portalizeCrossings(machine){

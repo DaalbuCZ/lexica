@@ -241,3 +241,5 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme] [data-edge].step-current .edge{stroke:var(--step-color);stroke-width:4;filter:drop-shadow(0 0 4px var(--step-color))}[data-theme] [data-edge].step-current .edge-text{fill:var(--step-color);font-weight:700}
 #step-status{color:var(--step-color)}
 .tester-actions{gap:4px}#step-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px}#step-toggle[aria-pressed=true]{color:var(--green)}
+
+.layout-popover{max-height:calc(100dvh - 24px);overflow-y:auto}.spring-forces{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:12px}.spring-forces[hidden]{display:none}.force-field{display:grid;grid-template-columns:1fr auto;gap:5px;font-size:11px}.force-field input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--green)}.force-field output{font-variant-numeric:tabular-nums;opacity:.8}.spring-forces button{padding:6px;font-size:11px}

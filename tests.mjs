@@ -531,13 +531,13 @@ test('stepping gives only the current state and latest transition a distinct hig
  runInNewContext('traceToken(null)',context);assert.ok([...nodes,...edges].every(el=>el.classes.size===0));
 });
 
-test('spring layout separates states, preserves lexer semantics and comment offsets, and is repeatable',()=>{
+test('spring layout separates states, preserves lexer semantics and comment offsets, and is deterministic from the same positions',()=>{
  for(const spacing of [.35,.5,.75,1]){
   const m=example();m.states.push({id:'disconnected',name:'alone',token:'',x:0,y:0});m.comments=[{id:'note',text:'Note',x:m.states[1].x+70,y:m.states[1].y-80,nodeIds:['s1']}];
-  const before=tokenize(m,'hi 42'),edges=structuredClone(m.edges);autoLayout(m,'spring',spacing);validate(m);assert.deepEqual(m.edges,edges);assert.deepEqual(tokenize(m,'hi 42'),before);
+  const source=structuredClone(m),before=tokenize(m,'hi 42'),edges=structuredClone(m.edges);autoLayout(m,'spring',spacing);validate(m);assert.deepEqual(m.edges,edges);assert.deepEqual(tokenize(m,'hi 42'),before);
   for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=88);
   assert.ok(Math.abs(m.comments[0].x-m.states[1].x-70)<1e-6);assert.ok(Math.abs(m.comments[0].y-m.states[1].y+80)<1e-6);
-  const positions=m.states.map(s=>[s.x,s.y]);autoLayout(m,'spring',spacing);assert.deepEqual(m.states.map(s=>[s.x,s.y]),positions);
+  const repeated=autoLayout(source,'spring',spacing);assert.deepEqual(repeated.states.map(s=>[s.x,s.y]),m.states.map(s=>[s.x,s.y]));
  }
 });
 test('spring density controls spacing and supports cycles, portals, coincident nodes, and a single state',()=>{
@@ -547,23 +547,39 @@ test('spring density controls spacing and supports cycles, portals, coincident n
  assert.ok(length(spacious)>length(compact));assert.deepEqual(tokenize(compact,'hello 42'),tokenize(spacious,'hello 42'));
  const one={start:'a',states:[{id:'a',name:'a',token:'A',x:0,y:0}],edges:[{from:'a',to:'a',label:'a'}]};autoLayout(one,'spring');assert.ok(Number.isFinite(one.states[0].x));assert.doesNotThrow(()=>toTikz(one));
 });
-test('spring multistart selection reduces crossings on a connected graph without requiring portals',()=>{
- const links=[['s2','s3'],['s5','s7'],['s0','s3'],['s7','s5'],['s0','s6'],['s2','s4'],['s5','s8'],['s2','s9'],['s8','s3'],['s6','s5'],['s2','s1'],['s0','s3']];
- const m={start:'s0',states:Array.from({length:10},(_,i)=>({id:'s'+i,name:'state'+i,token:'',x:0,y:0})),edges:[...Array.from({length:9},(_,i)=>['s0','s'+(i+1)]),...links].map(([from,to])=>({from,to,label:'x'}))};
- autoLayout(m,'spring');assert.ok(crossingPairs(m).length<=3);assert.ok(crossingPairs(m,true).length<=3);assert.ok(m.edges.every(e=>e.portal==null));
-});
 
 test('spring layout can automatically portalize crossings without changing state or transition counts',()=>{
  const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
  const expected=tokenize(m,'a0b1c2');autoLayout(m,'spring',.75,true);assert.equal(crossingPairs(m,true).length,0);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.deepEqual(tokenize(m,'a0b1c2'),expected);
 });
 
-import {springSubtrees} from './dist/layout.js';
-test('spring subtree interactions count cross-links but exclude shared-parent links and self loops',()=>{
- const ids=['r','a','a1','a2','b','b1','b2','c','c1','c2'],pairs=[['r','a'],['r','b'],['r','c'],['a','a1'],['a','a2'],['b','b1'],['b','b2'],['c','c1'],['c','c2'],['b2','a2'],['c','c']];
- const m={start:'r',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to])=>({from,to,label:'x'}))};
- const root=springSubtrees(m).find(h=>h.parent==='r');assert.deepEqual(root.groups.map(g=>[...g].sort()),[['a','a1','a2'],['b','b1','b2'],['c','c1','c2']]);assert.deepEqual(root.interactions,[[0,1,0],[1,0,0],[0,0,0]]);
- assert.ok(springSubtrees(m).some(h=>h.parent==='a'&&h.groups.length===2));enablePortal(m,m.edges[9]);assert.deepEqual(springSubtrees(m).find(h=>h.parent==='r').interactions,root.interactions);
- autoLayout(m,'spring',.75);const centers=root.groups.map(group=>({x:group.reduce((n,id)=>n+m.states.find(s=>s.id===id).x,0)/group.length,y:group.reduce((n,id)=>n+m.states.find(s=>s.id===id).y,0)/group.length})),distance=(a,b)=>Math.hypot(centers[a].x-centers[b].x,centers[a].y-centers[b].y);
- assert.ok(distance(0,1)<distance(0,2));assert.ok(distance(0,1)<distance(1,2));validate(m);
+
+import {springSettings,SPRING_DEFAULTS} from './dist/spring-settings.js';
+test('spring settings validate saved values and clamp each independent force control',()=>{
+ assert.deepEqual(springSettings(),SPRING_DEFAULTS);assert.deepEqual(springSettings(null),SPRING_DEFAULTS);
+ assert.deepEqual(springSettings({center:-1,repel:500,link:NaN,distance:2}),{center:0,repel:20,link:.4,distance:40});
+});
+test('spring solver lets the initial state move and applies link force and distance independently',()=>{
+ const source={start:'a',states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'',x:600,y:0}],edges:[{from:'a',to:'b',label:'x'}]};
+ const run=forces=>autoLayout(structuredClone(source),'spring',1,false,{center:0,repel:0,link:1,distance:300,...forces}),distance=m=>Math.hypot(m.states[0].x-m.states[1].x,m.states[0].y-m.states[1].y);
+ const relaxed=run({});assert.ok(Math.abs(distance(relaxed)-300)<2);assert.ok(Math.abs(relaxed.states[0].x-source.states[0].x)>100);
+ assert.deepEqual(run({link:0}).states,source.states);assert.ok(distance(run({distance:500}))>distance(run({distance:150}))+250);
+ assert.ok(relaxed.states.every(s=>!('vx' in s)&&!('vy' in s)&&!('index' in s)&&!('fx' in s)));
+});
+test('repulsion spreads nodes and center attraction controls compactness without subtree grouping',()=>{
+ const source={start:'a',states:[{id:'a',name:'a',token:'',x:-200,y:0},{id:'b',name:'b',token:'',x:200,y:0}],edges:[]};
+ const run=forces=>autoLayout(structuredClone(source),'spring',1,false,{center:.12,repel:5,link:0,distance:320,...forces}),distance=m=>Math.hypot(m.states[0].x-m.states[1].x,m.states[0].y-m.states[1].y);
+ assert.ok(distance(run({center:0,repel:10}))>distance(run({center:0,repel:2})));assert.ok(distance(run({center:1}))<distance(run({center:.05})));
+});
+
+test('spring force controls persist, reset, and are only shown for Spring layout',()=>{
+ const script=readFileSync(new URL('./dist/spring-controls.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function'),elements={},events={},saved={};
+ for(const key of Object.keys(SPRING_DEFAULTS)){elements['spring-'+key]={};elements['spring-'+key+'-value']={}}
+ elements['spring-reset']={};elements['spring-forces']={};elements['layout-mode']={value:'spring',addEventListener:(name,fn)=>events[name]=fn};elements['layout-menu']={matches:()=>false};
+ const context={document:{getElementById:id=>elements[id]},SPRING_DEFAULTS,springSettings,localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}};
+ runInNewContext(script+'\nvar controls=setupSpringControls();',context);assert.equal(elements['spring-forces'].hidden,false);
+ elements['spring-repel'].value='12';elements['spring-repel'].oninput();elements['spring-repel'].onchange();assert.equal(elements['spring-repel-value'].textContent,'12');assert.equal(JSON.parse(saved['lexica-spring-forces']).repel,12);
+ runInNewContext('controls=setupSpringControls();',context);assert.equal(context.controls.read().repel,12);
+ elements['layout-mode'].value='tree';events.change();assert.equal(elements['spring-forces'].hidden,true);elements['spring-reset'].onclick();assert.deepEqual(context.controls.read(),SPRING_DEFAULTS);
+ context.localStorage={getItem(){throw Error('unavailable')},setItem(){throw Error('unavailable')}};assert.doesNotThrow(()=>runInNewContext('setupSpringControls();',context));
 });
