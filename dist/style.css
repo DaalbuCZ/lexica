@@ -352,3 +352,44 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme=dark] .simple-field,[data-theme=dark] .simple-toggle strong,[data-theme=dark] .memory-rule-section h3{color:#e0e8ee}
 @media(max-width:650px){.toolbar{max-width:calc(100% - 250px)}.top-actions #memory-cells{height:34px;padding:6px 8px}.simplified-view .inspector{padding:12px}}
 @media(max-width:430px){.toolbar{max-width:calc(100% - 200px)}}
+.inspector-actions{display:flex;align-items:center;gap:4px}
+.inspector-actions .icon-button,.simple-memory-row .icon-button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:5px;border:0;background:transparent;color:inherit}
+.inspector-actions .icon-button:hover,.simple-memory-row .icon-button:hover{background:#0001}
+.inspector-actions #delete-selection{color:#cf7770}
+.inspector-actions [hidden]{display:none!important}
+.simple-editor{gap:8px}
+.simple-memory-row{grid-template-columns:minmax(0,1fr) minmax(0,.72fr) 30px;align-items:center;gap:7px;border:0;padding:0;margin:0}
+.simple-memory-row>input{min-width:0;width:100%;height:38px;padding:8px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;font-size:12px}
+.simple-memory-row .icon-button{grid-column:auto;margin:0}
+.simple-memory-row+.simple-memory-row{border-top:1px solid var(--line);padding-top:9px}
+.simple-memory-row .danger{display:none}
+.simple-toggle{padding:7px 0}
+.simple-section{gap:7px;padding-top:9px}
+.simple-memory-content{gap:8px;padding-top:8px}
+.memory-rule-section{gap:6px}
+.memory-rule-section h3{font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.simple-rule-fields{gap:7px}
+.simple-rule-fields .simple-field[hidden]{display:none!important}
+.simple-memory summary span{display:none}
+.inspector-title{margin-bottom:9px!important;padding-bottom:8px!important}
+#settings-dialog{width:480px;max-width:calc(100vw - 24px);padding:20px 22px}
+#settings-dialog .dialog-heading{align-items:center;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:3px}
+#settings-dialog .dialog-heading h2{font-size:17px;font-weight:600;margin:0}
+.setting-section{display:grid;gap:8px;padding:14px 0;border-bottom:1px solid var(--line)}
+.setting-section:last-child{border-bottom:0;padding-bottom:0}
+.setting-section h3{margin:0 0 3px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#829087}
+.setting-choice,.setting-row{display:flex;align-items:center;gap:10px;margin:0;padding:5px 0;font-size:12px}
+.setting-choice input{accent-color:var(--green);margin:0}
+.setting-choice span,.setting-row>span{display:grid;gap:3px}
+.setting-choice strong,.setting-row strong{font-size:12px;font-weight:600}
+.setting-choice small,.setting-row small,.setting-section p{font-size:10px;line-height:1.4;color:#839087}
+.setting-section p{margin:0}
+.setting-row{justify-content:space-between}
+.setting-row button{display:flex;align-items:center;gap:7px;padding:7px 9px}
+.setting-row input[type=range]{width:100%;margin:5px 0}
+.zoom-settings .setting-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+.zoom-settings .setting-row>input{grid-column:1/-1}
+.zoom-settings output{font:11px 'IBM Plex Mono',monospace;color:var(--green)}
+[data-theme=dark] .setting-choice small,[data-theme=dark] .setting-row small,[data-theme=dark] .setting-section p,[data-theme=dark] .setting-section h3{color:#b5c0c8}
+[data-theme=dark] .inspector-actions .icon-button:hover,[data-theme=dark] .simple-memory-row .icon-button:hover{background:#fff1}
+@media(max-width:650px){#settings-dialog{padding:16px}.setting-section{padding:11px 0}.simple-memory-row{grid-template-columns:minmax(0,1fr) minmax(0,.72fr) 30px}}

@@ -4,9 +4,9 @@ function readSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     const sensitivity = Number(saved.pinchSensitivity);
-    return {simplified: saved.simplified === true, pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 0.4};
+    return {simplified: saved.simplified === true, pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1};
   } catch {
-    return {simplified: false, pinchSensitivity: 0.4};
+    return {simplified: false, pinchSensitivity: 1};
   }
 }
 
@@ -30,26 +30,22 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   dialog.id = 'settings-dialog';
   dialog.setAttribute('aria-labelledby', 'settings-heading');
   dialog.innerHTML = `
-    <div class="dialog-heading"><div><h2 id="settings-heading">Editor settings</h2></div><button type="button" id="settings-close" aria-label="Close settings">✕</button></div>
-    <fieldset class="settings-group"><legend>Machine type</legend>
-      <label><input type="radio" name="machine-type" value="fsm"> Standard FSM</label>
-      <p>Finite-state machine with character transitions.</p>
-      <label><input type="radio" name="machine-type" value="extended"> Extended FSM</label>
-      <p>Enables memory cells, transition guards, and side effects.</p>
-    </fieldset>
-    <fieldset class="settings-group"><legend>Appearance</legend>
-      <div id="theme-control"><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Theme</span></button></div>
-      <label><input type="checkbox" id="label-boxes"> Boxes around transition labels</label>
-    </fieldset>
-    <fieldset class="settings-group"><legend>Editing style</legend>
-      <label><input type="checkbox" id="simplified-setting"> Simplified view</label>
-      <p>Click a state or transition to edit it. Drag a + handle to connect states. Character sets replace regex.</p>
-    </fieldset>
-    <fieldset class="settings-group zoom-settings"><legend>Pinch zoom</legend>
-      <label for="pinch-sensitivity">Sensitivity <output id="pinch-sensitivity-value"></output></label>
-      <input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1">
-      <p>Adjust trackpad and touchscreen pinching. Mouse wheel and trackpad scrolling stay unchanged.</p>
-    </fieldset>`;
+    <div class="dialog-heading"><h2 id="settings-heading">Settings</h2><button type="button" id="settings-close" aria-label="Close settings">✕</button></div>
+    <section class="setting-section"><h3>Machine</h3>
+      <label class="setting-choice"><input type="radio" name="machine-type" value="fsm"><span><strong>Standard FSM</strong><small>Character transitions.</small></span></label>
+      <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Memory counters, guards, and side effects.</small></span></label>
+    </section>
+    <section class="setting-section"><h3>Editing</h3>
+      <label class="setting-choice"><input type="checkbox" id="simplified-setting"><span><strong>Simplified view</strong><small>Use character sets and compact properties.</small></span></label>
+      <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw a box behind transition labels.</small></span></label>
+    </section>
+    <section class="setting-section"><h3>Appearance</h3>
+      <div class="setting-row"><span><strong>Theme</strong><small>Switch between light and dark.</small></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
+    </section>
+    <section class="setting-section zoom-settings"><h3>Pinch zoom</h3>
+      <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
+      <p>Controls trackpad and touchscreen pinching.</p>
+    </section>`;
   document.body.append(dialog);
 
   const sync = () => {
@@ -62,6 +58,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   const changed = changes => { updateEditorSettings(changes); sync(); onChange(); };
   button.onclick = () => { menu.hidePopover(); sync(); dialog.showModal(); };
   dialog.querySelector('#settings-close').onclick = () => dialog.close();
+  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
   dialog.querySelector('#pinch-sensitivity').oninput = e => {
