@@ -269,3 +269,5 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme=dark] ::highlight(lexica-token-color-9){background-color:#303822;text-decoration:underline solid #8aa13c;text-decoration-thickness:1.5px;text-decoration:underline solid #b5c86b;text-decoration-thickness:1.5px}
 ::highlight(lexica-error){background-color:#ffe3dc}[data-theme=dark] ::highlight(lexica-error){background-color:#4a2d27}
 ::highlight(lexica-step){background-color:#a71abb;color:transparent}[data-theme=dark] ::highlight(lexica-step){background-color:#efb0ff;color:transparent}
+
+.input-label{display:flex;align-items:center;justify-content:space-between;height:18px;margin-bottom:5px;gap:8px}.input-label>.field-label{margin:0}.input-label+.input-wrap{height:calc(100% - 23px)}.lexer-error-actions{display:flex;align-items:center;gap:8px;font-size:10px}.lexer-error-actions .has-errors{color:var(--error);font-weight:600}#next-error{display:flex;align-items:center;gap:3px;height:18px;padding:0 3px;border:0;background:transparent;font-size:10px}#next-error .tool-icon{width:14px;height:14px}

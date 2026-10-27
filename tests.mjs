@@ -425,7 +425,7 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
  const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
- const context={$:id=>elements[id],machine:m,tokenize,traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ const context={$:id=>elements[id],machine:m,tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
@@ -604,4 +604,18 @@ test('range highlights preserve one text flow for tabs, wide glyphs, combining m
  const numbers=[...registry.get('lexica-token-color-1')];assert.equal(numbers[1].start,input.value.length-2);assert.equal(numbers[1].end,input.value.length);
  context.frame={offset:3,end:4};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,1);
  runInNewContext('highlights.clearStep();',context);assert.equal(registry.has('lexica-step'),false);assert.equal(mirror.firstChild.data,input.value+'\u200b');
+});
+
+import {nextErrorToken,setupErrorNavigation} from './dist/error-navigation.js';
+test('next error follows the input cursor, advances past selections and wraps with Unicode offsets',()=>{
+ const errors=[{token:'ERROR',value:'😀',offset:2},{token:'ERROR',value:'!',offset:8}];
+ assert.equal(nextErrorToken(errors,0),errors[0]);assert.equal(nextErrorToken(errors,2),errors[0]);assert.equal(nextErrorToken(errors,4),errors[1]);assert.equal(nextErrorToken(errors,9),errors[0]);assert.equal(nextErrorToken([],0),null);
+});
+test('lexer error count updates on edits and disables navigation for clean input or invalid machines',()=>{
+ const input={selectionEnd:0},count={textContent:'',classList:{toggle(){}}},button={};let selected;
+ const nav=setupErrorNavigation(input,count,button,t=>selected=t);assert.equal(count.textContent,'0 errors');assert.equal(button.disabled,true);
+ nav.update([{token:'IDENT',value:'x',offset:0},{token:'ERROR',value:'!',offset:1},{token:'ERROR',value:'😀',offset:3}]);assert.equal(count.textContent,'2 errors');assert.equal(button.disabled,false);button.onclick();assert.equal(selected.offset,1);
+ input.selectionEnd=2;button.onclick();assert.equal(selected.offset,3);input.selectionEnd=5;button.onclick();assert.equal(selected.offset,1);
+ nav.update([{token:'ERROR',value:'!',offset:1}]);assert.equal(count.textContent,'1 error');nav.update([]);assert.equal(count.textContent,'0 errors');assert.equal(button.disabled,true);
+ nav.update([],true);assert.equal(count.textContent,'1 error');assert.equal(button.disabled,true);
 });
