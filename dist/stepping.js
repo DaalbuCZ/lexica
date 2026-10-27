@@ -1,4 +1,4 @@
-import {lexerSteps} from './lexer.js?v=47';
+import {lexerSteps} from './lexer.js?v=49';
 
 export function setupStepping({getMachine,traceToken,markFailures,highlights,onReset}){
  const $=id=>document.getElementById(id),input=$('input'),panel=document.querySelector('.tester');
@@ -8,7 +8,7 @@ export function setupStepping({getMachine,traceToken,markFailures,highlights,onR
   const frame=frames[index];if(!frame)return;
   panel.classList.add('stepping');$('step-controls').hidden=false;$('step-toggle').setAttribute('aria-pressed','true');
   $('step-prev').disabled=index<=0;$('step-next').disabled=frame.kind==='done'||frame.kind==='error';
-  $('step-status').textContent=`${index+1} · ${frame.message} · offset ${frame.offset}`;$('step-status').title=$('step-status').textContent;
+  const memory=frame.memory&&Object.keys(frame.memory).length?' · '+Object.entries(frame.memory).map(([name,value])=>`${name}=${value}`).join(', '):'';$('step-status').textContent=`${index+1} · ${frame.message} · offset ${frame.offset}${memory}`;$('step-status').title=$('step-status').textContent;
   traceToken(frame);markFailures((frame.failureState??frame.result?.failureState)?[frame.failureState??frame.result.failureState]:[],frame.edgeIndices??[]);highlights.clearStep();
   const box=highlights.step(frame);if(box){const area=input.getBoundingClientRect();if(box.top<area.top+12||box.bottom>area.bottom-12)input.scrollTop+=box.top-area.top-12;if(box.left<area.left+12||box.right>area.right-12)input.scrollLeft+=box.left-area.left-12;input.dispatchEvent(new Event('scroll'))}
  }

@@ -1,10 +1,12 @@
-import {stateLabel,transitionLabel} from './labels.js?v=16';
+import {stateLabel,transitionLabel} from './labels.js?v=17';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=40';
+import {routeEdges} from './layout.js?v=41';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
+ if(m.cells!==undefined&&!Array.isArray(m.cells))throw Error('Memory cells must be an array.');
+ const cells=new Map();for(const cell of m.cells??[]){if(!cell||typeof cell.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name)||cells.has(cell.name)||!Number.isSafeInteger(cell.initial??0))throw Error('Invalid or duplicate memory cell.');cells.set(cell.name,cell)}
  if(m.tester!==undefined&&(!m.tester||typeof m.tester!=='object'||Array.isArray(m.tester)||typeof m.tester.input!=='string'||(m.tester.showSkipped!==undefined&&typeof m.tester.showSkipped!=='boolean')))throw Error('Invalid lexer tester data.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
  if(m.comments!==undefined&&!Array.isArray(m.comments))throw Error('Invalid comments.');
@@ -12,7 +14,7 @@ export function validate(m){
  const ids=new Set();for(const s of m.states){if(typeof s.id!=='string'||ids.has(s.id)||!Number.isFinite(s.x)||!Number.isFinite(s.y)||typeof s.name!=='string'||typeof s.token!=='string'||(s.portal!==undefined&&typeof s.portal!=='string')||(s.accepting!==undefined&&typeof s.accepting!=='boolean'))throw Error('Invalid or duplicate state.');ids.add(s.id)}
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
- for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert)}return m;
+ for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert);if(e.guard!==undefined){const g=e.guard;if(!g||!cells.has(g.cell)||!['==','!=','>','>=','<','<='].includes(g.op)||!Number.isSafeInteger(g.value))throw Error('Invalid transition guard.')}if(e.effect!==undefined){const a=e.effect;if(!a||!cells.has(a.cell)||!['add','set'].includes(a.op)||!Number.isSafeInteger(a.value))throw Error('Invalid transition side effect.')}}return m;
 }
 export function parseMachine(text){
  if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
@@ -21,30 +23,33 @@ export function parseMachine(text){
  return validate(machine);
 }
 export function matcher(label,invert=false){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>invert?!r.test(c):r.test(c)}
-export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
+export function transitionError(m,e){try{matcher(e.label,e.invert);if(e.guard&&(!e.guard||!(m.cells??[]).some(c=>c.name===e.guard.cell)||!['==','!=','>','>=','<','<='].includes(e.guard.op)||!Number.isSafeInteger(e.guard.value)))throw Error('Invalid transition guard.');if(e.effect&&(!e.effect||!(m.cells??[]).some(c=>c.name===e.effect.cell)||!['add','set'].includes(e.effect.op)||!Number.isSafeInteger(e.effect.value)))throw Error('Invalid transition side effect.');destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
+ const initialMemory=Object.fromEntries((m.cells??[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
+ const enabled=(edge,mem)=>!edge.guard||({'==':mem[edge.guard.cell]===edge.guard.value,'!=':mem[edge.guard.cell]!==edge.guard.value,'>':mem[edge.guard.cell]>edge.guard.value,'>=':mem[edge.guard.cell]>=edge.guard.value,'<':mem[edge.guard.cell]<edge.guard.value,'<=':mem[edge.guard.cell]<=edge.guard.value})[edge.guard.op];
+ const apply=(edge,mem)=>{if(!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
-  let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
-  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,...extra});
+  const tokenMemory={...memory};let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
+  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,memory:{...memory},...extra});
   if(stepping)yield frame('start',pos,'Start token at '+pos);
   while(end<input.length){
-   const c=String.fromCodePoint(input.codePointAt(end)),next=edges.filter(e=>e.from===state&&e.test(c));
+   const c=String.fromCodePoint(input.codePointAt(end)),next=edges.filter(e=>e.from===state&&e.test?.(c)&&enabled(e,memory));
    if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+states.get(state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});
    if(!next.length){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
-   state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);const offset=end;end+=c.length;
-   if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges]};
+   const edge=next[0];memory=apply(edge,memory);state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
+   if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges],memory:{...memory}};
    if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' → '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
   }
   let token;
-  if(!last){token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
-  else{token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges};pos=last.end}
-  yield {...frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' · ':'')+(token.skip?'Skip ':'Emit ')+token.token),end:pos,traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token};
+  if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
+  else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges};pos=last.end}
+  yield {...frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' · ':'')+(token.skip?'Skip ':'Emit ')+token.token),end:pos,traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}};
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input'};
 }

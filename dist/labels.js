@@ -6,4 +6,4 @@ export function stateLabel(name){
  return {lines,fontSize,lineHeight,y:fontSize/3-(lines.length-1)*lineHeight/2,width:lines.length>1?52:60};
 }
 
-export function transitionLabel(edge){return edge.invert?'not ('+edge.label+')':edge.label}
+export function transitionLabel(edge){let label=edge.invert?'not ('+edge.label+')':edge.label;if(edge.guard)label+=' ['+edge.guard.cell+' '+edge.guard.op+' '+edge.guard.value+']';if(edge.effect)label+=' / '+edge.effect.cell+(edge.effect.op==='add'?' += ':' := ')+edge.effect.value;return label}
