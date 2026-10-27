@@ -230,3 +230,9 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme=dark] .dock-grip:hover{background:#39434c}
 
 #toggle-tester{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px;line-height:1}.tester-collapsed #toggle-tester .tool-icon{transform:rotate(180deg)}
+
+.layout-note{font-size:11px;line-height:1.5;margin:0;white-space:normal;color:inherit;opacity:.8}.layout-popover .check{margin:0;line-height:1.5}
+.step-controls{display:flex;align-items:center;gap:5px;height:34px;margin-top:5px}.step-controls[hidden],.tester-collapsed .step-controls{display:none}.step-controls button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:4px;flex-shrink:0;background:transparent;border:0}
+#step-status{font:10px/1.4 'IBM Plex Mono',monospace;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tester.stepping .test-grid{height:calc(100% - 79px)}
+.step-character{background:var(--green);color:white;outline:1px solid var(--green);border-radius:2px}[data-theme=dark] .step-character{color:#15232e}
+.tester-actions{gap:4px}#step-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px}#step-toggle[aria-pressed=true]{color:var(--green)}

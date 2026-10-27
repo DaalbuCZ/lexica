@@ -58,7 +58,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
 test('tree layout reserves separate bands for uneven subtrees and centers each parent',()=>{
  const m={start:'root',states:['root','a','b','a1','a2','a3','b1','b2'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','a'],['root','b'],['a','a1'],['a','a2'],['a2','a3'],['b','b1'],['b','b2'],['b2','root']].map(([from,to])=>({from,to,label:'[a-z]'})),comments:[{id:'note',text:'Notes',x:0,y:0}]};
  autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
- assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
+ const bandA=['a','a1','a2','a3'].map(id=>get(id).y),bandB=['b','b1','b2'].map(id=>get(id).y);assert.ok(Math.max(...bandA)+150<Math.min(...bandB)||Math.max(...bandB)+150<Math.min(...bandA));
  assert.equal(get('root').y,(get('a').y+get('b').y)/2);
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
  assert.deepEqual(m.comments[0].nodeIds,['root']);assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
@@ -86,7 +86,7 @@ test('tree layout keeps a shared destination with its specific parent instead of
  const m={start:'root',states:['root','integer','other','dot','double','underscore'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','integer'],['root','other'],['integer','dot'],['dot','double'],['integer','underscore'],['underscore','integer'],['root','dot']].map(([from,to])=>({from,to,label:'x'}))};
  const edges=JSON.stringify(m.edges);autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
  assert.ok(get('dot').x>get('integer').x);assert.ok(Math.abs(get('dot').y-get('integer').y)<300);
- assert.ok(get('other').y>Math.max(get('integer').y,get('dot').y,get('double').y,get('underscore').y));
+ const branch=['integer','dot','double','underscore'].map(id=>get(id).y);assert.ok(get('other').y>Math.max(...branch)||get('other').y<Math.min(...branch));
  assert.equal(JSON.stringify(m.edges),edges);validate(m);
 });
 test('radial layout centers the parent and spreads children around it with descendants farther out',()=>{
@@ -375,7 +375,7 @@ test('clicking a token selects its exact UTF-16 input range, including errors an
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function focusInputToken('));
  let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range},tokens={};
  const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
- runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,focusInputToken(){},syncInputLayout:()=>synced++});
+ runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
  tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
  let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
 });
@@ -472,4 +472,50 @@ test('pointer redraws are coalesced into one animation frame using the latest mo
  let frames=[],draws=0,maps=0;const context={requestAnimationFrame:fn=>{frames.push(fn);return frames.length},draw:()=>draws++,drawMap:()=>maps++};runInNewContext(script,context);
  runInNewContext('queueDraw();queueDraw();queueDraw();',context);assert.equal(frames.length,1);assert.equal(draws,0);frames[0]();assert.equal(draws,1);assert.equal(maps,1);
  runInNewContext('queueDraw();',context);assert.equal(frames.length,2);
+});
+
+import {crossingPairs} from './dist/layout.js';
+import {lexerSteps} from './dist/lexer.js';
+test('layout reorders branches to reduce crossings in tree and radial modes while preserving topology',()=>{
+ const links=[['s2','s3'],['s5','s7'],['s0','s3'],['s7','s5'],['s0','s6'],['s2','s4'],['s5','s8'],['s2','s9'],['s8','s3'],['s6','s5'],['s2','s1'],['s0','s3']];
+ const m={start:'s0',states:Array.from({length:10},(_,i)=>({id:'s'+i,name:'state'+i,token:'',x:0,y:0})),edges:[...Array.from({length:9},(_,i)=>['s0','s'+(i+1)]),...links].map(([from,to])=>({from,to,label:'x'}))};
+ for(const [mode,limit] of [['tree',2],['circle',3]]){
+  const next=autoLayout(structuredClone(m),mode);assert.ok(crossingPairs(next).length<=limit);assert.deepEqual(next.edges,m.edges);assert.equal(next.states.length,10);
+  const first=JSON.stringify(next);autoLayout(next,mode);assert.equal(JSON.stringify(next),first);
+  for(let i=0;i<next.states.length;i++)for(let j=i+1;j<next.states.length;j++)assert.ok(Math.hypot(next.states[i].x-next.states[j].x,next.states[i].y-next.states[j].y)>=72);
+ }
+});
+test('optional layout portals remove remaining routed crossings without adding states or changing tokens',()=>{
+ const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
+ const before=tokenize(m,'a0b1c2'),plain=autoLayout(structuredClone(m));assert.ok(crossingPairs(plain,true).length>0);assert.ok(plain.edges.every(e=>e.portal==null));
+ autoLayout(m,'tree',1,true);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.ok(m.edges.some(e=>e.portal));assert.equal(crossingPairs(m,true).length,0);assert.deepEqual(tokenize(m,'a0b1c2'),before);validate(m);assert.doesNotThrow(()=>toTikz(m));
+ for(const e of m.edges)assert.equal(destination(m,e).id,e.to);
+});
+test('character steps use Unicode code points, portal targets, inversion and the same emitted tokens',()=>{
+ const m=example();enablePortal(m,m.edges[0]);m.edges[0].label='[\\r\\n0-9 ]';m.edges[0].invert=true;
+ const input='😀 42\n',steps=[...lexerSteps(m,input)],reads=steps.filter(s=>s.kind==='character');
+ assert.equal(reads[0].character,'😀');assert.equal(reads[0].end,2);assert.equal(reads[0].state,'s1');assert.equal(steps.at(-1).kind,'done');
+ assert.deepEqual(steps.filter(s=>s.result).map(s=>s.result),tokenize(m,input));assert.ok(steps.some(s=>s.result?.skip));
+});
+test('stepping exposes longest-match backtracking, nonaccepting errors and ambiguity',()=>{
+ const m={start:'a',states:[['a',''],['b','B'],['c','']].map(([id,token],i)=>({id,name:id,token,x:i*150,y:0})),edges:[{from:'a',to:'b',label:'a'},{from:'b',to:'c',label:'b'}]};
+ const steps=[...lexerSteps(m,'ab!')];assert.ok(steps.some(s=>s.message.includes('Backtrack to 1')));assert.ok(steps.some(s=>s.kind==='blocked'));assert.deepEqual(steps.filter(s=>s.result).map(s=>s.result),tokenize(m,'ab!'));
+ m.states[1].token='';const errors=[...lexerSteps(m,'a')];assert.equal(errors.find(s=>s.result).result.failureState,'b');
+ m.edges.push({...m.edges[0]});assert.throws(()=>[...lexerSteps(m,'a')],/Ambiguous/);assert.equal([...lexerSteps(example(),'')].at(-1).kind,'done');
+});
+
+test('portals assign a usable generated name to an unnamed destination',()=>{
+ const m=example();m.states[1].name='';enablePortal(m,m.edges[0]);assert.equal(m.edges[0].portal,'STATE');assert.equal(destination(m,m.edges[0]).id,'s1');validate(m);
+});
+
+test('step controls move forward and backward, reset on edits, and expose matching errors',()=>{
+ const script=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function');
+ const elements={},listeners={},panel={classList:{add(){},remove(){}}};for(const id of ['input','input-highlights','step-controls','step-toggle','step-prev','step-next','step-stop','step-status'])elements[id]={setAttribute(){}};
+ elements.input.value='a';elements.input.addEventListener=(name,fn)=>listeners[name]=fn;elements['input-highlights'].querySelectorAll=()=>[];elements['input-highlights'].querySelector=()=>null;
+ let machine=example(),resets=0,trace;const context={document:{getElementById:id=>elements[id],querySelector:()=>panel},lexerSteps,getMachine:()=>machine,traceToken:frame=>trace=frame,markFailures(){},onReset:()=>resets++};
+ runInNewContext(script+'\nvar controller=setupStepping({getMachine,traceToken,markFailures,onReset});',context);
+ elements['step-toggle'].onclick();assert.equal(context.controller.active(),true);assert.match(elements['step-status'].textContent,/Start token/);assert.equal(elements['step-prev'].disabled,true);
+ elements['step-next'].onclick();assert.equal(trace.character,'a');elements['step-prev'].onclick();assert.match(elements['step-status'].textContent,/Start token/);elements['step-next'].onclick();assert.equal(trace.character,'a');
+ listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
+ machine.edges[0].label='';elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Transition cannot be empty/);assert.equal(elements['step-next'].disabled,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);
 });

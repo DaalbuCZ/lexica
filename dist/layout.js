@@ -1,8 +1,8 @@
 import {transitionLabel} from './labels.js?v=16';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
-import {destination,statePortalBox} from './portals.js';
+import {destination,statePortalBox,enablePortal} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
-export function autoLayout(machine,mode='tree',spacing=1) {
+export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const anchors=commentAnchors(machine);
@@ -38,6 +38,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
   heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
  }
  const step=Math.max(120,Math.max(320,...machine.edges.map(e=>transitionLabel(e).length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
+ function place(){
  if(mode==='circle'){
   let left=160;
   for(const root of roots){
@@ -59,8 +60,7 @@ export function autoLayout(machine,mode='tree',spacing=1) {
    for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
    left+=radius*2+step;
   }
-  positionComments(anchors);
-  return machine;
+  return;
  }
  let forestTop=100;
  for(const root of roots){
@@ -74,9 +74,50 @@ export function autoLayout(machine,mode='tree',spacing=1) {
   }
   forestTop+=heights.get(root)+120*spacing;
  }
+ }
+ place();
+ let best=layoutScore(machine),trials=0;
+ // Keep subtree bands intact; only reorder siblings, with bounded search on large graphs.
+ for(let pass=0;pass<3;pass++){
+  let improved=false;
+  for(const branches of children.values())for(let i=0;i<branches.length;i++)for(let j=i+1;j<branches.length;j++){
+   if(trials++>=300)break;
+   [branches[i],branches[j]]=[branches[j],branches[i]];place();const score=layoutScore(machine);
+   if(score.crossings<best.crossings||score.crossings===best.crossings&&score.length<best.length-1e-6){best=score;improved=true}else [branches[i],branches[j]]=[branches[j],branches[i]];
+  }
+  if(!improved||trials>=300)break;
+ }
+ place();
+ if(portals){
+  for(let attempts=0;attempts<machine.edges.length;attempts++){
+   const pairs=crossingPairs(machine,true);if(!pairs.length)break;
+   const counts=new Map();for(const pair of pairs)for(const i of pair)counts.set(i,(counts.get(i)??0)+1);
+   const index=[...counts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];enablePortal(machine,machine.edges[index]);
+  }
+ }
  positionComments(anchors);
  return machine;
 }
+function visibleSegments(machine){
+ const states=new Map(machine.states.map(s=>[s.id,s]));
+ return machine.edges.flatMap((e,i)=>e.portal==null&&e.from!==e.to&&states.has(e.from)&&states.has(e.to)?[{i,a:states.get(e.from),b:states.get(e.to)}]:[]);
+}
+function intersects(a,b,c,d){
+ const turn=(p,q,r)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
+ return turn(a,b,c)*turn(a,b,d)<-1e-8&&turn(c,d,a)*turn(c,d,b)<-1e-8;
+}
+export function crossingPairs(machine,routed=false){
+ const segments=visibleSegments(machine),pairs=[],routes=routed?routeEdges(machine):null,paths=routed?new Map(segments.map(e=>[e.i,Array.from({length:17},(_,i)=>sample(routes[e.i],i/16))])):null;
+ for(let i=0;i<segments.length;i++)for(let j=i+1;j<segments.length;j++){
+  const a=segments[i],b=segments[j];if(a.a===b.a||a.a===b.b||a.b===b.a||a.b===b.b)continue;
+  let crossing=false;
+  if(paths){const p=paths.get(a.i),q=paths.get(b.i);for(let u=1;u<p.length&&!crossing;u++)for(let v=1;v<q.length;v++)if(intersects(p[u-1],p[u],q[v-1],q[v])){crossing=true;break}}
+  else crossing=intersects(a.a,a.b,b.a,b.b);
+  if(crossing)pairs.push([a.i,b.i]);
+ }
+ return pairs;
+}
+function layoutScore(machine){return {crossings:crossingPairs(machine).length,length:visibleSegments(machine).reduce((n,e)=>n+Math.hypot(e.a.x-e.b.x,e.a.y-e.b.y),0)}}
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 function sample(c,t){const a=at(c.p0,c.c1,t),b=at(c.c1,c.c2,t),d=at(c.c2,c.p3,t);return at(at(a,b,t),at(b,d,t),t)}
 function overlaps(a,b){return Math.abs(a.x-b.x)<(a.w+b.w)/2+8&&Math.abs(a.y-b.y)<(a.h+b.h)/2+8}
