@@ -17,6 +17,10 @@ export function setupInputHighlights(input,mirror,colorClass){
   if(native)return mirror.firstChild?firstRect(range(start,end)):null;
   return mirror.querySelector(`[data-input-offset="${start}"]`)?.getClientRects()[0]??null;
  }
+ function rects(start,end){
+  if(native)return mirror.firstChild?[...range(start,end).getClientRects()]:[];
+  const span=mirror.querySelector(`[data-input-offset="${start}"]`);return span?[...span.getClientRects()]:[];
+ }
  function step(frame){
   clearStep();if(!(frame.end>frame.offset))return null;
   if(native){if(!mirror.firstChild)return null;const r=range(frame.offset,frame.end),highlight=new Highlight(r);highlight.priority=1;CSS.highlights.set('lexica-step',highlight);return firstRect(r)}
@@ -26,5 +30,5 @@ export function setupInputHighlights(input,mirror,colorClass){
   }
   return mirror.querySelector('.step-character')?.getBoundingClientRect()??null;
  }
- return {render,rect,step,clearStep};
+ return {render,rect,rects,step,clearStep};
 }

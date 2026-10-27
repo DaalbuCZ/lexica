@@ -1,4 +1,4 @@
-import {lexerSteps} from './lexer.js?v=52';
+import {lexerSteps} from './lexer.js?v=53';
 
 export function setupStepping({getMachine,traceToken,markFailures,highlights,onReset}){
  const $=id=>document.getElementById(id),input=$('input'),panel=document.querySelector('.tester');
@@ -20,7 +20,7 @@ export function setupStepping({getMachine,traceToken,markFailures,highlights,onR
   catch(error){frames.push({kind:'error',offset:frames.at(-1)?.offset??startOffset,end:frames.at(-1)?.offset??startOffset,message:error.message,traceStates:error.stateId?[error.stateId]:[],traceEdges:error.edgeIndices??[],failureState:error.stateId,edgeIndices:error.edgeIndices,token:'ERROR'});ended=true}
   index=frames.length-1;show();
  }
- function toggle(){if(iterator){reset();return}startOffset=input.selectionStart??0;iterator=lexerSteps(getMachine(),input.value,true,startOffset);next()}
+ function toggle(){if(iterator){reset();return}startOffset=0;iterator=lexerSteps(getMachine(),input.value,true,startOffset);next()}
  function previous(){if(index>0){index--;show()}}
  $('step-toggle').onclick=toggle;$('step-next').onclick=next;$('step-prev').onclick=previous;
  input.addEventListener('input',reset);input.addEventListener('pointerdown',reset);
