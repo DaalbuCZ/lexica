@@ -518,6 +518,7 @@ test('step controls move forward and backward, reset on edits, and expose matchi
  elements['step-toggle'].onclick();assert.equal(context.controller.active(),true);assert.match(elements['step-status'].textContent,/Start token/);assert.equal(elements['step-prev'].disabled,true);
  elements['step-next'].onclick();assert.equal(trace.character,'a');elements['step-prev'].onclick();assert.match(elements['step-status'].textContent,/Start token/);elements['step-next'].onclick();assert.equal(trace.character,'a');
  listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
+ elements.input.value='hi 42';elements.input.selectionStart=3;elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Start token at 3/);elements['step-next'].onclick();assert.equal(trace.character,'4');assert.equal(trace.offset,3);elements['step-stop'].onclick();
  machine.edges[0].label='';elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Transition cannot be empty/);assert.equal(elements['step-next'].disabled,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);
 });
 
@@ -582,4 +583,13 @@ test('spring force controls persist, reset, and are only shown for Spring layout
  runInNewContext('controls=setupSpringControls();',context);assert.equal(context.controls.read().repel,12);
  elements['layout-mode'].value='tree';events.change();assert.equal(elements['spring-forces'].hidden,true);elements['spring-reset'].onclick();assert.deepEqual(context.controls.read(),SPRING_DEFAULTS);
  context.localStorage={getItem(){throw Error('unavailable')},setItem(){throw Error('unavailable')}};assert.doesNotThrow(()=>runInNewContext('setupSpringControls();',context));
+});
+
+test('lexer stepping starts at the requested cursor with absolute offsets and intact Unicode characters',()=>{
+ const m=example(),input='hello 42 world',steps=[...lexerSteps(m,input,true,6)];assert.equal(steps[0].offset,6);assert.equal(steps.find(s=>s.kind==='character').character,'4');
+ const tokens=steps.filter(s=>s.result).map(s=>s.result);assert.equal(tokens[0].token,'NUMBER');assert.equal(tokens[0].offset,6);assert.equal(tokens[0].value,'42');assert.equal(tokens.at(-1).offset,9);assert.ok(steps.every(s=>s.offset>=6));
+ const inside=[...lexerSteps(m,input,true,2)];assert.equal(inside.find(s=>s.result).result.value,'llo');assert.equal(inside.find(s=>s.result).result.offset,2);
+ assert.deepEqual([...lexerSteps(m,input,true,input.length)].map(s=>[s.kind,s.offset]),[['done',input.length]]);
+ const unicode=[...lexerSteps(m,'x😀!',true,2)];assert.equal(unicode[0].offset,1);assert.equal(unicode.find(s=>s.result).result.value,'😀');assert.equal(unicode.at(-1).offset,4);
+ assert.deepEqual(tokenize(m,input).map(s=>s.value),['hello',' ','42',' ','world']);
 });

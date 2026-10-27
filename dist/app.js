@@ -1,12 +1,12 @@
 import {setupSpringControls} from './spring-controls.js?v=40';
-import {setupStepping} from './stepping.js?v=40';
+import {setupStepping} from './stepping.js?v=41';
 import {setupTesterResize} from './tester-resize.js?v=22';
 import {setupDocking} from './docking.js?v=17';
 import {stateLabel,transitionLabel} from './labels.js?v=16';
 import {insertState} from './transitions.js';
 import {commentLayout,makeComment,commentAnchors,commentNodeIds,positionComments,commentLinks,commentLinkKey,connectCommentNode,removeCommentLinks} from './comments.js?v=16';
-import {copySelection,pasteSelection} from './selection.js?v=40';
-import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=40';
+import {copySelection,pasteSelection} from './selection.js?v=41';
+import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=41';
 import {autoLayout,routeEdges} from './layout.js?v=40';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let machine=example(),selection={type:'state',id:'s1'},source=null,history=[],future=[];
 let stepper={reset(){}};

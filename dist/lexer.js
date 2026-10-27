@@ -23,10 +23,11 @@ export function matcher(label,invert=false){if(!label)throw Error('Transition ca
 export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
-export function* lexerSteps(m,input,stepping=true){
+export function* lexerSteps(m,input,stepping=true,startOffset=0){
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
- let pos=0;
+ let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
+ if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
   let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
   const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,...extra});
