@@ -76,18 +76,6 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  }
  }
  place();
- let best=layoutScore(machine),trials=0;
- // Keep subtree bands intact; only reorder siblings, with bounded search on large graphs.
- for(let pass=0;pass<3;pass++){
-  let improved=false;
-  for(const branches of children.values())for(let i=0;i<branches.length;i++)for(let j=i+1;j<branches.length;j++){
-   if(trials++>=300)break;
-   [branches[i],branches[j]]=[branches[j],branches[i]];place();const score=layoutScore(machine);
-   if(score.crossings<best.crossings||score.crossings===best.crossings&&score.length<best.length-1e-6){best=score;improved=true}else [branches[i],branches[j]]=[branches[j],branches[i]];
-  }
-  if(!improved||trials>=300)break;
- }
- place();
  if(portals){
   for(let attempts=0;attempts<machine.edges.length;attempts++){
    const pairs=crossingPairs(machine,true);if(!pairs.length)break;
@@ -117,7 +105,6 @@ export function crossingPairs(machine,routed=false){
  }
  return pairs;
 }
-function layoutScore(machine){return {crossings:crossingPairs(machine).length,length:visibleSegments(machine).reduce((n,e)=>n+Math.hypot(e.a.x-e.b.x,e.a.y-e.b.y),0)}}
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 function sample(c,t){const a=at(c.p0,c.c1,t),b=at(c.c1,c.c2,t),d=at(c.c2,c.p3,t);return at(at(a,b,t),at(b,d,t),t)}
 function overlaps(a,b){return Math.abs(a.x-b.x)<(a.w+b.w)/2+8&&Math.abs(a.y-b.y)<(a.h+b.h)/2+8}

@@ -58,7 +58,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
 test('tree layout reserves separate bands for uneven subtrees and centers each parent',()=>{
  const m={start:'root',states:['root','a','b','a1','a2','a3','b1','b2'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','a'],['root','b'],['a','a1'],['a','a2'],['a2','a3'],['b','b1'],['b','b2'],['b2','root']].map(([from,to])=>({from,to,label:'[a-z]'})),comments:[{id:'note',text:'Notes',x:0,y:0}]};
  autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
- const bandA=['a','a1','a2','a3'].map(id=>get(id).y),bandB=['b','b1','b2'].map(id=>get(id).y);assert.ok(Math.max(...bandA)+150<Math.min(...bandB)||Math.max(...bandB)+150<Math.min(...bandA));
+ assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
  assert.equal(get('root').y,(get('a').y+get('b').y)/2);
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
  assert.deepEqual(m.comments[0].nodeIds,['root']);assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
@@ -86,7 +86,7 @@ test('tree layout keeps a shared destination with its specific parent instead of
  const m={start:'root',states:['root','integer','other','dot','double','underscore'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','integer'],['root','other'],['integer','dot'],['dot','double'],['integer','underscore'],['underscore','integer'],['root','dot']].map(([from,to])=>({from,to,label:'x'}))};
  const edges=JSON.stringify(m.edges);autoLayout(m);const get=id=>m.states.find(s=>s.id===id);
  assert.ok(get('dot').x>get('integer').x);assert.ok(Math.abs(get('dot').y-get('integer').y)<300);
- const branch=['integer','dot','double','underscore'].map(id=>get(id).y);assert.ok(get('other').y>Math.max(...branch)||get('other').y<Math.min(...branch));
+ assert.ok(get('other').y>Math.max(get('integer').y,get('dot').y,get('double').y,get('underscore').y));
  assert.equal(JSON.stringify(m.edges),edges);validate(m);
 });
 test('radial layout centers the parent and spreads children around it with descendants farther out',()=>{
@@ -476,11 +476,11 @@ test('pointer redraws are coalesced into one animation frame using the latest mo
 
 import {crossingPairs} from './dist/layout.js';
 import {lexerSteps} from './dist/lexer.js';
-test('layout reorders branches to reduce crossings in tree and radial modes while preserving topology',()=>{
+test('tree and radial layouts keep stable subtree placement without changing topology',()=>{
  const links=[['s2','s3'],['s5','s7'],['s0','s3'],['s7','s5'],['s0','s6'],['s2','s4'],['s5','s8'],['s2','s9'],['s8','s3'],['s6','s5'],['s2','s1'],['s0','s3']];
  const m={start:'s0',states:Array.from({length:10},(_,i)=>({id:'s'+i,name:'state'+i,token:'',x:0,y:0})),edges:[...Array.from({length:9},(_,i)=>['s0','s'+(i+1)]),...links].map(([from,to])=>({from,to,label:'x'}))};
- for(const [mode,limit] of [['tree',2],['circle',3]]){
-  const next=autoLayout(structuredClone(m),mode);assert.ok(crossingPairs(next).length<=limit);assert.deepEqual(next.edges,m.edges);assert.equal(next.states.length,10);
+ for(const mode of ['tree','circle']){
+  const next=autoLayout(structuredClone(m),mode);assert.deepEqual(next.edges,m.edges);assert.equal(next.states.length,10);
   const first=JSON.stringify(next);autoLayout(next,mode);assert.equal(JSON.stringify(next),first);
   for(let i=0;i<next.states.length;i++)for(let j=i+1;j<next.states.length;j++)assert.ok(Math.hypot(next.states[i].x-next.states[j].x,next.states[i].y-next.states[j].y)>=72);
  }
