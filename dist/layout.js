@@ -81,6 +81,21 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  positionComments(anchors);
  return machine;
 }
+export function springSubtrees(machine){
+ const children=new Map(machine.states.map(s=>[s.id,[]])),outgoing=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),edges=[];
+ for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&target!==e.from&&outgoing.has(e.from)){outgoing.get(e.from).push(target);edges.push([e.from,target])}}
+ for(const root of [machine.start,...children.keys()]){
+  if(!children.has(root)||seen.has(root))continue;const stack=[{id:root,parent:null}];
+  while(stack.length){const {id,parent}=stack.pop();if(seen.has(id))continue;seen.add(id);if(parent!==null)children.get(parent).push(id);for(const next of [...outgoing.get(id)].reverse())if(!seen.has(next))stack.push({id:next,parent:id})}
+ }
+ const descendants=id=>{const result=[],stack=[id];while(stack.length){const next=stack.pop();result.push(next);stack.push(...children.get(next))}return result};
+ return [...children].filter(([,branches])=>branches.length>1).map(([parent,branches])=>{
+  const groups=branches.map(descendants),owner=new Map(groups.flatMap((ids,i)=>ids.map(id=>[id,i]))),interactions=groups.map(()=>groups.map(()=>0));
+  for(const [from,to] of edges){const a=owner.get(from),b=owner.get(to);if(a!==undefined&&b!==undefined&&a!==b){interactions[a][b]++;interactions[b][a]++}}
+  return {parent,groups,interactions};
+ });
+}
+
 export function springLayout(machine,spacing=1){
  const anchors=commentAnchors(machine),starts=['tree','circle'].map(mode=>new Map(autoLayout(structuredClone(machine),mode,spacing).states.map(s=>[s.id,{x:s.x,y:s.y}])));
  const states=new Map(machine.states.map(s=>[s.id,s])),neighbors=new Map(machine.states.map(s=>[s.id,[]]));
@@ -92,6 +107,7 @@ export function springLayout(machine,spacing=1){
   for(let i=0;i<ids.length;i++)for(const next of neighbors.get(ids[i]))if(!seen.has(next)){seen.add(next);ids.push(next)}
   const nodes=ids.map(id=>states.get(id));components.push({nodes,links:links.filter(e=>ids.includes(e.from.id))});
  }
+ const hierarchy=springSubtrees(machine);
  const looped=new Set(machine.edges.filter(e=>e.portal==null&&e.from===e.to).map(e=>e.from));
  const radius=s=>Math.max(Math.max(88,160*spacing)/2,looped.has(s.id)?100:0,s.portal?80:0,s.token?Math.max(65,s.token.length*3.5):0);
  let best=null;
@@ -100,6 +116,7 @@ export function springLayout(machine,spacing=1){
   let left=160;
   for(const component of components){
    const nodes=component.nodes,index=new Map(nodes.map((s,i)=>[s.id,i]));
+   const families=hierarchy.filter(h=>index.has(h.parent)).map(h=>({...h,groups:h.groups.map(ids=>ids.map(id=>index.get(id)))}));
    const initial=starts[seed],origin=initial?.get(nodes[0].id);
    nodes.forEach((s,i)=>{if(initial){const p=initial.get(s.id);s.x=p.x-origin.x;s.y=p.y-origin.y}else{const angle=i*(2.3999632297+(seed-2)*.51),r=i?ideal*Math.sqrt(i):0;s.x=Math.cos(angle)*r;s.y=Math.sin(angle)*r}});
    for(let iteration=0;iteration<320;iteration++){
@@ -110,6 +127,17 @@ export function springLayout(machine,spacing=1){
      forces[i].x-=fx;forces[i].y-=fy;forces[j].x+=fx;forces[j].y+=fy;
     }
     for(const e of component.links){const dx=e.to.x-e.from.x,dy=e.to.y-e.from.y,d=Math.hypot(dx,dy)||1,force=(d-e.length)*.08,fx=dx/d*force,fy=dy/d*force,a=index.get(e.from.id),b=index.get(e.to.id);forces[a].x+=fx;forces[a].y+=fy;forces[b].x-=fx;forces[b].y-=fy}
+    // Translate each subtree together: interacting siblings attract, unrelated siblings repel.
+    for(const family of families){
+     const centers=family.groups.map(group=>{const x=group.reduce((n,i)=>n+nodes[i].x,0)/group.length,y=group.reduce((n,i)=>n+nodes[i].y,0)/group.length;return {x,y,radius:Math.sqrt(group.reduce((n,i)=>n+(nodes[i].x-x)**2+(nodes[i].y-y)**2,0)/group.length)+group.reduce((n,i)=>n+radius(nodes[i]),0)/group.length}});
+     for(let a=0;a<centers.length;a++)for(let b=a+1;b<centers.length;b++){
+      const p=centers[a],q=centers[b];let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy);if(d<.01){dx=Math.cos(a+b+seed);dy=Math.sin(a+b+seed);d=1}
+      const weight=family.interactions[a][b],rest=p.radius+q.radius+ideal*(weight?0.65:1.3),force=(weight?(d-rest)*.055*Math.sqrt(weight):-ideal*ideal*8/(d*d)-Math.max(0,rest-d)*.25)/Math.sqrt(centers.length);
+      const fx=dx/d*force,fy=dy/d*force;
+      for(const i of family.groups[a]){forces[i].x+=fx;forces[i].y+=fy}for(const i of family.groups[b]){forces[i].x-=fx;forces[i].y-=fy}
+     }
+     for(let g=0;g<family.groups.length;g++)if(family.groups[g].length>1)for(const i of family.groups[g]){forces[i].x+=(centers[g].x-nodes[i].x)*.006;forces[i].y+=(centers[g].y-nodes[i].y)*.006}
+    }
     const temperature=ideal*.25*(1-iteration/320)**2+.1;
     for(let i=1;i<nodes.length;i++){const s=nodes[i],f=forces[i];f.x-=s.x*.001;f.y-=s.y*.001;const scale=Math.min(1,temperature/(Math.hypot(f.x,f.y)||1));s.x+=f.x*scale;s.y+=f.y*scale}
    }

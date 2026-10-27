@@ -557,3 +557,13 @@ test('spring layout can automatically portalize crossings without changing state
  const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
  const expected=tokenize(m,'a0b1c2');autoLayout(m,'spring',.75,true);assert.equal(crossingPairs(m,true).length,0);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.deepEqual(tokenize(m,'a0b1c2'),expected);
 });
+
+import {springSubtrees} from './dist/layout.js';
+test('spring subtree interactions count cross-links but exclude shared-parent links and self loops',()=>{
+ const ids=['r','a','a1','a2','b','b1','b2','c','c1','c2'],pairs=[['r','a'],['r','b'],['r','c'],['a','a1'],['a','a2'],['b','b1'],['b','b2'],['c','c1'],['c','c2'],['b2','a2'],['c','c']];
+ const m={start:'r',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to])=>({from,to,label:'x'}))};
+ const root=springSubtrees(m).find(h=>h.parent==='r');assert.deepEqual(root.groups.map(g=>[...g].sort()),[['a','a1','a2'],['b','b1','b2'],['c','c1','c2']]);assert.deepEqual(root.interactions,[[0,1,0],[1,0,0],[0,0,0]]);
+ assert.ok(springSubtrees(m).some(h=>h.parent==='a'&&h.groups.length===2));enablePortal(m,m.edges[9]);assert.deepEqual(springSubtrees(m).find(h=>h.parent==='r').interactions,root.interactions);
+ autoLayout(m,'spring',.75);const centers=root.groups.map(group=>({x:group.reduce((n,id)=>n+m.states.find(s=>s.id===id).x,0)/group.length,y:group.reduce((n,id)=>n+m.states.find(s=>s.id===id).y,0)/group.length})),distance=(a,b)=>Math.hypot(centers[a].x-centers[b].x,centers[a].y-centers[b].y);
+ assert.ok(distance(0,1)<distance(0,2));assert.ok(distance(0,1)<distance(1,2));validate(m);
+});
