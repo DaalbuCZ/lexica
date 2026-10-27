@@ -236,7 +236,7 @@ test('pasted machine JSON shares file validation and enforces the 1 MB limit',()
 test('invalid pasted imports preserve the graph and valid imports can be undone',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function importMachine('),app.indexOf("$('import').onclick"));
  const original=example(),history=[],fields={'import-dialog':{open:true,close(){this.open=false}},'import-json':{value:'pasted JSON'}};
- const context={machine:original,parseMachine,$:id=>fields[id],checkpoint:()=>history.push(JSON.stringify(context.machine)),cancelConnect:()=>{},clearSelection:()=>{},showProperties:()=>{},changed:()=>{},fit:()=>{},toast:()=>{}};
+ const context={machine:original,parseMachine,restoreTester(){},$:id=>fields[id],checkpoint:()=>history.push(JSON.stringify(context.machine)),cancelConnect:()=>{},clearSelection:()=>{},showProperties:()=>{},changed:()=>{},fit:()=>{},toast:()=>{}};
  runInNewContext(script,context);assert.throws(()=>context.importMachine('{broken'),/Invalid JSON/);assert.equal(context.machine,original);assert.equal(history.length,0);assert.equal(fields['import-dialog'].open,true);
  const next=example();next.states[1].name='Imported identifier';context.importMachine(JSON.stringify(next));
  assert.deepEqual(context.machine,next);assert.equal(fields['import-dialog'].open,false);assert.equal(fields['import-json'].value,'');assert.deepEqual(JSON.parse(history.pop()),original);
@@ -618,4 +618,14 @@ test('lexer error count updates on edits and disables navigation for clean input
  input.selectionEnd=2;button.onclick();assert.equal(selected.offset,3);input.selectionEnd=5;button.onclick();assert.equal(selected.offset,1);
  nav.update([{token:'ERROR',value:'!',offset:1}]);assert.equal(count.textContent,'1 error');nav.update([]);assert.equal(count.textContent,'0 errors');assert.equal(button.disabled,true);
  nav.update([],true);assert.equal(count.textContent,'1 error');assert.equal(button.disabled,true);
+});
+
+import {machineWithTester,restoreTester} from './dist/tester-state.js';
+test('saved machines restore tester text and skipped-token preference, including blank input',()=>{
+ const m=example(),input={value:'hi\t42\n😀'},skip={checked:true},saved=machineWithTester(m,input,skip),parsed=parseMachine(JSON.stringify(saved));
+ assert.deepEqual(parsed.tester,{input:input.value,showSkipped:true});assert.equal(m.tester,undefined);assert.deepEqual(tokenize(parsed,input.value),tokenize(m,input.value));
+ const restored={value:'default'},restoredSkip={checked:false};restoreTester(parsed,restored,restoredSkip);assert.equal(restored.value,input.value);assert.equal(restoredSkip.checked,true);
+ restoreTester({...m,tester:{input:''}},restored,restoredSkip);assert.equal(restored.value,'');assert.equal(restoredSkip.checked,false);
+ restored.value='keep current text';restoreTester(m,restored,restoredSkip);assert.equal(restored.value,'keep current text');
+ for(const tester of [null,[],{input:42},{input:'x',showSkipped:'yes'}])assert.throws(()=>validate({...m,tester}),/tester/);
 });

@@ -1,14 +1,15 @@
+import {machineWithTester,restoreTester} from './tester-state.js?v=47';
 import {setupErrorNavigation} from './error-navigation.js?v=46';
 import {setupInputHighlights} from './input-highlights.js?v=44';
 import {setupSpringControls} from './spring-controls.js?v=40';
-import {setupStepping} from './stepping.js?v=44';
+import {setupStepping} from './stepping.js?v=47';
 import {setupTesterResize} from './tester-resize.js?v=22';
 import {setupDocking} from './docking.js?v=17';
 import {stateLabel,transitionLabel} from './labels.js?v=16';
 import {insertState} from './transitions.js';
 import {commentLayout,makeComment,commentAnchors,commentNodeIds,positionComments,commentLinks,commentLinkKey,connectCommentNode,removeCommentLinks} from './comments.js?v=16';
-import {copySelection,pasteSelection} from './selection.js?v=41';
-import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=41';
+import {copySelection,pasteSelection} from './selection.js?v=47';
+import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=47';
 import {autoLayout,routeEdges} from './layout.js?v=40';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let machine=example(),selection={type:'state',id:'s1'},source=null,history=[],future=[];
 let stepper={reset(){}},errorNav={update(){}};
@@ -29,9 +30,10 @@ $('canvas').addEventListener('pointerdown',e=>{if((source||commentSource)&&e.but
 async function copyItems(cut=false){const fragment=copySelection(machine,selectedStates,selectedEdges,selectedComments,selectedCommentLinks);if(!fragment.states.length&&!fragment.edges.length&&!fragment.comments.length)return;clipboardText=JSON.stringify(fragment);pasteCount=0;try{await navigator.clipboard.writeText(clipboardText);toast(cut?'Selection cut.':'Selection copied.')}catch{toast('Copied inside this editor.')}if(cut)remove()}
 async function pasteItems(){let text=clipboardText;try{text=await navigator.clipboard.readText()||text}catch{}try{if(text.length>1000000)throw Error('Clipboard selection is too large.');if(text!==clipboardText)pasteCount=0;const next=structuredClone(machine),result=pasteSelection(next,JSON.parse(text),{x:40*(pasteCount+1),y:40*(pasteCount+1)});clipboardText=text;checkpoint();machine=next;selectedStates=result.states;selectedEdges=result.edges;selectedComments=result.comments;selectedCommentLinks.clear();primaryFromSelection();pasteCount++;showProperties(false);changed()}catch(error){toast(error.message)}}
 try{const saved=localStorage.getItem('lexica-machine');if(saved)machine=validate(JSON.parse(saved))}catch{toast('Could not restore saved machine. Example loaded.')}
+restoreTester(machine,$('input'),$('show-skipped'));
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500)}
 function checkpoint(){history.push(JSON.stringify(machine));if(history.length>80)history.shift();future=[]}
-function save(){try{localStorage.setItem('lexica-machine',JSON.stringify(machine));document.querySelector('.local').innerHTML='<i></i> Saved locally'}catch{document.querySelector('.local').textContent='Storage unavailable - export to save'}}
+function save(){try{localStorage.setItem('lexica-machine',JSON.stringify(machineWithTester(machine,$('input'),$('show-skipped'))));document.querySelector('.local').innerHTML='<i></i> Saved locally'}catch{document.querySelector('.local').textContent='Storage unavailable - export to save'}}
 function changed(){save();render()}
 let drawFrame=null;
 function queueDraw(){if(drawFrame!==null)return;drawFrame=requestAnimationFrame(()=>{drawFrame=null;draw();drawMap()})}
@@ -130,13 +132,13 @@ document.addEventListener('selectionchange',()=>{if(document.activeElement===$('
 function syncInputLayout(){const input=$('input'),highlights=$('input-highlights');if(!input||!highlights)return;highlights.style.paddingRight=(11+Math.max(0,input.offsetWidth-input.clientWidth))+'px';highlights.scrollTop=input.scrollTop;highlights.scrollLeft=input.scrollLeft}
 function renderInputHighlights(tokens){inputHighlights.render(tokens);syncInputLayout()}
 function markFailures(states=[],edges=[]){document.querySelectorAll('[data-node]').forEach(el=>el.classList.toggle('failure-state',states.includes(el.dataset.node)));document.querySelectorAll('[data-edge]').forEach(el=>el.classList.toggle('runtime-error',edges.includes(+el.dataset.edge)))}
-function test(){traceToken(null);markFailures();try{const all=tokenize(machine,$('input').value);errorNav.update(all);markFailures(all.filter(t=>t.token==='ERROR').map(t=>t.failureState));visibleTokens=all.filter(t=>$('show-skipped').checked||!t.skip);$('tokens').innerHTML=visibleTokens.length?visibleTokens.map((t,i)=>{const color=t.token==='ERROR'?' error':' token-tinted '+tokenColorClass(t.token);return `<div class="token${color}${t.skip?' token-skipped':''}" data-token-index="${i}" tabindex="0" role="button" title="Click to select in input · Hover to trace in graph · Offset ${t.offset}"><b>${esc(t.token)}${t.skip?' · skip':''}</b>${esc(JSON.stringify(t.value))}</div>`}).join(''):'<span class="empty">Type some input to see tokens.</span>';renderInputHighlights(all)}catch(err){errorNav.update([],true);markFailures(err.stateId?[err.stateId]:[],err.edgeIndices??[]);visibleTokens=[];$('tokens').innerHTML=`<span class="lexer-error" role="alert">${esc(err.message)}</span>`;$('input-highlights').innerHTML=''}}$('input').oninput=()=>{test();focusInputToken()};$('input').onscroll=syncInputLayout;window.addEventListener('resize',syncInputLayout);
+function test(){traceToken(null);markFailures();try{const all=tokenize(machine,$('input').value);errorNav.update(all);markFailures(all.filter(t=>t.token==='ERROR').map(t=>t.failureState));visibleTokens=all.filter(t=>$('show-skipped').checked||!t.skip);$('tokens').innerHTML=visibleTokens.length?visibleTokens.map((t,i)=>{const color=t.token==='ERROR'?' error':' token-tinted '+tokenColorClass(t.token);return `<div class="token${color}${t.skip?' token-skipped':''}" data-token-index="${i}" tabindex="0" role="button" title="Click to select in input · Hover to trace in graph · Offset ${t.offset}"><b>${esc(t.token)}${t.skip?' · skip':''}</b>${esc(JSON.stringify(t.value))}</div>`}).join(''):'<span class="empty">Type some input to see tokens.</span>';renderInputHighlights(all)}catch(err){errorNav.update([],true);markFailures(err.stateId?[err.stateId]:[],err.edgeIndices??[]);visibleTokens=[];$('tokens').innerHTML=`<span class="lexer-error" role="alert">${esc(err.message)}</span>`;$('input-highlights').innerHTML=''}}$('input').oninput=()=>{save();test();focusInputToken()};$('input').onscroll=syncInputLayout;window.addEventListener('resize',syncInputLayout);
 function exportSvg(){const svg=$('canvas').cloneNode(true);svg.setAttribute('xmlns','http://www.w3.org/2000/svg');svg.setAttribute('width','820');svg.setAttribute('height','510');const box=$('diagram').getBBox();svg.setAttribute('viewBox',`${box.x-30} ${box.y-30} ${box.width+60} ${box.height+60}`);svg.querySelector('.connection-preview')?.remove();const style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent='.edge{fill:none;stroke:#65755d;stroke-width:1.6;marker-end:url(#arrow)}.edge-hit,.comment-link-hit{display:none}.edge-label-box{fill:white;stroke:#798b79;stroke-width:1}.edge-text.boxed{stroke:none}.edge-text{font:11px monospace;fill:#53634b;paint-order:stroke;stroke:white;stroke-width:6px}.node circle{fill:#f9fbf5;stroke:#718664;stroke-width:1.7}.node .inner{fill:none}.node text{text-anchor:middle;font:12px sans-serif;fill:#425838}.node .token-label{font:9px monospace}.portal path{fill:#edf5e9;stroke:#386b4e;stroke-width:1.2}.portal text{font:10px monospace;fill:#386b4e}.portal-wire{stroke:#386b4e;fill:none}.invalid path{stroke:#b54f3c}.invalid text{fill:#b54f3c}.comment-label rect{fill:#fff9da;stroke:#cbb879;stroke-width:1}.comment-label text{font:11px sans-serif;fill:#756536}.selection-box,.comment-preview{display:none}.comment-link{fill:none;stroke:#8b907e;stroke-width:1.4;stroke-dasharray:6 5}';svg.prepend(style);return new XMLSerializer().serializeToString(svg)}
-function exportText(){return $('format').value==='tex'?toTikz(machine,$('standalone').checked):$('format').value==='json'?JSON.stringify(machine,null,2):exportSvg()}
+function exportText(){return $('format').value==='tex'?toTikz(machine,$('standalone').checked):$('format').value==='json'?JSON.stringify(machineWithTester(machine,$('input'),$('show-skipped')),null,2):exportSvg()}
 function preview(){document.querySelector('.export-help').hidden=$('format').value!=='tex';try{$('export-preview').value=exportText();$('download').textContent='↓ Download .'+$('format').value;$('standalone-label').style.visibility=$('format').value==='tex'?'visible':'hidden'}catch(err){toast(err.message)}}
 function openExport(){$('app-menu').hidePopover();preview();$('export-dialog').showModal()}$('export').onclick=openExport;$('close-dialog').onclick=()=>$('export-dialog').close();$('format').onchange=preview;$('standalone').onchange=preview;$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(exportText());toast('Copied to clipboard.')}catch{toast('Select and copy the export preview.')}};$('download').onclick=()=>{const ext=$('format').value;const blob=new Blob([exportText()],{type:ext==='svg'?'image/svg+xml':ext==='json'?'application/json':'application/x-tex'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='lexer.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 function importMachine(text){
- const next=parseMachine(text);checkpoint();cancelConnect();machine=next;clearSelection();showProperties(false);changed();fit();$('import-dialog').close();$('import-json').value='';toast('Machine imported. Undo to restore the previous machine.');
+ const next=parseMachine(text);checkpoint();cancelConnect();machine=next;restoreTester(machine,$('input'),$('show-skipped'));clearSelection();showProperties(false);changed();fit();$('import-dialog').close();$('import-json').value='';toast('Machine imported. Undo to restore the previous machine.');
 }
 $('import').onclick=()=>{$('app-menu').hidePopover();$('import-error').textContent='';$('import-dialog').showModal();$('import-json').focus()};
 $('close-import').onclick=()=>$('import-dialog').close();
@@ -169,7 +171,7 @@ function resizeCanvas(){
 }
 new ResizeObserver(resizeCanvas).observe($('canvas'));
 
-$('show-skipped').onchange=test;
+$('show-skipped').onchange=()=>{save();test()};
 
 try{$('layout-portals').checked=localStorage.getItem('lexica-layout-portals')==='true'}catch{}
 $('layout-portals').onchange=()=>{try{localStorage.setItem('lexica-layout-portals',String($('layout-portals').checked))}catch{}};
