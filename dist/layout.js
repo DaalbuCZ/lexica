@@ -6,6 +6,7 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const anchors=commentAnchors(machine);
+ if(mode==='spring'){springLayout(machine,spacing);if(portals)portalizeCrossings(machine);positionComments(anchors);return machine}
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[],parents=new Map();
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
  for(const e of machine.edges){let target;try{target=destination(machine,e)?.id}catch{continue}if(target&&e.from!==target)outgoing.get(e.from)?.push(target)}
@@ -76,16 +77,71 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false) {
  }
  }
  place();
- if(portals){
-  for(let attempts=0;attempts<machine.edges.length;attempts++){
-   const pairs=crossingPairs(machine,true);if(!pairs.length)break;
-   const counts=new Map();for(const pair of pairs)for(const i of pair)counts.set(i,(counts.get(i)??0)+1);
-   const index=[...counts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];enablePortal(machine,machine.edges[index]);
-  }
- }
+ if(portals)portalizeCrossings(machine);
  positionComments(anchors);
  return machine;
 }
+export function springLayout(machine,spacing=1){
+ const anchors=commentAnchors(machine),starts=['tree','circle'].map(mode=>new Map(autoLayout(structuredClone(machine),mode,spacing).states.map(s=>[s.id,{x:s.x,y:s.y}])));
+ const states=new Map(machine.states.map(s=>[s.id,s])),neighbors=new Map(machine.states.map(s=>[s.id,[]]));
+ const ideal=Math.max(130,320*spacing),links=[];
+ for(const e of machine.edges){let to;try{to=destination(machine,e)}catch{continue}const from=states.get(e.from);if(!from||!to||from===to)continue;links.push({from,to,length:Math.max(ideal,transitionLabel(e).length*7+90)});neighbors.get(from.id).push(to.id);neighbors.get(to.id).push(from.id)}
+ const seen=new Set(),components=[];
+ for(const root of [machine.start,...[...states.keys()].sort()]){
+  if(!states.has(root)||seen.has(root))continue;const ids=[root];seen.add(root);
+  for(let i=0;i<ids.length;i++)for(const next of neighbors.get(ids[i]))if(!seen.has(next)){seen.add(next);ids.push(next)}
+  const nodes=ids.map(id=>states.get(id));components.push({nodes,links:links.filter(e=>ids.includes(e.from.id))});
+ }
+ const looped=new Set(machine.edges.filter(e=>e.portal==null&&e.from===e.to).map(e=>e.from));
+ const radius=s=>Math.max(Math.max(88,160*spacing)/2,looped.has(s.id)?100:0,s.portal?80:0,s.token?Math.max(65,s.token.length*3.5):0);
+ let best=null;
+ // Try eight deterministic starting arrangements; prefer fewer crossings, then shorter links.
+ for(let seed=0;seed<8;seed++){
+  let left=160;
+  for(const component of components){
+   const nodes=component.nodes,index=new Map(nodes.map((s,i)=>[s.id,i]));
+   const initial=starts[seed],origin=initial?.get(nodes[0].id);
+   nodes.forEach((s,i)=>{if(initial){const p=initial.get(s.id);s.x=p.x-origin.x;s.y=p.y-origin.y}else{const angle=i*(2.3999632297+(seed-2)*.51),r=i?ideal*Math.sqrt(i):0;s.x=Math.cos(angle)*r;s.y=Math.sin(angle)*r}});
+   for(let iteration=0;iteration<320;iteration++){
+    const forces=nodes.map(()=>({x:0,y:0}));
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+     const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<.01){dx=1;dy=0;d=1}
+     const minimum=radius(a)+radius(b),repel=ideal*ideal*5/(d*d)+Math.max(0,minimum-d)*.8,fx=dx/d*repel,fy=dy/d*repel;
+     forces[i].x-=fx;forces[i].y-=fy;forces[j].x+=fx;forces[j].y+=fy;
+    }
+    for(const e of component.links){const dx=e.to.x-e.from.x,dy=e.to.y-e.from.y,d=Math.hypot(dx,dy)||1,force=(d-e.length)*.08,fx=dx/d*force,fy=dy/d*force,a=index.get(e.from.id),b=index.get(e.to.id);forces[a].x+=fx;forces[a].y+=fy;forces[b].x-=fx;forces[b].y-=fy}
+    const temperature=ideal*.25*(1-iteration/320)**2+.1;
+    for(let i=1;i<nodes.length;i++){const s=nodes[i],f=forces[i];f.x-=s.x*.001;f.y-=s.y*.001;const scale=Math.min(1,temperature/(Math.hypot(f.x,f.y)||1));s.x+=f.x*scale;s.y+=f.y*scale}
+   }
+   // Resolve residual collisions after the cooled simulation without changing graph topology.
+   for(let pass=0;pass<200;pass++){
+    let overlap=false;
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+     const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<.01){dx=1;dy=0;d=1}const minimum=radius(a)+radius(b)+1;if(d>=minimum)continue;
+     overlap=true;const shift=(minimum-d)/2+.01;a.x-=dx/d*shift;a.y-=dy/d*shift;b.x+=dx/d*shift;b.y+=dy/d*shift;
+    }
+    if(!overlap)break;
+   }
+   const minX=Math.min(...nodes.map(s=>s.x-radius(s))),minY=Math.min(...nodes.map(s=>s.y-radius(s)));
+   for(const s of nodes){s.x+=left-minX;s.y+=120-minY}
+   left=Math.max(...nodes.map(s=>s.x+radius(s)))+ideal;
+  }
+  positionComments(anchors);
+  const crossings=crossingPairs(machine,true).length,length=routeEdges(machine).reduce((sum,e)=>sum+Math.hypot(e.c1.x-e.p0.x,e.c1.y-e.p0.y)+Math.hypot(e.c2.x-e.c1.x,e.c2.y-e.c1.y)+Math.hypot(e.p3.x-e.c2.x,e.p3.y-e.c2.y),0);
+  if(!best||crossings<best.crossings||crossings===best.crossings&&length<best.length)best={crossings,length,positions:machine.states.map(s=>({x:s.x,y:s.y}))};
+ }
+ if(best)machine.states.forEach((s,i)=>Object.assign(s,best.positions[i]));
+ positionComments(anchors);
+ return machine;
+}
+function portalizeCrossings(machine){
+ for(let attempts=0;attempts<machine.edges.length;attempts++){
+  const pairs=crossingPairs(machine,true);if(!pairs.length)break;
+  const counts=new Map();for(const pair of pairs)for(const i of pair)counts.set(i,(counts.get(i)??0)+1);
+  const index=[...counts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];enablePortal(machine,machine.edges[index]);
+ }
+}
+
 function visibleSegments(machine){
  const states=new Map(machine.states.map(s=>[s.id,s]));
  return machine.edges.flatMap((e,i)=>e.portal==null&&e.from!==e.to&&states.has(e.from)&&states.has(e.to)?[{i,a:states.get(e.from),b:states.get(e.to)}]:[]);

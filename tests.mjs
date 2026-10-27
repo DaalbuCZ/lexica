@@ -210,6 +210,7 @@ test('both layout dropdowns persist across reloads and reject invalid saved choi
  let fields=boot();assert.equal(fields['layout-mode'].value,'circle');assert.equal(fields['layout-density'].value,'0.35');
  fields['layout-mode'].value='tree';fields['layout-mode'].onchange();fields['layout-density'].value='0.5';fields['layout-density'].onchange();
  fields=boot();assert.equal(fields['layout-mode'].value,'tree');assert.equal(fields['layout-density'].value,'0.5');
+ saved['lexica-layout-mode']='spring';fields=boot();assert.equal(fields['layout-mode'].value,'spring');
  saved['lexica-layout-mode']='unknown';saved['lexica-layout-density']='1.5';fields=boot();assert.equal(fields['layout-mode'].value,'tree');assert.equal(fields['layout-density'].value,'1');
  const fallback={'layout-mode':{value:'tree'},'layout-density':{value:'0.75'}};
  assert.doesNotThrow(()=>runInNewContext(script,{$:id=>fallback[id],localStorage:{getItem:()=>{throw Error('blocked')},setItem:()=>{throw Error('blocked')}}}));
@@ -528,4 +529,31 @@ test('stepping gives only the current state and latest transition a distinct hig
  assert.equal(nodes[0].classes.has('trace-highlight'),true);assert.equal(nodes[0].classes.has('step-current'),false);assert.equal(nodes[1].classes.has('step-current'),true);assert.equal(edges[0].classes.has('step-current'),false);assert.equal(edges[1].classes.has('step-current'),true);
  context.frame={traceStates:['a','b'],traceEdges:[0,1]};runInNewContext('traceToken(frame)',context);assert.ok([...nodes,...edges].every(el=>!el.classes.has('step-current')));
  runInNewContext('traceToken(null)',context);assert.ok([...nodes,...edges].every(el=>el.classes.size===0));
+});
+
+test('spring layout separates states, preserves lexer semantics and comment offsets, and is repeatable',()=>{
+ for(const spacing of [.35,.5,.75,1]){
+  const m=example();m.states.push({id:'disconnected',name:'alone',token:'',x:0,y:0});m.comments=[{id:'note',text:'Note',x:m.states[1].x+70,y:m.states[1].y-80,nodeIds:['s1']}];
+  const before=tokenize(m,'hi 42'),edges=structuredClone(m.edges);autoLayout(m,'spring',spacing);validate(m);assert.deepEqual(m.edges,edges);assert.deepEqual(tokenize(m,'hi 42'),before);
+  for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=88);
+  assert.ok(Math.abs(m.comments[0].x-m.states[1].x-70)<1e-6);assert.ok(Math.abs(m.comments[0].y-m.states[1].y+80)<1e-6);
+  const positions=m.states.map(s=>[s.x,s.y]);autoLayout(m,'spring',spacing);assert.deepEqual(m.states.map(s=>[s.x,s.y]),positions);
+ }
+});
+test('spring density controls spacing and supports cycles, portals, coincident nodes, and a single state',()=>{
+ const source=example();enablePortal(source,source.edges[0]);source.edges.push({from:'s1',to:'s0',label:'!'});for(const s of source.states){s.x=0;s.y=0}
+ const compact=autoLayout(structuredClone(source),'spring',.35),spacious=autoLayout(structuredClone(source),'spring',1);
+ const length=m=>m.edges.filter(e=>e.from!==e.to).reduce((n,e)=>{const a=m.states.find(s=>s.id===e.from),b=destination(m,e);return n+Math.hypot(a.x-b.x,a.y-b.y)},0);
+ assert.ok(length(spacious)>length(compact));assert.deepEqual(tokenize(compact,'hello 42'),tokenize(spacious,'hello 42'));
+ const one={start:'a',states:[{id:'a',name:'a',token:'A',x:0,y:0}],edges:[{from:'a',to:'a',label:'a'}]};autoLayout(one,'spring');assert.ok(Number.isFinite(one.states[0].x));assert.doesNotThrow(()=>toTikz(one));
+});
+test('spring multistart selection reduces crossings on a connected graph without requiring portals',()=>{
+ const links=[['s2','s3'],['s5','s7'],['s0','s3'],['s7','s5'],['s0','s6'],['s2','s4'],['s5','s8'],['s2','s9'],['s8','s3'],['s6','s5'],['s2','s1'],['s0','s3']];
+ const m={start:'s0',states:Array.from({length:10},(_,i)=>({id:'s'+i,name:'state'+i,token:'',x:0,y:0})),edges:[...Array.from({length:9},(_,i)=>['s0','s'+(i+1)]),...links].map(([from,to])=>({from,to,label:'x'}))};
+ autoLayout(m,'spring');assert.ok(crossingPairs(m).length<=3);assert.ok(crossingPairs(m,true).length<=3);assert.ok(m.edges.every(e=>e.portal==null));
+});
+
+test('spring layout can automatically portalize crossings without changing state or transition counts',()=>{
+ const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
+ const expected=tokenize(m,'a0b1c2');autoLayout(m,'spring',.75,true);assert.equal(crossingPairs(m,true).length,0);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.deepEqual(tokenize(m,'a0b1c2'),expected);
 });

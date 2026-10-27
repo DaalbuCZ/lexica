@@ -1,4 +1,4 @@
-import {lexerSteps} from './lexer.js?v=37';
+import {lexerSteps} from './lexer.js?v=38';
 
 export function setupStepping({getMachine,traceToken,markFailures,onReset}){
  const $=id=>document.getElementById(id),input=$('input'),panel=document.querySelector('.tester');

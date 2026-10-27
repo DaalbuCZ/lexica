@@ -1,12 +1,12 @@
-import {setupStepping} from './stepping.js?v=35';
+import {setupStepping} from './stepping.js?v=38';
 import {setupTesterResize} from './tester-resize.js?v=22';
 import {setupDocking} from './docking.js?v=17';
 import {stateLabel,transitionLabel} from './labels.js?v=16';
 import {insertState} from './transitions.js';
 import {commentLayout,makeComment,commentAnchors,commentNodeIds,positionComments,commentLinks,commentLinkKey,connectCommentNode,removeCommentLinks} from './comments.js?v=16';
-import {copySelection,pasteSelection} from './selection.js?v=37';
-import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=37';
-import {autoLayout,routeEdges} from './layout.js?v=37';
+import {copySelection,pasteSelection} from './selection.js?v=38';
+import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js?v=38';
+import {autoLayout,routeEdges} from './layout.js?v=38';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let machine=example(),selection={type:'state',id:'s1'},source=null,history=[],future=[];
 let stepper={reset(){}};
 let selectedStates=new Set(['s1']),selectedEdges=new Set(),selectedComments=new Set(),selectedCommentLinks=new Set(),toolMode='pan',marquee=null,clipboardText='',pasteCount=0,lastTransitionRule='';
@@ -141,7 +141,7 @@ $('import-file').onclick=()=>$('file').click();
 $('import-paste').onclick=()=>{try{importMachine($('import-json').value)}catch(err){$('import-error').textContent=err.message}};
 $('file').onchange=async()=>{try{const f=$('file').files[0];if(!f)return;if(f.size>1000000)throw Error('Machine is too large (maximum 1 MB).');importMachine(await f.text())}catch(err){$('import-error').textContent=err.message}$('file').value=''};
 function restoreLayoutSettings(){
- for(const [id,values] of [['layout-mode',['tree','circle']],['layout-density',['0.35','0.5','0.75','1']]]){
+ for(const [id,values] of [['layout-mode',['tree','circle','spring']],['layout-density',['0.35','0.5','0.75','1']]]){
   try{let value=localStorage.getItem('lexica-'+id);if(id==='layout-density'&&value==='1.5')value='1';if(values.includes(value))$(id).value=value}catch{}
   $(id).onchange=saveLayoutSettings;
  }
