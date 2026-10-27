@@ -374,9 +374,9 @@ test('properties use the full canvas height with a side-docked tester and stay i
 
 test('clicking a token selects its exact UTF-16 input range, including errors and skipped gaps',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function focusInputToken('));
- let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range},tokens={};
+ let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range,getBoundingClientRect:()=>({})},tokens={};
  const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
- runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
+ runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,inputHighlights:{rect:()=>null},stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
  tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
  let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
 });
@@ -513,8 +513,8 @@ test('step controls move forward and backward, reset on edits, and expose matchi
  const script=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function');
  const elements={},listeners={},panel={classList:{add(){},remove(){}}};for(const id of ['input','input-highlights','step-controls','step-toggle','step-prev','step-next','step-stop','step-status'])elements[id]={setAttribute(){}};
  elements.input.value='a';elements.input.addEventListener=(name,fn)=>listeners[name]=fn;elements['input-highlights'].querySelectorAll=()=>[];elements['input-highlights'].querySelector=()=>null;
- let machine=example(),resets=0,trace;const context={document:{getElementById:id=>elements[id],querySelector:()=>panel},lexerSteps,getMachine:()=>machine,traceToken:frame=>trace=frame,markFailures(){},onReset:()=>resets++};
- runInNewContext(script+'\nvar controller=setupStepping({getMachine,traceToken,markFailures,onReset});',context);
+ let machine=example(),resets=0,trace;const context={document:{getElementById:id=>elements[id],querySelector:()=>panel},lexerSteps,highlights:{clearStep(){},step:()=>null},getMachine:()=>machine,traceToken:frame=>trace=frame,markFailures(){},onReset:()=>resets++};
+ runInNewContext(script+'\nvar controller=setupStepping({getMachine,traceToken,markFailures,highlights,onReset});',context);
  elements['step-toggle'].onclick();assert.equal(context.controller.active(),true);assert.match(elements['step-status'].textContent,/Start token/);assert.equal(elements['step-prev'].disabled,true);
  elements['step-next'].onclick();assert.equal(trace.character,'a');elements['step-prev'].onclick();assert.match(elements['step-status'].textContent,/Start token/);elements['step-next'].onclick();assert.equal(trace.character,'a');
  listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
@@ -592,4 +592,16 @@ test('lexer stepping starts at the requested cursor with absolute offsets and in
  assert.deepEqual([...lexerSteps(m,input,true,input.length)].map(s=>[s.kind,s.offset]),[['done',input.length]]);
  const unicode=[...lexerSteps(m,'x😀!',true,2)];assert.equal(unicode[0].offset,1);assert.equal(unicode.find(s=>s.result).result.value,'😀');assert.equal(unicode.at(-1).offset,4);
  assert.deepEqual(tokenize(m,input).map(s=>s.value),['hello',' ','42',' ','world']);
+});
+
+test('range highlights preserve one text flow for tabs, wide glyphs, combining marks and joined emoji',()=>{
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
+ Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
+ const registry=new Map(),context={input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
+ runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);
+ context.tokens=[{token:'IDENT',value:'hi',offset:0},{token:'WS',value:'\t',offset:2,skip:true},{token:'ERROR',value:input.value.slice(3,-2),offset:3},{token:'NUMBER',value:'42',offset:input.value.length-2}];
+ runInNewContext('highlights.render(tokens);',context);assert.equal(mirror.firstChild.data,input.value+'\u200b');assert.equal('innerHTML' in mirror,false);
+ const numbers=[...registry.get('lexica-token-color-1')];assert.equal(numbers[1].start,input.value.length-2);assert.equal(numbers[1].end,input.value.length);
+ context.frame={offset:3,end:4};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,1);
+ runInNewContext('highlights.clearStep();',context);assert.equal(registry.has('lexica-step'),false);assert.equal(mirror.firstChild.data,input.value+'\u200b');
 });

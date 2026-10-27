@@ -243,3 +243,29 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .tester-actions{gap:4px}#step-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px}#step-toggle[aria-pressed=true]{color:var(--green)}
 
 .layout-popover{max-height:calc(100dvh - 24px);overflow-y:auto}.spring-forces{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:12px}.spring-forces[hidden]{display:none}.force-field{display:grid;grid-template-columns:1fr auto;gap:5px;font-size:11px}.force-field input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--green)}.force-field output{font-variant-numeric:tabular-nums;opacity:.8}.spring-forces button{padding:6px;font-size:11px}
+
+/* The text and highlight mirror must use identical glyph advances and tab stops. */
+#input,.input-highlights{font:12px/1.7 'IBM Plex Mono',monospace;tab-size:4;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;letter-spacing:normal;word-spacing:normal;font-kerning:none;font-variant-ligatures:none}
+
+::highlight(lexica-token-color-0){background-color:#e8f2fb;text-decoration:underline solid #3d7fb8;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-0){background-color:#25384a;text-decoration:underline solid #3d7fb8;text-decoration-thickness:1.5px;text-decoration:underline solid #7fb8e8;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-1){background-color:#e8f5ec;text-decoration:underline solid #478f60;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-1){background-color:#24382b;text-decoration:underline solid #478f60;text-decoration-thickness:1.5px;text-decoration:underline solid #72c08d;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-2){background-color:#fbf2df;text-decoration:underline solid #b88a33;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-2){background-color:#3b3323;text-decoration:underline solid #b88a33;text-decoration-thickness:1.5px;text-decoration:underline solid #d9b45f;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-3){background-color:#fbeaed;text-decoration:underline solid #c25a6c;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-3){background-color:#3d282d;text-decoration:underline solid #c25a6c;text-decoration-thickness:1.5px;text-decoration:underline solid #e58b9b;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-4){background-color:#f0ebfa;text-decoration:underline solid #8567bf;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-4){background-color:#322b43;text-decoration:underline solid #8567bf;text-decoration-thickness:1.5px;text-decoration:underline solid #b39ae6;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-5){background-color:#e6f5f3;text-decoration:underline solid #3f968c;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-5){background-color:#223b38;text-decoration:underline solid #3f968c;text-decoration-thickness:1.5px;text-decoration:underline solid #6fc6bb;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-6){background-color:#fceee5;text-decoration:underline solid #c47a43;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-6){background-color:#3d2f25;text-decoration:underline solid #c47a43;text-decoration-thickness:1.5px;text-decoration:underline solid #e19b65;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-7){background-color:#ebedfa;text-decoration:underline solid #6f79bf;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-7){background-color:#2a2d45;text-decoration:underline solid #6f79bf;text-decoration-thickness:1.5px;text-decoration:underline solid #9aa5ea;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-8){background-color:#fbeaf4;text-decoration:underline solid #bf5d92;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-8){background-color:#3c2934;text-decoration:underline solid #bf5d92;text-decoration-thickness:1.5px;text-decoration:underline solid #e28bb9;text-decoration-thickness:1.5px}
+::highlight(lexica-token-color-9){background-color:#eff6e4;text-decoration:underline solid #8aa13c;text-decoration-thickness:1.5px}
+[data-theme=dark] ::highlight(lexica-token-color-9){background-color:#303822;text-decoration:underline solid #8aa13c;text-decoration-thickness:1.5px;text-decoration:underline solid #b5c86b;text-decoration-thickness:1.5px}
+::highlight(lexica-error){background-color:#ffe3dc}[data-theme=dark] ::highlight(lexica-error){background-color:#4a2d27}
+::highlight(lexica-step){background-color:#a71abb;color:transparent}[data-theme=dark] ::highlight(lexica-step){background-color:#efb0ff;color:transparent}
