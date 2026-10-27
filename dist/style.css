@@ -294,3 +294,14 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme=dark] .settings-group p{color:#aebac3}
 [data-theme=dark] .simple-endpoints{background:#171c21}
 [data-theme=dark] .advanced-expression{border-color:var(--line)}
+/* Promoted editor controls */
+#theme-control{margin:4px 0 8px}
+#theme-control #theme-toggle{margin:0;padding:8px 10px;gap:8px;justify-content:flex-start}
+.toolbar #memory-cells{display:inline-flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.toolbar #memory-cells>span:first-child{font-family:'IBM Plex Mono',monospace;font-size:17px}
+.simplified-view #add-comment,.simplified-view #toggle-properties{display:none}
+.simple-memory{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+.simple-memory summary{cursor:pointer;font-size:11px;font-weight:600;padding:5px 0}
+.simple-memory[open]{padding-bottom:4px}
+.inspector-title{display:flex;align-items:center;justify-content:space-between}
+[data-theme=dark] .simple-memory{border-color:var(--line)}
