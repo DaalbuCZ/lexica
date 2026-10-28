@@ -1,3 +1,4 @@
+import {lexerConfigurationKey} from './lexer-cache.js';
 import {singleCharacterError} from './regex-analysis.js';
 import {stateLabel,transitionLabel} from './labels.js?v=17';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
@@ -36,6 +37,16 @@ function overlapCandidates(labels){const codes=new Set(Array.from({length:128},(
 function overlapWitness(a,b){const left=JSON.stringify([a.label,a.invert??false]),right=JSON.stringify([b.label,b.invert??false]),key=[left,right].sort().join('|');if(overlapCache.has(key))return overlapCache.get(key);const matchesA=matcher(a.label,a.invert),matchesB=matcher(b.label,b.invert);let witness=null;for(const character of overlapCandidates([a.label,b.label]))if(matchesA(character)&&matchesB(character)){witness=character;break}overlapCache.set(key,witness);return witness}
 export function ambiguousTransitionWitnesses(machine){const extended=machine.machineType==='extended'||(machine.machineType===undefined&&((machine.cells??[]).length||machine.edges.some(edge=>edge.guard||edge.effect))),signature=JSON.stringify([extended,machine.edges.map(edge=>[edge.from,edge.label,edge.invert??false,edge.guard??null])]);if(machineOverlapCache.has(signature))return machineOverlapCache.get(signature);const byState=new Map();machine.edges.forEach((edge,index)=>{const list=byState.get(edge.from)??[];list.push({...edge,index});byState.set(edge.from,list)});const found=new Map();for(const edges of byState.values())for(let i=0;i<edges.length;i++)for(let j=i+1;j<edges.length;j++){const a=edges[i],b=edges[j];if(extended&&!guardsMayOverlap(a.guard,b.guard))continue;try{const witness=overlapWitness(a,b);if(witness!==null){found.set(a.index,witness);found.set(b.index,witness)}}catch{}}machineOverlapCache.set(signature,found);return found}
 export function transitionError(m,e){try{matcher(e.label,e.invert);const expressionIssue=singleCharacterError(e.label,e.invert);if(expressionIssue)throw Error(expressionIssue);if(e.guard&&(!e.guard||!(m.cells??[]).some(c=>c.name===e.guard.cell)||!['==','!=','>','>=','<','<=','odd','even'].includes(e.guard.op)||!Number.isSafeInteger(e.guard.value)))throw Error('Invalid transition guard.');if(e.effect&&(!e.effect||!(m.cells??[]).some(c=>c.name===e.effect.cell)||!['add','set'].includes(e.effect.op)||!Number.isSafeInteger(e.effect.value)))throw Error('Invalid transition side effect.');destination(m,e);return ''}catch(error){return error.message}}
+let diagnosticsKey=null,diagnosticsResult=null;
+export function configurationDiagnostics(machine){
+ const key=lexerConfigurationKey(machine);if(key===diagnosticsKey)return diagnosticsResult;
+ const overlaps=ambiguousTransitionWitnesses(machine),edges=new Map(),states=new Map(),portals=new Map();
+ const addState=(id,message)=>{if(!states.has(id))states.set(id,message)};
+ machine.edges.forEach((edge,index)=>{const issue=transitionError(machine,edge)||(overlaps.has(index)?`Ambiguous transition for ${JSON.stringify(overlaps.get(index))}.`:'');if(issue){edges.set(index,issue);addState(edge.from,'Outgoing transition: '+issue)}});
+ for(const state of machine.states){if(state.accepting===true&&!state.token)addState(state.id,'An accepting state needs a token name.');if(state.portal){const group=portals.get(state.portal)??[];group.push(state.id);portals.set(state.portal,group)}}
+ for(const [name,ids] of portals)if(ids.length>1)for(const id of ids)addState(id,`Portal "${name}" has multiple destinations.`);
+ diagnosticsKey=key;diagnosticsResult={states,edges};return diagnosticsResult;
+}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
@@ -43,25 +54,25 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0){
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)})),outgoing=new Map();for(const edge of edges){if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)}
  const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
  const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
- const enabled=(edge,mem)=>!extended||!edge.guard||({'==':mem[edge.guard.cell]===edge.guard.value,'!=':mem[edge.guard.cell]!==edge.guard.value,'>':mem[edge.guard.cell]>edge.guard.value,'>=':mem[edge.guard.cell]>=edge.guard.value,'<':mem[edge.guard.cell]<edge.guard.value,'<=':mem[edge.guard.cell]<=edge.guard.value,'odd':Math.abs(mem[edge.guard.cell]%2)===1,'even':mem[edge.guard.cell]%2===0})[edge.guard.op];
+ const enabled=(edge,mem)=>!extended||!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]);
  const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
   const tokenStart=pos,tokenMemory={...memory};let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
-  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,tokenStart,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,memory:{...memory},...extra});
+  const frame=(kind,offset,message,extra={})=>{const statesLength=pathStates.length,edgesLength=pathEdges.length;return {kind,offset,end:offset,tokenStart,state,get traceStates(){return pathStates.slice(0,statesLength)},get traceEdges(){return pathEdges.slice(0,edgesLength)},message,memory:{...memory},...extra}};
   if(stepping)yield frame('start',pos,'Start token at '+pos);
   while(end<input.length){
-   const c=String.fromCodePoint(input.codePointAt(end)),next=(outgoing.get(state)??[]).filter(e=>e.test(c)&&enabled(e,memory));
-   if(!next.length){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
-   const edge=next[0];memory=apply(edge,memory);state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
-   if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges],memory:{...memory}};
-   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' â†’ '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
+   const c=String.fromCodePoint(input.codePointAt(end)),edge=(outgoing.get(state)??[]).find(e=>e.test(c)&&enabled(e,memory));
+   if(!edge){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
+   memory=apply(edge,memory);state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
+   if(isAccepting(states.get(state)))last={end,state:states.get(state),statesLength:pathStates.length,edgesLength:pathEdges.length,memory};
+   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' \u2192 '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
   }
   let token;
   if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
-  else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges};pos=last.end}
-  yield {...frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' Â· ':'')+(token.skip?'Skip ':'Emit ')+token.token),end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}};
+  else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:pathStates.slice(0,last.statesLength),traceEdges:pathEdges.slice(0,last.edgesLength)};pos=last.end}
+  yield frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' \u00b7 ':'')+(token.skip?'Skip ':'Emit ')+token.token,{end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}});
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input',memory:{...memory}};
 }

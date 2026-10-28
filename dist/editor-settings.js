@@ -1,16 +1,16 @@
 const STORAGE_KEY = 'lexica-editor-settings';
 
-function readSettings() {
+export function readEditorSettings(storage) {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(STORAGE_KEY) || '{}');
     const sensitivity = Number(saved.pinchSensitivity);
-    return {simplified: saved.simplified === true, pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1};
+    return {simplified: saved.simplified === true, highlightInputErrors: saved.highlightInputErrors !== false, pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1};
   } catch {
-    return {simplified: false, pinchSensitivity: 1};
+    return {simplified: false, highlightInputErrors: true, pinchSensitivity: 1};
   }
 }
 
-export const editorSettings = readSettings();
+export const editorSettings = readEditorSettings();
 
 export function updateEditorSettings(changes) {
   Object.assign(editorSettings, changes);
@@ -39,24 +39,26 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
       <label class="setting-choice"><input type="checkbox" id="simplified-setting"><span><strong>Simplified view</strong><small>Use character sets and compact properties.</small></span></label>
       <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw a box behind transition labels.</small></span></label>
     </section>
-<section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
+<section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="highlight-input-errors"><span><strong>Highlight input errors in FSM</strong><small>Show failed token paths and stopping states. Configuration errors always remain red.</small></span></label><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
     <section class="setting-section"><h3>Appearance</h3>
       <div class="setting-row"><span><strong>Theme</strong><small>Switch between light and dark.</small></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
     </section>
     <section class="setting-section zoom-settings"><h3>Pinch zoom</h3>
       <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
       <p>Controls trackpad and touchscreen pinching.</p>
-    </section>`;
+    </section>
+    <section class="setting-section"><h3>Debug tools</h3><div class="setting-row"><span><strong>Loading animation</strong><small>Replay the animation. Press Esc to close.</small></span><button type="button" id="preview-loading">Preview</button></div></section>`;
   document.body.append(dialog);
 
   const sync = () => {
     dialog.querySelector(`[name="machine-type"][value="${getMachineType()}"]`).checked = true;
     dialog.querySelector('#simplified-setting').checked = editorSettings.simplified;
+    dialog.querySelector('#highlight-input-errors').checked = editorSettings.highlightInputErrors;
     dialog.querySelector('#label-boxes').checked = getLabelBoxes();
     dialog.querySelector('#pinch-sensitivity').value = editorSettings.pinchSensitivity;
     dialog.querySelector('#pinch-sensitivity-value').value = `${editorSettings.pinchSensitivity.toFixed(1)}×`;
   };
-  const changed = changes => { updateEditorSettings(changes); sync(); onChange(); };
+  const changed = changes => { updateEditorSettings(changes); sync(); onChange(changes); };
   button.onclick = () => { menu.hidePopover(); sync(); dialog.showModal(); };
   dialog.querySelector('#settings-close').onclick = () => dialog.close();
   dialog.addEventListener('click', event => {
@@ -66,6 +68,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   });
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
+  dialog.querySelector('#highlight-input-errors').onchange = e => changed({highlightInputErrors: e.target.checked});
   dialog.querySelector('#pinch-sensitivity').oninput = e => {
     editorSettings.pinchSensitivity = Number(e.target.value);
     dialog.querySelector('#pinch-sensitivity-value').value = `${editorSettings.pinchSensitivity.toFixed(1)}×`;
