@@ -1,6 +1,11 @@
+import {placeInspector} from './dist/inspector-placement.js';
+import {ambiguousTransitionWitnesses,transitionError} from './dist/lexer.js';
+import {createDebugSession} from './dist/debug-session.js';
+import {simpleCharacterClass} from './dist/editor-settings.js';
+import {singleCharacterError,characterBounds} from './dist/regex-analysis.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
-test('ambiguity is reported instead of selecting a random transition',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});assert.throws(()=>tokenize(m,'a'),/Ambiguous/)});
+test('ambiguity is reported statically before running any input',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});const issues=ambiguousTransitionWitnesses(m);assert.equal(issues.has(0),true);assert.equal(issues.has(m.edges.length-1),true)});
 test('TikZ exports positions, loops, accepting and initial states; escapes labels',()=>{const m=example();m.states[1].token='ID_%';const t=toTikz(m);assert.match(t,/documentclass/);assert.match(t,/state,initial/);assert.match(t,/state,accepting/);assert.match(t,/controls/);assert.ok(t.includes('ID\\_\\%'));assert.ok(t.includes('\\textbackslash{}s'));assert.ok(!toTikz(m,false).includes('documentclass'))});
 test('import rejects broken references and malformed regex',()=>{const m=example();m.edges[0].to='missing';assert.throws(()=>validate(m));m.edges[0].to='s1';m.edges[0].label='[';assert.throws(()=>validate(m))});
 test('longest match backtracks to last accepting state',()=>{const m={start:'a',states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:1,y:1},{id:'c',name:'c',token:'',x:2,y:2}],edges:[{from:'a',to:'b',label:'a'},{from:'b',to:'c',label:'b'}]};assert.deepEqual(tokenize(m,'ab').map(t=>t.token),['B','ERROR'])});
@@ -204,7 +209,7 @@ test('comment joining finishes after one destination, in either direction, like 
 });
 
 test('both layout dropdowns persist across reloads and reject invalid saved choices',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function restoreLayoutSettings('),app.indexOf("$('label-boxes').onclick"));
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function restoreLayoutSettings('),app.indexOf("$('memory-cells').onclick"));
  const saved={'lexica-layout-mode':'circle','lexica-layout-density':'0.35'};
  const boot=()=>{const fields={'layout-mode':{value:'tree'},'layout-density':{value:'0.75'}};runInNewContext(script,{$:id=>fields[id],localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}});return fields};
  let fields=boot();assert.equal(fields['layout-mode'].value,'circle');assert.equal(fields['layout-density'].value,'0.35');
@@ -288,15 +293,9 @@ test('clicking blank canvas during comment joining cancels without creating a st
  canvas.onpointerdown({button:0,target:{closest:()=>null}});assert.equal(cancelled,1);assert.equal(added,0);
 });
 
-test('tips can be hidden, restored, and remember the choice without requiring storage',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setTipsVisible('),app.indexOf("$('fit').onclick="));
- for(const unavailable of [false,true]){
-  const elements={'tips-panel':{hidden:false},'show-tips':{hidden:true},'hide-tips':{}},saved={};
-  const context={$:id=>elements[id],localStorage:{getItem:key=>{if(unavailable)throw Error();return saved[key]},setItem:(key,value)=>{if(unavailable)throw Error();saved[key]=value}}};
-  runInNewContext(script,context);elements['hide-tips'].onclick();assert.equal(elements['tips-panel'].hidden,true);assert.equal(elements['show-tips'].hidden,false);
-  if(!unavailable){runInNewContext(script,context);assert.equal(elements['tips-panel'].hidden,true)}
-  elements['show-tips'].onclick();assert.equal(elements['tips-panel'].hidden,false);assert.equal(elements['show-tips'].hidden,true);
- }
+test('contextual tips remember their visibility independently of the shortcuts button',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setTipsVisible('),app.indexOf("$('hide-tips').onclick="));
+ for(const unavailable of [false,true]){const panel={hidden:false},saved={},context={$:()=>panel,localStorage:{setItem:(key,value)=>{if(unavailable)throw Error();saved[key]=value}}};runInNewContext(script,context);context.setTipsVisible(false);assert.equal(panel.hidden,true);if(!unavailable)assert.equal(saved['lexica-tips-hidden'],'true');context.setTipsVisible(true);assert.equal(panel.hidden,false)}
 });
 
 test('transition diagnostics identify unfinished rules and failed tokens retain the attempted path',async()=>{
@@ -306,19 +305,19 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
  assert.match(transitionError(m,{...m.edges[0],label:''}),/empty/);
  assert.match(transitionError(m,{...m.edges[0],label:'['}),/Invalid/);
  const [failed]=tokenize(m,'x');assert.equal(failed.failureState,'b');assert.deepEqual(failed.traceStates,['a','b']);assert.deepEqual(failed.traceEdges,[0]);
- m.edges.push({...m.edges[0]});assert.throws(()=>tokenize(m,'x'),error=>error.stateId==='a'&&error.edgeIndices.join(',')==='0,1');
+ m.edges.push({...m.edges[0]});assert.equal(ambiguousTransitionWitnesses(m).size,2);
 });
 
 test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch zooms',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf("$('zoom-in').onclick="),app.indexOf('\n',app.indexOf("$('zoom-in').onclick=")));
  let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
- runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math});
+ runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math,editorSettings:{pinchSensitivity:1}});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
- wheel({...event,ctrlKey:true});assert.equal(zoomed[0],1.25);
- wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],.8);
- elements['zoom-in'].onclick();assert.equal(zoomed[0],.8);elements['zoom-out'].onclick();assert.equal(zoomed[0],1.25);
- wheel({...event,deltaY:1000,ctrlKey:true});assert.equal(zoomed[0],1.25);
+ wheel({...event,ctrlKey:true});assert.equal(zoomed[0],Math.exp(.06));
+ wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],Math.exp(-.35));
+ elements['zoom-in'].onclick();assert.equal(zoomed[0],.77);elements['zoom-out'].onclick();assert.equal(zoomed[0],1.3);
+ wheel({...event,deltaY:1000,ctrlKey:true});assert.equal(zoomed[0],Math.exp(.35));
 });
 
 test('inverted transitions complement one-character matches and survive saves, copies, and TeX',async()=>{
@@ -356,20 +355,23 @@ test('panel grips persist keyboard and drag docking, and cancel without changing
 test('toolbar popovers open beside vertical docks and stay within the viewport',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setupPopover('),app.indexOf("setupPopover('layout-toggle'"));
  for(const [dock,left,expected] of [['left',18,'74px'],['right',680,'432px']]){
-  const handlers={},menu={style:{},addEventListener:(name,fn)=>handlers[name]=fn},toggle={getBoundingClientRect:()=>({left,top:400,bottom:432})};
+  const handlers={},menu={style:{},addEventListener:(name,fn)=>handlers[name]=fn},toggle={setAttribute(){},getBoundingClientRect:()=>({left,top:400,bottom:432})};
   const context={$:id=>id==='menu'?menu:toggle,document:{body:{dataset:{toolbarDock:dock}},querySelector:()=>({getBoundingClientRect:()=>({left,right:left+48,top:76})})},window:{innerWidth:745,innerHeight:919}};
   runInNewContext(script+"setupPopover('toggle','menu');",context);handlers.beforetoggle({newState:'open'});assert.equal(menu.style.left,expected);assert.equal(menu.style.top,'400px');
  }
 });
 
-test('properties use the full canvas height with a side-docked tester and stay inside the canvas',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\n',app.indexOf('function showProperties(')));
- for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
-  const panel={style:{},offsetWidth:240,offsetHeight:500};
-  const context={selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
-  runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
-  assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
- }
+test('properties flip around the click and return to their anchor after content shrinks',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function inspectorViewport('),app.indexOf('const inspectorResizeObserver'));
+ const panel={style:{},height:200,getBoundingClientRect(){return {width:240,height:this.height}}},target={dataset:{edge:'0'},getBoundingClientRect:()=>({left:-3000,top:-2000,width:7000,height:5000})};
+ const context={placeInspector,inspectorAnchor:null,inspectorKey:'',selection:{type:'edge',index:0},editorSettings:{simplified:false},requestAnimationFrame(){},document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:()=>panel,querySelectorAll:()=>[target]},$:()=>({setAttribute(){}}),window:{innerWidth:745,innerHeight:919}};
+ runInNewContext(script+"showProperties(true,{clientX:400,clientY:600});",context);assert.equal(panel.style.left,'416px');assert.equal(panel.style.top,'585px');panel.height=600;context.clampInspector();assert.equal(panel.style.top,'15px');panel.height=200;context.clampInspector();assert.equal(panel.style.top,'585px');
+ context.showProperties(true,{clientX:700,clientY:900});assert.equal(panel.style.left,'444px');assert.equal(panel.style.top,'707px');context.showProperties(false);assert.equal(context.inspectorAnchor,null);
+});
+
+test('inspector placement respects visual viewport bounds and prefers flipping over edge clamping',()=>{
+ assert.deepEqual(placeInspector({x:700,y:900},{width:240,height:500},{width:745,height:919}),{x:444,y:407});
+ const pos=placeInspector({x:120,y:160},{width:320,height:600},{left:100,top:150,width:400,height:500});assert.ok(pos.x>=112&&pos.x<=168);assert.equal(pos.y,162);
 });
 
 test('clicking a token selects its exact UTF-16 input range, including errors and skipped gaps',()=>{
@@ -403,7 +405,7 @@ test('input caret and selections highlight matching tokens and traces without mo
  const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
  const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
  const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
- const context={visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ const context={stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
  runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
  input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
@@ -425,7 +427,7 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
  const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
- const context={$:id=>elements[id],machine:m,tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ const context={$:id=>elements[id],machine:m,tokenize,hideInputTokenHover(){},errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
@@ -502,24 +504,20 @@ test('stepping exposes longest-match backtracking, nonaccepting errors and ambig
  const m={start:'a',states:[['a',''],['b','B'],['c','']].map(([id,token],i)=>({id,name:id,token,x:i*150,y:0})),edges:[{from:'a',to:'b',label:'a'},{from:'b',to:'c',label:'b'}]};
  const steps=[...lexerSteps(m,'ab!')];assert.ok(steps.some(s=>s.message.includes('Backtrack to 1')));assert.ok(steps.some(s=>s.kind==='blocked'));assert.deepEqual(steps.filter(s=>s.result).map(s=>s.result),tokenize(m,'ab!'));
  m.states[1].token='';const errors=[...lexerSteps(m,'a')];assert.equal(errors.find(s=>s.result).result.failureState,'b');
- m.edges.push({...m.edges[0]});assert.throws(()=>[...lexerSteps(m,'a')],/Ambiguous/);assert.equal([...lexerSteps(example(),'')].at(-1).kind,'done');
+ m.edges.push({...m.edges[0]});assert.equal(ambiguousTransitionWitnesses(m).size,2);assert.equal([...lexerSteps(example(),'')].at(-1).kind,'done');
 });
 
 test('portals assign a usable generated name to an unnamed destination',()=>{
  const m=example();m.states[1].name='';enablePortal(m,m.edges[0]);assert.equal(m.edges[0].portal,'STATE');assert.equal(destination(m,m.edges[0]).id,'s1');validate(m);
 });
 
-test('step controls move forward and backward, reset on edits, and expose matching errors',()=>{
- const script=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function');
- const elements={},listeners={},panel={classList:{add(){},remove(){}}};for(const id of ['input','input-highlights','step-controls','step-toggle','step-prev','step-next','step-stop','step-status'])elements[id]={setAttribute(){}};
- elements.input.value='a';elements.input.addEventListener=(name,fn)=>listeners[name]=fn;elements['input-highlights'].querySelectorAll=()=>[];elements['input-highlights'].querySelector=()=>null;
- let machine=example(),resets=0,trace;const context={document:{getElementById:id=>elements[id],querySelector:()=>panel},lexerSteps,highlights:{clearStep(){},step:()=>null},getMachine:()=>machine,traceToken:frame=>trace=frame,markFailures(){},onReset:()=>resets++};
- runInNewContext(script+'\nvar controller=setupStepping({getMachine,traceToken,markFailures,highlights,onReset});',context);
- elements['step-toggle'].onclick();assert.equal(context.controller.active(),true);assert.match(elements['step-status'].textContent,/Start token/);assert.equal(elements['step-prev'].disabled,true);
- elements['step-next'].onclick();assert.equal(trace.character,'a');elements['step-prev'].onclick();assert.match(elements['step-status'].textContent,/Start token/);elements['step-next'].onclick();assert.equal(trace.character,'a');
- listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
- elements.input.value='hi 42';elements.input.selectionStart=3;elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Start token at 3/);elements['step-next'].onclick();assert.equal(trace.character,'4');assert.equal(trace.offset,3);elements['step-stop'].onclick();
- machine.edges[0].label='';elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Transition cannot be empty/);assert.equal(elements['step-next'].disabled,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);
+test('debugger seeks the token under the cursor and jumps by token or character',()=>{
+ const session=createDebugSession(example(),'hello 42 world');assert.equal(session.seek(3).offset,0);assert.equal(session.next().character,'h');assert.equal(session.previous().kind,'start');assert.equal(session.nextToken().tokenStart,5);assert.equal(session.nextToken().tokenStart,6);assert.equal(session.next().character,'4');assert.equal(session.previousToken().tokenStart,5);assert.equal(session.seek(7).tokenStart,6);assert.equal(session.seek(14).tokenStart,9);assert.equal(session.nextToken().kind,'done');assert.equal(session.canNext(),false);assert.equal(session.previousToken().tokenStart,9);
+});
+
+test('debugger token seeking replays committed memory effects and includes skipped tokens',()=>{
+ const m={start:'a',machineType:'extended',cells:[{name:'n',initial:0}],states:[{id:'a',name:'start',token:'',x:0,y:0},{id:'b',name:'letter',token:'LETTER',x:100,y:0},{id:'w',name:'space',token:'WS',skip:true,x:200,y:0}],edges:[{from:'a',to:'b',label:'[a-z]',effect:{cell:'n',op:'add',value:1}},{from:'a',to:'w',label:' '}]};
+ const session=createDebugSession(m,'a b');assert.equal(session.seek(2).memory.n,1);assert.equal(session.current().tokenStart,2);assert.equal(session.next().memory.n,2);assert.equal(session.previousToken().tokenStart,1);assert.equal(session.current().memory.n,1);assert.equal(session.seek(0).memory.n,0);session.nextToken();session.nextToken();assert.equal(session.nextToken().memory.n,2);
 });
 
 test('stepping gives only the current state and latest transition a distinct highlight',()=>{
@@ -574,7 +572,7 @@ test('repulsion spreads nodes and center attraction controls compactness without
 });
 
 test('spring force controls persist, reset, and are only shown for Spring layout',()=>{
- const script=readFileSync(new URL('./dist/spring-controls.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function'),elements={},events={},saved={};
+ const script=readFileSync(new URL('./dist/spring-controls.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),elements={},events={},saved={};
  for(const key of Object.keys(SPRING_DEFAULTS)){elements['spring-'+key]={};elements['spring-'+key+'-value']={}}
  elements['spring-reset']={};elements['spring-forces']={};elements['layout-mode']={value:'spring',addEventListener:(name,fn)=>events[name]=fn};elements['layout-menu']={matches:()=>false};
  const context={document:{getElementById:id=>elements[id]},SPRING_DEFAULTS,springSettings,localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}};
@@ -602,7 +600,7 @@ test('range highlights preserve one text flow for tabs, wide glyphs, combining m
  context.tokens=[{token:'IDENT',value:'hi',offset:0},{token:'WS',value:'\t',offset:2,skip:true},{token:'ERROR',value:input.value.slice(3,-2),offset:3},{token:'NUMBER',value:'42',offset:input.value.length-2}];
  runInNewContext('highlights.render(tokens);',context);assert.equal(mirror.firstChild.data,input.value+'\u200b');assert.equal('innerHTML' in mirror,false);
  const numbers=[...registry.get('lexica-token-color-1')];assert.equal(numbers[1].start,input.value.length-2);assert.equal(numbers[1].end,input.value.length);
- context.frame={offset:3,end:4};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,1);
+ context.frame={kind:'character',offset:3,end:4,tokenStart:3,tokenEnd:input.value.length-2};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,3);
  runInNewContext('highlights.clearStep();',context);assert.equal(registry.has('lexica-step'),false);assert.equal(mirror.firstChild.data,input.value+'\u200b');
 });
 
@@ -628,4 +626,53 @@ test('saved machines restore tester text and skipped-token preference, including
  restoreTester({...m,tester:{input:''}},restored,restoredSkip);assert.equal(restored.value,'');assert.equal(restoredSkip.checked,false);
  restored.value='keep current text';restoreTester(m,restored,restoredSkip);assert.equal(restored.value,'keep current text');
  for(const tester of [null,[],{input:42},{input:'x',showSkipped:'yes'}])assert.throws(()=>validate({...m,tester}),/tester/);
+});
+
+
+test('simplified editing preserves regex meaning and refuses concatenations',()=>{
+ assert.equal(simpleCharacterClass('abc'),null);assert.equal(simpleCharacterClass('a|bc'),null);assert.equal(simpleCharacterClass('[a][b]'),null);assert.equal(simpleCharacterClass('.'),null);
+ for(const source of ['[abc]','[^a-z]','a','\\n','\\d','\\+','😀']){const simple=simpleCharacterClass(source);assert.ok(simple,source);const original=new RegExp('^(?:'+source+')$','u'),converted=new RegExp('^['+simple.characters+']$','u');for(const char of ['a','b','c','z','0','\n','+','😀'])assert.equal(original.test(char),simple.inverted?!converted.test(char):converted.test(char),source+' on '+JSON.stringify(char))}
+});
+
+test('unreachable multi-character transition expressions are diagnosed statically',()=>{
+ for(const source of ['abc','[a-z]{2}','(?:ab|cd)','a(bc)','a\\u0062'])assert.match(singleCharacterError(source),/cannot match one character/,source);
+ for(const source of ['[abc]','a|bc','ab?','(?:ab)*c','\\p{L}','😀','(?=a)a'])assert.equal(singleCharacterError(source),'',source);
+ assert.equal(singleCharacterError('abc',true),'');const m=example();m.edges[0].label='abc';assert.match(transitionError(m,m.edges[0]),/cannot match one character/);assert.doesNotThrow(()=>parseMachine(JSON.stringify(m)));
+});
+
+
+test('debugger buttons share a live session and input clicks retarget without disabling debugging',()=>{
+ const source=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function');
+ const ids=['input','step-controls','step-toggle','step-prev','step-next','step-prev-token','step-next-token','step-status','step-memory'],elements=Object.fromEntries(ids.map(id=>[id,{setAttribute(){},replaceChildren(){}}])),events={};
+ elements.input.value='hello 42 world';elements.input.selectionStart=7;elements.input.addEventListener=(name,fn)=>events[name]=fn;
+ let resets=0,frame;const context={document:{getElementById:id=>elements[id],querySelector:()=>({classList:{add(){},remove(){}}}),createElement:()=>({append(){}})},createDebugSession,getMachine:()=>example(),getTokens:()=>tokenize(example(),elements.input.value),traceToken:value=>frame=value,markFailures(){},highlights:{clearStep(){},step:()=>null},onReset:()=>resets++};
+ runInNewContext(source+'\nvar controller=setupStepping({getMachine,getTokens,traceToken,markFailures,highlights,onReset});',context);context.controller.toggle();assert.equal(frame.tokenStart,6);elements['step-next'].onclick();assert.equal(frame.character,'4');elements['step-next-token'].onclick();assert.equal(frame.tokenStart,8);elements['step-prev-token'].onclick();assert.equal(frame.tokenStart,6);elements.input.selectionStart=1;events.click();assert.equal(frame.tokenStart,0);assert.equal(context.controller.active(),true);assert.equal(resets,0);events.input();assert.equal(context.controller.active(),false);assert.equal(resets,1);
+});
+
+test('Unicode regex escape pairs are one character for static transition diagnostics',()=>{
+ assert.equal(singleCharacterError('\\uD83D\\uDE00'),'');assert.equal(characterBounds('😀').min,1);assert.equal(characterBounds('\\u{1F600}').min,1);assert.equal(singleCharacterError('\\uD83D\\uDE00a').length>0,true);
+});
+
+
+test('emitted debugger frames keep the token being emitted as their full-token highlight',()=>{
+ const session=createDebugSession(example(),'hello 42');session.seek(0);while(session.current().kind!=='emit')session.next();assert.equal(session.current().tokenStart,0);assert.equal(session.current().tokenEnd,5);assert.equal(session.current().state,'s1');
+});
+
+
+test('memory inspector opens below its button with matching right edges',()=>{
+ const viewport={width:1200,height:900},anchor={x:1180,y:60,placement:'bottom-end'},panel={width:320,height:420},position=placeInspector(anchor,panel,viewport);assert.equal(position.x+panel.width,anchor.x);assert.equal(position.y,anchor.y+8);
+});
+
+
+test('input hover waits for the pointer to settle, positions above it, and cancels on leave',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let activeInputHover='),app.indexOf('function focusToken(')),handlers={},timers=new Map();let sequence=0;
+ const badge={style:{},hidden:true,getBoundingClientRect:()=>({width:80,height:24})},context={$:id=>id==='input'?{addEventListener:(name,fn)=>handlers[name]=fn}:badge,allInputTokens:[{token:'IDENT',offset:0,value:'hi'}],inputHighlights:{hover(){},rects:()=>[{left:100,right:300,top:100,bottom:140}]},tokenColorClass:()=> 'token-color-1',window:{innerWidth:1000,innerHeight:800},clearTimeout:id=>timers.delete(id),setTimeout:(fn,delay)=>{assert.ok(delay>=100);timers.set(++sequence,fn);return sequence}};
+ runInNewContext(script,context);handlers.pointermove({clientX:180,clientY:120});assert.equal(badge.hidden,true);handlers.pointermove({clientX:200,clientY:120});assert.equal(timers.size,1);[...timers.values()][0]();assert.equal(badge.hidden,false);assert.equal(badge.textContent,'IDENT');assert.equal(badge.style.left,'160px');assert.equal(badge.style.top,'84px');handlers.pointermove({clientX:210,clientY:120});assert.equal(badge.hidden,true);handlers.pointerleave();assert.equal(timers.has(sequence),false);
+});
+
+
+test('hover highlights the full token without replacing the current debugger character',()=>{
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace('export function','function'),input={value:'hello 42'},mirror={};Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
+ const registry=new Map(),context={input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return []}})}};
+ runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);context.token={token:'IDENT',offset:0,value:'hello'};runInNewContext('highlights.render([token]);highlights.hover(token);highlights.step({kind:"character",offset:1,end:2,tokenStart:0,tokenEnd:5});',context);const hover=registry.get('lexica-hover-token-color-1');assert.equal([...hover][0].start,0);assert.equal([...hover][0].end,5);assert.ok(registry.get('lexica-step').priority>hover.priority);runInNewContext('highlights.hover(null);',context);assert.equal(registry.has('lexica-hover-token-color-1'),false);assert.equal(registry.has('lexica-step'),true);
 });

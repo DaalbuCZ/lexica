@@ -420,11 +420,6 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 [data-theme=dark] .shortcuts-intro,[data-theme=dark] .shortcut-groups h3{color:#b5c0c8}
 .tester.stepping .test-grid{height:calc(100% - 101px)}
 @media(max-width:650px){#shortcuts-dialog{padding:16px}.shortcut-groups{grid-template-columns:1fr;gap:2px}}
-#app-loading{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--page,#f9fbf7);color:var(--text,#29382f);font-size:14px;font-weight:500;transition:opacity .16s ease}
-.loading #app-loading{opacity:1;visibility:visible}.app-ready #app-loading{opacity:0;visibility:hidden;pointer-events:none}
-.loading-spinner{width:20px;height:20px;border:2px solid var(--line);border-top-color:var(--green);border-radius:50%;animation:lexica-spin .75s linear infinite}
-@keyframes lexica-spin{to{transform:rotate(360deg)}}
-[data-theme=dark] #app-loading{--page:#3e4549;--text:#edf1f5;--line:#59636b;--green:#a9d5ff}
 #show-tips{padding:7px!important;width:30px;height:30px;gap:0}
 #shortcuts-dialog{width:760px;padding:24px 28px;background:var(--panel);color:inherit}
 .shortcuts-intro{font-size:13px;line-height:1.5;margin:16px 0 20px;color:#66756c}
@@ -443,3 +438,54 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .tester.stepping #step-status{grid-column:1/-1;grid-row:2;min-height:25px;padding:5px 8px;border-radius:5px;background:color-mix(in srgb,var(--step-fill) 50%,var(--panel));font-size:12px;color:var(--step-color)}
 .tester.stepping .test-grid{height:calc(100% - 130px)}
 @media(max-width:650px){#shortcuts-dialog{padding:16px}.shortcut-groups{grid-template-columns:1fr}.shortcut-groups section{padding:9px 12px}.shortcuts-intro{margin:10px 0 14px}}
+/* Loader: a source line is scanned and separated into typed tokens. */
+#app-loading{gap:22px;font-family:'DM Sans',sans-serif}
+.loading-brand{display:flex;gap:8px;align-items:center;font-size:25px;font-weight:700;letter-spacing:-1px}
+.loading-brand>span{display:grid;place-items:center;width:31px;height:33px;border-radius:8px;background:var(--green);color:var(--panel);font:29px Georgia,serif}
+.loading-scene{width:min(430px,90vw);padding:30px 14px 14px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--panel) 65%,transparent);box-shadow:0 18px 65px #00000008}
+.loading-code{display:flex;align-items:center;justify-content:center;gap:0;min-height:74px;animation:token-separate 3.6s ease-in-out infinite;font:18px 'IBM Plex Mono',monospace}
+.loading-token{position:relative;display:inline-block;padding:10px 5px;border:1px solid transparent;border-radius:7px;animation:token-recognize 3.6s ease-in-out infinite;animation-delay:calc(var(--i)*100ms)}
+.loading-token b{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font:9px 'IBM Plex Mono',monospace;letter-spacing:.05em;opacity:0;color:hsl(var(--h) 65% 42%);animation:token-label 3.6s ease-in-out infinite;animation-delay:calc(var(--i)*100ms)}
+.loading-track{height:3px;margin:22px 15px 0;overflow:hidden;border-radius:2px;background:var(--line)}
+.loading-track i{display:block;width:30%;height:100%;margin:0;background:var(--green);border-radius:2px;animation:token-scan 3.6s ease-in-out infinite}
+#app-loading>p{margin:0;font-size:12px;color:inherit;opacity:.65;letter-spacing:.015em}
+@keyframes token-separate{0%,12%,92%,100%{gap:0}38%,75%{gap:12px}}
+@keyframes token-recognize{0%,15%,92%,100%{border-color:transparent;background:transparent;transform:translateY(0)}38%,75%{border-color:hsl(var(--h) 50% 65% / .6);background:hsl(var(--h) 65% 70% / .18);transform:translateY(3px)}}
+@keyframes token-label{0%,20%,90%,100%{opacity:0;translate:0 5px}40%,75%{opacity:1;translate:0 0}}
+@keyframes token-scan{0%{transform:translateX(-110%)}70%,100%{transform:translateX(450%)}}
+[data-theme=dark] .loading-token b{color:hsl(var(--h) 75% 78%)}
+@media(prefers-reduced-motion:reduce){.loading-code{animation:none;gap:12px}.loading-token{animation:none;border-color:var(--line)}.loading-token b{animation:none;opacity:1}.loading-track i{animation:none;width:100%;opacity:.4}}
+/* Use the panel's remaining space instead of subtracting guessed control heights. */
+.tester{display:flex;flex-direction:column}
+.tester>.panel-title,.tester>.step-controls,.tester>.step-memory{flex-shrink:0}
+.tester>.test-grid{flex:1;height:auto!important;min-height:0}
+.tester.stepping .step-controls{display:flex;align-items:center;gap:8px;min-height:32px;margin-top:4px}
+.step-navigation{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.step-controls .step-navigation button{min-width:0;width:28px;height:27px;padding:0;flex:none;font:22px/1 'DM Sans',sans-serif}
+.tester.stepping #step-status{grid-column:auto;grid-row:auto;flex:1;min-width:0;min-height:0;padding:0;background:transparent;font-size:11px;line-height:1.5;color:var(--step-color)}
+.input-token-hover{position:fixed;z-index:100;max-width:calc(100vw - 12px)}
+::highlight(lexica-current-token){background-color:#e6a5ef35;color:transparent}
+[data-theme=dark] ::highlight(lexica-current-token){background-color:#efb0ff30;color:transparent}
+::highlight(lexica-error),[data-theme=dark] ::highlight(lexica-error){background-color:transparent;text-decoration:underline wavy #e56e69 1.5px}
+.input-highlights .token-mark.error,[data-theme=dark] .input-highlights .token-mark.error{background:transparent;box-shadow:none;text-decoration:underline wavy #e56e69 1.5px;text-underline-offset:3px}
+.input-highlights .step-token{background:#e6a5ef35;box-shadow:none}
+[data-theme=dark] .input-highlights .step-token{background:#efb0ff30}
+.input-highlights .step-character{background:var(--step-color);color:transparent;outline:0;box-shadow:none}
+.transition-rule-error{font-size:11px;line-height:1.5;color:var(--error,#d36b60);margin:0 0 10px}
+.output-label{height:18px}.output-label .lexer-error-actions{margin-left:auto}
+body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step-memory{display:none!important}
+.input-highlights span.step-character,.input-highlights .token-mark.error.step-character{background:var(--step-color);color:transparent;outline:0;box-shadow:none}
+.memory-brain{width:20px;height:20px;stroke-width:1.5}
+::highlight(lexica-hover-token-color-0){background-color:#3d7fb844;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-0){background-color:#7fb8e844;color:transparent}
+::highlight(lexica-hover-token-color-1){background-color:#478f6044;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-1){background-color:#72c08d44;color:transparent}
+::highlight(lexica-hover-token-color-2){background-color:#b88a3344;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-2){background-color:#d9b45f44;color:transparent}
+::highlight(lexica-hover-token-color-3){background-color:#c25a6c44;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-3){background-color:#e58b9b44;color:transparent}
+::highlight(lexica-hover-token-color-4){background-color:#8567bf44;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-4){background-color:#b39ae644;color:transparent}
+::highlight(lexica-hover-token-color-5){background-color:#3f968c44;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-5){background-color:#6fc6bb44;color:transparent}
+::highlight(lexica-hover-token-color-6){background-color:#c47a4344;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-6){background-color:#e19b6544;color:transparent}
+::highlight(lexica-hover-token-color-7){background-color:#6f79bf44;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-7){background-color:#9aa5ea44;color:transparent}
+::highlight(lexica-hover-token-color-8){background-color:#bf5d9244;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-8){background-color:#e28bb944;color:transparent}
+::highlight(lexica-hover-token-color-9){background-color:#8aa13c44;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-9){background-color:#b5c86b44;color:transparent}
+.input-highlights span.token-hover,.input-highlights .token-mark.error.token-hover{background:color-mix(in srgb,var(--token-accent,#e56e69) 27%,transparent);border-radius:2px}
+::highlight(lexica-hover-error){background-color:#e56e6944;color:transparent}
+.input-highlights .step-character.token-hover,.input-highlights .token-mark.error.step-character.token-hover{background:var(--step-color)}

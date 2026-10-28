@@ -1,3 +1,4 @@
+import {singleCharacterError} from './regex-analysis.js';
 import {stateLabel,transitionLabel} from './labels.js?v=17';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
@@ -34,7 +35,7 @@ function overlapCandidates(labels){const codes=new Set(Array.from({length:128},(
  return [...codes].filter(code=>code<=0x10ffff).map(code=>String.fromCodePoint(code))}
 function overlapWitness(a,b){const left=JSON.stringify([a.label,a.invert??false]),right=JSON.stringify([b.label,b.invert??false]),key=[left,right].sort().join('|');if(overlapCache.has(key))return overlapCache.get(key);const matchesA=matcher(a.label,a.invert),matchesB=matcher(b.label,b.invert);let witness=null;for(const character of overlapCandidates([a.label,b.label]))if(matchesA(character)&&matchesB(character)){witness=character;break}overlapCache.set(key,witness);return witness}
 export function ambiguousTransitionWitnesses(machine){const extended=machine.machineType==='extended'||(machine.machineType===undefined&&((machine.cells??[]).length||machine.edges.some(edge=>edge.guard||edge.effect))),signature=JSON.stringify([extended,machine.edges.map(edge=>[edge.from,edge.label,edge.invert??false,edge.guard??null])]);if(machineOverlapCache.has(signature))return machineOverlapCache.get(signature);const byState=new Map();machine.edges.forEach((edge,index)=>{const list=byState.get(edge.from)??[];list.push({...edge,index});byState.set(edge.from,list)});const found=new Map();for(const edges of byState.values())for(let i=0;i<edges.length;i++)for(let j=i+1;j<edges.length;j++){const a=edges[i],b=edges[j];if(extended&&!guardsMayOverlap(a.guard,b.guard))continue;try{const witness=overlapWitness(a,b);if(witness!==null){found.set(a.index,witness);found.set(b.index,witness)}}catch{}}machineOverlapCache.set(signature,found);return found}
-export function transitionError(m,e){try{matcher(e.label,e.invert);if(e.guard&&(!e.guard||!(m.cells??[]).some(c=>c.name===e.guard.cell)||!['==','!=','>','>=','<','<=','odd','even'].includes(e.guard.op)||!Number.isSafeInteger(e.guard.value)))throw Error('Invalid transition guard.');if(e.effect&&(!e.effect||!(m.cells??[]).some(c=>c.name===e.effect.cell)||!['add','set'].includes(e.effect.op)||!Number.isSafeInteger(e.effect.value)))throw Error('Invalid transition side effect.');destination(m,e);return ''}catch(error){return error.message}}
+export function transitionError(m,e){try{matcher(e.label,e.invert);const expressionIssue=singleCharacterError(e.label,e.invert);if(expressionIssue)throw Error(expressionIssue);if(e.guard&&(!e.guard||!(m.cells??[]).some(c=>c.name===e.guard.cell)||!['==','!=','>','>=','<','<=','odd','even'].includes(e.guard.op)||!Number.isSafeInteger(e.guard.value)))throw Error('Invalid transition guard.');if(e.effect&&(!e.effect||!(m.cells??[]).some(c=>c.name===e.effect.cell)||!['add','set'].includes(e.effect.op)||!Number.isSafeInteger(e.effect.value)))throw Error('Invalid transition side effect.');destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
@@ -47,20 +48,20 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0){
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
-  const tokenMemory={...memory};let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
-  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,memory:{...memory},...extra});
+  const tokenStart=pos,tokenMemory={...memory};let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
+  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,tokenStart,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,memory:{...memory},...extra});
   if(stepping)yield frame('start',pos,'Start token at '+pos);
   while(end<input.length){
    const c=String.fromCodePoint(input.codePointAt(end)),next=(outgoing.get(state)??[]).filter(e=>e.test(c)&&enabled(e,memory));
    if(!next.length){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
    const edge=next[0];memory=apply(edge,memory);state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
    if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges],memory:{...memory}};
-   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' → '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
+   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' â†’ '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
   }
   let token;
   if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
   else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges};pos=last.end}
-  yield {...frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' · ':'')+(token.skip?'Skip ':'Emit ')+token.token),end:pos,traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}};
+  yield {...frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' Â· ':'')+(token.skip?'Skip ':'Emit ')+token.token),end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}};
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input',memory:{...memory}};
 }

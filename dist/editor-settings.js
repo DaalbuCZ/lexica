@@ -39,6 +39,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
       <label class="setting-choice"><input type="checkbox" id="simplified-setting"><span><strong>Simplified view</strong><small>Use character sets and compact properties.</small></span></label>
       <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw a box behind transition labels.</small></span></label>
     </section>
+<section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
     <section class="setting-section"><h3>Appearance</h3>
       <div class="setting-row"><span><strong>Theme</strong><small>Switch between light and dark.</small></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
     </section>
@@ -77,16 +78,16 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
 
 export function simpleCharacterClass(label, inverted = false) {
   if (!label) return {characters: '', inverted};
-  if (label === '.') return {characters: '\\s\\S', inverted};
-  const match = label.match(/^\[([\s\S]*)\]$/u);
+  if (label === '.') return null;
+  const match = label.match(/^\[((?:\\[\s\S]|[^\]\\])*)\]$/u);
   if (match) {
     const negated = match[1].startsWith('^');
     return {characters: negated ? match[1].slice(1) : match[1], inverted: inverted !== negated};
   }
-  try {
-    const expression = new RegExp(`^(?:[${label}])$`, 'u');
-    if (!expression.test('')) return {characters: label, inverted};
-  } catch {}
+  // Only one regex atom can be represented by a character set. Concatenation
+  // such as abc must never silently become [abc] when switching views.
+  if (/^\\(?:[dDsSwWnrtfv]|[\\.^$|?*+()[\]{}\/\-]|x[\da-fA-F]{2}|u[\da-fA-F]{4}|u\{[\da-fA-F]+\})$/u.test(label)) return {characters: label, inverted};
+  if ([...label].length === 1 && !/[.^$|?*+()[\]{}\\]/u.test(label)) return {characters: label, inverted};
   return null;
 }
 
