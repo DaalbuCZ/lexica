@@ -1,3 +1,6 @@
+import {editorSettings,setupEditorSettings,updateEditorSettings,simpleCharacterClass,characterClassExpression} from './editor-settings.js';
+import {placeInspector} from './inspector-placement.js';
+import {setupLoadingPreview} from './loading-preview.js';
 import {machineWithTester,restoreTester} from './tester-state.js?v=47';
 import {setupErrorNavigation} from './error-navigation.js?v=46';
 import {setupInputHighlights} from './input-highlights.js?v=44';
@@ -52,6 +55,32 @@ function draw(){let html=commentLinks(machine).map(link=>{const key=commentLinkK
  $('diagram').innerHTML=html;document.querySelectorAll('[data-comment-link]').forEach(g=>{g.onpointerdown=e=>e.stopPropagation();g.onclick=e=>{e.stopPropagation();choose('comment-link',g.dataset.commentLink,{toggle:e.shiftKey});showProperties(false);markSelection();properties()}});document.querySelectorAll('[data-edge]').forEach(g=>g.onclick=e=>{e.stopPropagation();choose('edge',+g.dataset.edge,{toggle:e.shiftKey});showProperties(false);markSelection();properties()});document.querySelectorAll('[data-node]').forEach(g=>{g.onpointerdown=e=>startDrag(e,g.dataset.node);});document.querySelectorAll('[data-comment]').forEach(g=>g.onpointerdown=e=>startCommentConnection(e,g.dataset.comment))
 }
 function properties(){
+ $('inspector-heading').textContent=selection.type==='state'?'State':selection.type==='edge'?'Transition':'Properties';
+ if(editorSettings.simplified&&selectedStates.size+selectedEdges.size+selectedComments.size+selectedCommentLinks.size===1){
+  if(selection.type==='state'){renderSimpleState(machine.states.find(s=>s.id===selection.id));return}
+  if(selection.type==='edge'&&renderSimpleEdge())return;
+ }
+ classicProperties();
+}
+function classicView(){updateEditorSettings({simplified:false});properties();showProperties(true)}
+function renderSimpleState(s){
+ $('properties').innerHTML=`<div class="simple-editor"><label class="simple-field compact-field"><span>Name</span><input id="state-name" value="${esc(s.name)}"></label>${machine.start===null||s.id===machine.start?`<label class="simple-toggle"><input id="initial" type="checkbox" ${s.id===machine.start?'checked':''}><span>Initial state</span></label>`:''}<label class="simple-toggle"><input id="accepting" type="checkbox" ${isAccepting(s)?'checked':''}><span>Accepting state</span></label>${isAccepting(s)?`<div class="simple-section"><label class="simple-field compact-field"><span>Token</span><input id="token-name" value="${esc(s.token)}" placeholder="TOKEN"></label><label class="simple-toggle"><input id="skip" type="checkbox" ${s.skip?'checked':''}><span>Skip token</span></label></div>`:''}<button id="classic-edit">More properties</button><button id="delete" class="danger">Delete state</button></div>`;
+ $('state-name').onchange=()=>{if(!$('state-name').value.trim())return;checkpoint();s.name=$('state-name').value;changed()};
+ $('accepting').onchange=()=>{checkpoint();setAccepting(s,$('accepting').checked);changed()};
+ if($('initial'))$('initial').onchange=()=>{checkpoint();machine.start=$('initial').checked?s.id:null;changed()};
+ if($('token-name'))$('token-name').onchange=()=>{checkpoint();s.token=$('token-name').value.trim();changed()};
+ if($('skip'))$('skip').onchange=()=>{checkpoint();s.skip=$('skip').checked;changed()};
+ $('classic-edit').onclick=classicView;$('delete').onclick=remove;
+}
+function renderSimpleEdge(){
+ const e=machine.edges[selection.index];if(!e)return false;
+ const characters=simpleCharacterClass(e.label,!!e.invert);if(!characters||e.portal!=null)return false;
+ const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to);
+ $('properties').innerHTML=`<div class="simple-editor"><div class="simple-route"><span>${esc(from?.name??'Unknown')}</span><b aria-hidden="true">→</b><span>${esc(to?.name??'Unknown')}</span></div><label class="simple-field compact-field"><span>Characters and ranges</span><input id="edge-label" value="${esc(characters.characters)}" placeholder="a-zA-Z0-9" spellcheck="false"></label><label class="simple-toggle"><input id="invert-match" type="checkbox" ${characters.inverted?'checked':''}><span>Invert set</span></label><button id="classic-edit">More properties</button><button id="delete" class="danger">Delete transition</button></div>`;
+ const save=()=>{try{const body=$('edge-label').value;if(!body)throw Error('Enter at least one character or range.');if(body.startsWith('^'))throw Error('Use Invert set instead of a leading ^.');const label=characterClassExpression(body);matcher(label);checkpoint();e.label=label;e.invert=$('invert-match').checked;lastTransitionRule=label;changed()}catch(error){toast(error.message)}};
+ $('edge-label').onchange=save;$('invert-match').onchange=save;$('classic-edit').onclick=classicView;$('delete').onclick=remove;return true;
+}
+function classicProperties(){
  const total=selectedStates.size+selectedEdges.size+selectedComments.size+selectedCommentLinks.size;
  if(selection.type==='none'){ $('properties').innerHTML='';return }
  if(total>1){$('properties').innerHTML=`<p class="selection-summary">${total} items selected</p><button id="copy-group">Copy selection</button><button id="delete" class="danger">Delete selection</button>`;$('copy-group').onclick=()=>copyItems();$('delete').onclick=remove;return}
@@ -62,7 +91,18 @@ function options(id){return machine.states.map(s=>`<option value="${esc(s.id)}" 
 function remove(){if(!selectedStates.size&&!selectedEdges.size&&!selectedComments.size&&!selectedCommentLinks.size)return;checkpoint();removeCommentLinks(machine,selectedCommentLinks);machine.states=machine.states.filter(s=>!selectedStates.has(s.id));machine.edges=machine.edges.filter((e,i)=>!selectedEdges.has(i)&&!selectedStates.has(e.from)&&(e.portal!=null||!selectedStates.has(e.to)));machine.comments=(machine.comments??[]).filter(c=>!selectedComments.has(c.id));for(const c of machine.comments){c.nodeIds=commentNodeIds(c).filter(id=>!selectedStates.has(id));delete c.nodeId}if(selectedComments.has(commentSource))commentSource=null;if(selectedStates.has(machine.start))machine.start=null;if(selectedStates.has(source)){source=null;connectPoint=null}clearSelection();showProperties(false);changed()}
 function point(e){return new DOMPoint(e.clientX,e.clientY).matrixTransform($('canvas').getScreenCTM().inverse())}
 let drag=null,pan=null,space=false,connectPoint=null,rightStart=null;
-function showProperties(show,event){document.body.classList.toggle('properties-hidden',!show);$('toggle-properties').setAttribute('aria-expanded',String(show));if(!show)return;const panel=document.querySelector('.inspector');const target=selection.type==='comment-link'?[...document.querySelectorAll('[data-comment-link]')].find(g=>g.dataset.commentLink===selection.id):selection.type==='state'?[...document.querySelectorAll('[data-node]')].find(g=>g.dataset.node===selection.id):selection.type==='comment'?[...document.querySelectorAll('[data-comment]')].find(g=>g.dataset.comment===selection.id):document.querySelector(`[data-edge="${selection.index}"]`);const box=target?.getBoundingClientRect(),x=event?.clientX??box?.right??window.innerWidth/2,y=event?.clientY??box?.top??150,area=$('canvas').getBoundingClientRect(),top=area.top+72,bottom=area.bottom-12;panel.style.maxHeight=Math.max(80,bottom-top)+'px';panel.style.maxWidth=Math.max(120,area.width-24)+'px';panel.style.left=Math.max(area.left+10,Math.min(x+16,area.right-panel.offsetWidth-12))+'px';panel.style.top=Math.max(top,Math.min(y-15,bottom-panel.offsetHeight))+'px'}
+function showProperties(show,event){
+ document.body.classList.toggle('properties-hidden',!show);$('toggle-properties').setAttribute('aria-expanded',String(show));if(!show)return;
+ const panel=document.querySelector('.inspector'),area=$('canvas').getBoundingClientRect();
+ panel.style.width=editorSettings.simplified?'min(320px, calc(100vw - 24px))':'min(240px, calc(100vw - 24px))';
+ panel.style.maxHeight=Math.max(80,area.height-24)+'px';panel.style.maxWidth=Math.max(120,area.width-24)+'px';
+ const target=selection.type==='edge'?document.querySelector(`[data-edge="${selection.index}"] .edge-text`):selection.type==='state'?[...document.querySelectorAll('[data-node]')].find(el=>el.dataset.node===selection.id):selection.type==='comment'?[...document.querySelectorAll('[data-comment]')].find(el=>el.dataset.comment===selection.id):null;
+ const box=target?.getBoundingClientRect(),anchor={x:event?.clientX??(box?box.left+box.width/2:area.left+area.width/2),y:event?.clientY??(box?box.top+box.height/2:area.top+80),bounds:box};
+ const position=placeInspector(anchor,panel.getBoundingClientRect(),{left:area.left,top:area.top,width:area.width,height:area.height});
+ panel.style.left=position.x+'px';panel.style.top=position.y+'px';
+}
+new ResizeObserver(()=>{if(!document.body.classList.contains('properties-hidden'))showProperties(true)}).observe(document.querySelector('.inspector'));
+
 function markSelection(){document.querySelectorAll('[data-comment-link]').forEach(g=>g.classList.toggle('selected',selectedCommentLinks.has(g.dataset.commentLink)));document.querySelectorAll('[data-node]').forEach(g=>g.classList.toggle('selected',selectedStates.has(g.dataset.node)));document.querySelectorAll('[data-comment]').forEach(g=>g.classList.toggle('selected',selectedComments.has(g.dataset.comment)));document.querySelectorAll('[data-edge]').forEach(g=>g.querySelector('.edge')?.classList.toggle('selected-edge',edgeSelected(machine.edges[+g.dataset.edge],+g.dataset.edge)));$('copy-selection').disabled=selection.type==='none';$('toggle-properties').disabled=selection.type==='none'}
 function cancelConnect(){commentSource=null;placingComment=false;document.body.classList.remove('placing-comment');source=null;connectPoint=null;rightStart=null;$('modehint').textContent='Right-click a state to connect · Double-click to add · Drag canvas to pan';draw()}
 function connectTo(id){checkpoint();machine.edges.push({from:source,to:id,label:source===id?lastTransitionRule:''});choose('edge',machine.edges.length-1);source=null;connectPoint=null;rightStart=null;$('modehint').textContent='Right-click a state to connect · Double-click to add · Drag canvas to pan';changed();showProperties(true);$('edge-label').focus();$('edge-label').select()}
@@ -101,6 +141,9 @@ function setupPopover(toggleId,menuId,height=270){
  $(menuId).addEventListener('toggle',e=>$(toggleId).setAttribute('aria-expanded',String(e.newState==='open')));
 }
 setupPopover('layout-toggle','layout-menu',()=>$('layout-mode').value==='spring'?620:390);setupPopover('app-menu-toggle','app-menu',180);
+setupEditorSettings(()=>{properties();if(!document.body.classList.contains('properties-hidden'))showProperties(true)});
+setupLoadingPreview($('app-loading'),$('preview-loading'));
+
 function setTipsVisible(visible){$('tips-panel').hidden=!visible;$('show-tips').hidden=visible;try{localStorage.setItem('lexica-tips-hidden',String(!visible))}catch{}}
 $('hide-tips').onclick=()=>setTipsVisible(false);$('show-tips').onclick=()=>setTipsVisible(true);
 try{setTipsVisible(localStorage.getItem('lexica-tips-hidden')!=='true')}catch{}

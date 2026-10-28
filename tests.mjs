@@ -1,3 +1,6 @@
+import {placeInspector} from './dist/inspector-placement.js';
+import {simpleCharacterClass,characterClassExpression,readEditorSettings} from './dist/editor-settings.js';
+import {setupLoadingPreview} from './dist/loading-preview.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
 test('ambiguity is reported instead of selecting a random transition',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});assert.throws(()=>tokenize(m,'a'),/Ambiguous/)});
@@ -363,12 +366,12 @@ test('toolbar popovers open beside vertical docks and stay within the viewport',
 });
 
 test('properties use the full canvas height with a side-docked tester and stay inside the canvas',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\n',app.indexOf('function showProperties(')));
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\nnew ResizeObserver',app.indexOf('function showProperties(')));
  for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
-  const panel={style:{},offsetWidth:240,offsetHeight:500};
-  const context={selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
+  const panel={style:{},getBoundingClientRect:()=>({width:240,height:500})};area.height=area.bottom-area.top;
+  const context={placeInspector,editorSettings:{simplified:false},selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
   runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
-  assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
+  assert.equal(panel.style.maxHeight,(area.height-24)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+12);
  }
 });
 
@@ -628,4 +631,29 @@ test('saved machines restore tester text and skipped-token preference, including
  restoreTester({...m,tester:{input:''}},restored,restoredSkip);assert.equal(restored.value,'');assert.equal(restoredSkip.checked,false);
  restored.value='keep current text';restoreTester(m,restored,restoredSkip);assert.equal(restored.value,'keep current text');
  for(const tester of [null,[],{input:42},{input:'x',showSkipped:'yes'}])assert.throws(()=>validate({...m,tester}),/tester/);
+});
+
+test('loading preview survives startup cleanup, replays on demand, and closes with its control',()=>{
+ class Element{constructor(){this.attributes={};this.children=[];this.listeners={};this.open=false;this.content='count += 42;'}cloneNode(){const clone=new Element();clone.attributes={...this.attributes};clone.content=this.content;return clone}removeAttribute(name){delete this.attributes[name]}setAttribute(name,value){this.attributes[name]=value}replaceChildren(...children){this.children=children}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}focus(){this.focused=true}}
+ const source=new Element(),button=new Element();source.attributes.id='app-loading';let dialog;const saved=globalThis.document;globalThis.document={createElement:()=>new Element(),body:{append:el=>dialog=el}};try{const preview=setupLoadingPreview(source,button);source.content='removed after startup';button.onclick();assert.equal(dialog.open,true);assert.equal(dialog.children[0].content,'count += 42;');assert.equal(dialog.children[0].attributes.id,undefined);assert.equal(dialog.children[1].focused,true);dialog.children[1].onclick();assert.equal(dialog.open,false);assert.equal(dialog.children.length,0);preview.open();assert.equal(dialog.children[0].content,'count += 42;');preview.close();assert.equal(dialog.open,false)}finally{globalThis.document=saved}
+});
+
+test('simplified character fields preserve matching and keep advanced expressions intact',()=>{
+ for(const source of ['abc','a|bc','[a][b]','.','^','$'])assert.equal(simpleCharacterClass(source),null);
+ for(const source of ['[abc]','[^a-z]','a','\\n','\\d','\\+','😀'])for(const invert of [false,true]){
+  const simple=simpleCharacterClass(source,invert),original=new RegExp('^(?:'+source+')$','u'),converted=new RegExp('^'+characterClassExpression(simple.characters)+'$','u');
+  for(const char of ['a','b','c','z','0','\n','+','😀'])assert.equal(invert?!original.test(char):original.test(char),simple.inverted?!converted.test(char):converted.test(char),source);
+ }
+ assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true});
+});
+
+test('opening compact properties preserves machine data and editing keeps validation and undo',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function renderSimpleState('),app.indexOf('function classicProperties('));
+ const machine=example(),before=JSON.stringify(machine),elements={};let checkpoints=0,changes=0;
+ const context={machine,selection:{index:0},$:id=>elements[id]??= {},esc:value=>String(value),isAccepting,setAccepting,simpleCharacterClass,characterClassExpression,classicView(){},remove(){},checkpoint:()=>checkpoints++,changed:()=>changes++,matcher:label=>new RegExp(label,'u'),toast(){}};
+ runInNewContext(script+'renderSimpleState(machine.states[0]);renderSimpleEdge();',context);
+ assert.equal(JSON.stringify(machine),before);assert.equal(checkpoints,0);assert.equal(changes,0);
+ elements['edge-label'].value='z-a';elements['invert-match'].checked=false;elements['edge-label'].onchange();assert.equal(checkpoints,0);assert.equal(JSON.stringify(machine),before);
+ elements['edge-label'].value='a-z';elements['edge-label'].onchange();assert.equal(machine.edges[0].label,'[a-z]');assert.equal(checkpoints,1);assert.equal(changes,1);
 });
