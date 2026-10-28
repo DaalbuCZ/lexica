@@ -8,3 +8,8 @@ export function placeInspector(anchor,size,viewport,{margin=12,gap=16}={}){
  const preferredY=anchor.y-15,y=preferredY+size.height<=bottom?preferredY:anchor.y+15-size.height>=top?anchor.y+15-size.height:clamp(preferredY,top,bottom-size.height);
  return {x:clamp(x,left,right-size.width),y:clamp(y,top,bottom-size.height)};
 }
+
+export function clampInspectorPosition(position,size,viewport,margin=12){
+ const left=(viewport.left??0)+margin,top=(viewport.top??0)+margin;
+ return {x:Math.max(left,Math.min(position.x,Math.max(left,(viewport.left??0)+viewport.width-size.width-margin))),y:Math.max(top,Math.min(position.y,Math.max(top,(viewport.top??0)+viewport.height-size.height-margin)))};
+}

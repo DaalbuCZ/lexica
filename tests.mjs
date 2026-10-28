@@ -1,8 +1,14 @@
+import {errorSpans,underlineSegments} from './dist/error-underlines.js';
+import {createLexerAnalyzer} from './dist/lexer-analyzer.js';
+import {createWorkerHandler} from './dist/lexer-worker.js';
+import {createViewportController,screenToWorld,worldToScreen,wheelPanDelta} from './dist/viewport.js';
+import {setupMinimap} from './dist/minimap.js';
+import {createDebouncedTask} from './dist/debounced-task.js';
 import {createTokenizationCache} from './dist/lexer-cache.js';
 import {configurationDiagnostics} from './dist/lexer.js';
 import {readEditorSettings} from './dist/editor-settings.js';
 import {setupLoadingPreview} from './dist/loading-preview.js';
-import {placeInspector} from './dist/inspector-placement.js';
+import {placeInspector,clampInspectorPosition} from './dist/inspector-placement.js';
 import {ambiguousTransitionWitnesses,transitionError} from './dist/lexer.js';
 import {createDebugSession} from './dist/debug-session.js';
 import {simpleCharacterClass} from './dist/editor-settings.js';
@@ -315,7 +321,7 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
 test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch zooms',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf("$('zoom-in').onclick="),app.indexOf('\n',app.indexOf("$('zoom-in').onclick=")));
  let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
- runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math,editorSettings:{pinchSensitivity:1}});
+ runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math,wheelPanDelta,editorSettings:{pinchSensitivity:1}});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
  wheel({...event,ctrlKey:true});assert.equal(zoomed[0],Math.exp(.06));
@@ -368,8 +374,8 @@ test('toolbar popovers open beside vertical docks and stay within the viewport',
 test('properties flip around the click and return to their anchor after content shrinks',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function inspectorViewport('),app.indexOf('const inspectorResizeObserver'));
  const panel={style:{},height:200,getBoundingClientRect(){return {width:240,height:this.height}}},target={dataset:{edge:'0'},getBoundingClientRect:()=>({left:-3000,top:-2000,width:7000,height:5000})};
- const context={placeInspector,inspectorAnchor:null,inspectorKey:'',selection:{type:'edge',index:0},editorSettings:{simplified:false},requestAnimationFrame(){},document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:()=>panel,querySelectorAll:()=>[target]},$:()=>({setAttribute(){}}),window:{innerWidth:745,innerHeight:919}};
- runInNewContext(script+"showProperties(true,{clientX:400,clientY:600});",context);assert.equal(panel.style.left,'416px');assert.equal(panel.style.top,'585px');panel.height=600;context.clampInspector();assert.equal(panel.style.top,'15px');panel.height=200;context.clampInspector();assert.equal(panel.style.top,'585px');
+ const context={placeInspector,clampInspectorPosition,screenToWorld,worldToScreen,view:()=>({x:0,y:0,width:745,height:919}),inspectorAnchor:null,inspectorKey:'',selection:{type:'edge',index:0},editorSettings:{simplified:false},requestAnimationFrame(){},document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:()=>panel,querySelectorAll:()=>[target]},$:id=>id==='canvas'?{getBoundingClientRect:()=>({left:0,top:0,width:745,height:919})}:{setAttribute(){}},window:{innerWidth:745,innerHeight:919}};
+ runInNewContext(script+"showProperties(true,{clientX:400,clientY:600});",context);assert.equal(panel.style.left,'416px');assert.equal(panel.style.top,'585px');panel.height=600;context.clampInspector();assert.equal(panel.style.top,'307px');panel.height=200;context.clampInspector();assert.equal(panel.style.top,'585px');
  context.showProperties(true,{clientX:700,clientY:900});assert.equal(panel.style.left,'444px');assert.equal(panel.style.top,'707px');context.showProperties(false);assert.equal(context.inspectorAnchor,null);
 });
 
@@ -382,7 +388,7 @@ test('clicking a token selects its exact UTF-16 input range, including errors an
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function focusInputToken('));
  let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range,getBoundingClientRect:()=>({})},tokens={};
  const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
- runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,inputHighlights:{rect:()=>null},stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
+ runInNewContext(script,{inputAnalysisPending:false,$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,inputHighlights:{rect:()=>null},stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
  tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
  let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
 });
@@ -408,8 +414,8 @@ test('input caret and selections highlight matching tokens and traces without mo
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusInputToken('),app.indexOf("$('input').onclick=focusInputToken"));
  const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
  const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
- const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
- const context={stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{contains:()=>active.has(i),toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
+ const context={lastFocusedOutputToken:null,inputAnalysisPending:false,stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
  runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
  input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
@@ -431,7 +437,7 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
  const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
- const context={tokenizationCache:createTokenizationCache(tokenize),renderedTokens:null,renderedShowSkipped:null,$:id=>elements[id],machine:m,tokenize,hideInputTokenHover(){},errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ const context={inputTestVersion:0,inputWork:{cancel(){}},setInputPending(){},tokenizationCache:createTokenizationCache(tokenize),renderedTokens:null,renderedShowSkipped:null,$:id=>elements[id],machine:m,tokenize,hideInputTokenHover(){},errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
@@ -597,9 +603,9 @@ test('lexer stepping starts at the requested cursor with absolute offsets and in
 });
 
 test('range highlights preserve one text flow for tabs, wide glyphs, combining marks and joined emoji',()=>{
- const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
  Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
- const registry=new Map(),context={input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
+ const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
  runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);
  context.tokens=[{token:'IDENT',value:'hi',offset:0},{token:'WS',value:'\t',offset:2,skip:true},{token:'ERROR',value:input.value.slice(3,-2),offset:3},{token:'NUMBER',value:'42',offset:input.value.length-2}];
  runInNewContext('highlights.render(tokens);',context);assert.equal(mirror.firstChild.data,input.value+'\u200b');assert.equal('innerHTML' in mirror,false);
@@ -668,16 +674,19 @@ test('memory inspector opens below its button with matching right edges',()=>{
 });
 
 
-test('input hover waits for the pointer to settle, positions above it, and cancels on leave',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let activeInputHover='),app.indexOf('function focusToken(')),handlers={},timers=new Map();let sequence=0;
- const badge={style:{},hidden:true,getBoundingClientRect:()=>({width:80,height:24})},context={$:id=>id==='input'?{addEventListener:(name,fn)=>handlers[name]=fn}:badge,allInputTokens:[{token:'IDENT',offset:0,value:'hi'}],inputHighlights:{hover(){},rects:()=>[{left:100,right:300,top:100,bottom:140}]},tokenColorClass:()=> 'token-color-1',window:{innerWidth:1000,innerHeight:800},clearTimeout:id=>timers.delete(id),setTimeout:(fn,delay)=>{assert.equal(delay,50);timers.set(++sequence,fn);return sequence}};
- runInNewContext(script,context);handlers.pointermove({clientX:180,clientY:120});assert.equal(badge.hidden,true);handlers.pointermove({clientX:200,clientY:120});assert.equal(timers.size,1);[...timers.values()][0]();assert.equal(badge.hidden,false);assert.equal(badge.textContent,'IDENT');assert.equal(badge.style.left,'160px');assert.equal(badge.style.top,'84px');handlers.pointermove({clientX:210,clientY:120});assert.equal(badge.hidden,true);handlers.pointerleave();assert.equal(timers.has(sequence),false);
+test('hover survives movement within a token, follows the pointer, and resets only when leaving it',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let activeInputHover='),app.indexOf('function focusToken(')),handlers={},timers=new Map(),highlights=[];let sequence=0;
+ const tokens=[{token:'IDENT',offset:0,value:'hi'},{token:'NUMBER',offset:3,value:'42'}],badge={style:{},hidden:true,getBoundingClientRect:()=>({width:80,height:24})};
+ const context={inputAnalysisPending:false,$:id=>id==='input'?{addEventListener:(name,fn)=>handlers[name]=fn}:badge,allInputTokens:tokens,inputHighlights:{hover:token=>highlights.push(token),tokenAtPoint(x,y){return tokens.find(token=>!token.skip&&this.rects(token.offset).some(rect=>x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom))},rects:start=>start===0?[{left:100,right:300,top:100,bottom:140},{left:100,right:250,top:150,bottom:190}]:[{left:400,right:500,top:100,bottom:140}]},tokenColorClass:()=> 'token-color-1',window:{innerWidth:1000,innerHeight:800},clearTimeout:id=>timers.delete(id),setTimeout:(fn,delay)=>{assert.equal(delay,50);timers.set(++sequence,fn);return sequence}};
+ const settle=()=>{const [id,fn]=[...timers.entries()][0];timers.delete(id);fn()};
+ runInNewContext(script,context);handlers.pointermove({clientX:180,clientY:120});assert.equal(badge.hidden,true);handlers.pointermove({clientX:200,clientY:120});assert.equal(timers.size,1);settle();assert.equal(badge.hidden,false);assert.equal(badge.textContent,'IDENT');assert.equal(badge.style.left,'160px');assert.equal(badge.style.top,'84px');const count=highlights.length;
+ handlers.pointermove({clientX:210,clientY:120});assert.equal(badge.hidden,false);assert.equal(badge.style.left,'170px');assert.equal(timers.size,0);assert.equal(highlights.length,count);handlers.pointermove({clientX:180,clientY:170});assert.equal(badge.hidden,false);assert.equal(highlights.length,count);
+ handlers.pointermove({clientX:420,clientY:120});assert.equal(badge.hidden,true);assert.equal(highlights.at(-1),null);settle();assert.equal(badge.textContent,'NUMBER');assert.equal(highlights.at(-1),tokens[1]);handlers.pointermove({clientX:600,clientY:120});assert.equal(badge.hidden,true);handlers.pointerleave();assert.equal(timers.size,0);
 });
 
-
 test('hover highlights the full token without replacing the current debugger character',()=>{
- const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace('export function','function'),input={value:'hello 42'},mirror={};Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
- const registry=new Map(),context={input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return []}})}};
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'hello 42'},mirror={};Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
+ const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return []}})}};
  runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);context.token={token:'IDENT',offset:0,value:'hello'};runInNewContext('highlights.render([token]);highlights.hover(token);highlights.step({kind:"character",offset:1,end:2,tokenStart:0,tokenEnd:5});',context);const hover=registry.get('lexica-hover-token-color-1');assert.equal([...hover][0].start,0);assert.equal([...hover][0].end,5);assert.ok(registry.get('lexica-step').priority>hover.priority);runInNewContext('highlights.hover(null);',context);assert.equal(registry.has('lexica-hover-token-color-1'),false);assert.equal(registry.has('lexica-step'),true);
 });
 
@@ -731,6 +740,109 @@ test('opening existing memory settings does not redraw or tokenize the machine',
 
 
 test('unchanged tester renders retain token cards and input highlights',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));let writes=0,paints=0;const output={};Object.defineProperty(output,'innerHTML',{set(){writes++}});const elements={input:{value:'hello 42'},tokens:output,'show-skipped':{checked:false},'input-highlights':{}},machine=example();const context={tokenizationCache:createTokenizationCache(tokenize),renderedTokens:null,renderedShowSkipped:null,hideInputTokenHover(){},traceToken(){},markFailures(){},errorNav:{update(){}},machine,$:id=>elements[id],tokenColorClass:()=>'',esc:value=>value,renderInputHighlights:()=>paints++,visibleTokens:[]};
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));let writes=0,paints=0;const output={};Object.defineProperty(output,'innerHTML',{set(){writes++}});const elements={input:{value:'hello 42'},tokens:output,'show-skipped':{checked:false},'input-highlights':{}},machine=example();const context={inputTestVersion:0,inputWork:{cancel(){}},setInputPending(){},tokenizationCache:createTokenizationCache(tokenize),renderedTokens:null,renderedShowSkipped:null,hideInputTokenHover(){},traceToken(){},markFailures(){},errorNav:{update(){}},machine,$:id=>elements[id],tokenColorClass:()=>'',esc:value=>value,renderInputHighlights:()=>paints++,visibleTokens:[]};
  runInNewContext(script,context);context.test();context.test();machine.states[0].x+=100;context.test();assert.equal(writes,1);assert.equal(paints,1);elements['show-skipped'].checked=true;context.test();assert.equal(writes,2);machine.states[1].token='WORD';context.test();assert.equal(writes,3);assert.equal(paints,3);
+});
+
+
+test('view updates accumulate between events and paint only once per animation frame',()=>{
+ const frames=new Map(),writes=[],changes=[];let sequence=0;const canvas={viewBox:{baseVal:{x:0,y:0,width:800,height:600}},clientWidth:800,clientHeight:600,setAttribute:(name,value)=>writes.push([name,value])},controller=createViewportController(canvas,(view,metrics)=>changes.push({view,metrics}),{requestFrame:fn=>{frames.set(++sequence,fn);return sequence},cancelFrame:id=>frames.delete(id)});
+ for(let i=0;i<100;i++)controller.set({...controller.get(),x:controller.get().x+2});assert.equal(frames.size,1);assert.equal(writes.length,0);assert.equal(controller.get().x,200);const callback=[...frames.values()][0];callback();assert.equal(writes.length,1);assert.equal(writes[0][1],'200 0 800 600');assert.equal(changes.length,1);assert.deepEqual(changes[0].metrics,{width:800,height:600});controller.set({...controller.get(),y:50});controller.flush();assert.equal(writes.length,2);assert.equal(frames.size,0);controller.flush();assert.equal(writes.length,2);
+});
+
+test('pending pinch changes preserve the pointer anchor before they paint',()=>{
+ const canvas={viewBox:{baseVal:{x:0,y:0,width:800,height:600}},clientWidth:800,clientHeight:600,setAttribute(){}},controller=createViewportController(canvas,()=>{},{requestFrame:()=>1,cancelFrame(){}}),rect={left:50,top:20,width:800,height:600},pointer={clientX:750,clientY:220},anchor=screenToWorld(pointer,controller.get(),rect);
+ for(let i=0;i<20;i++){const view=controller.get(),at=screenToWorld(pointer,view,rect),factor=.97;controller.set({x:at.x+(view.x-at.x)*factor,y:at.y+(view.y-at.y)*factor,width:view.width*factor,height:view.height*factor})}const result=screenToWorld(pointer,controller.get(),rect);assert.ok(Math.abs(result.x-anchor.x)<1e-8);assert.ok(Math.abs(result.y-anchor.y)<1e-8);assert.equal(canvas.viewBox.baseVal.width,800);assert.deepEqual(screenToWorld({clientX:100,clientY:150},{x:0,y:0,width:800,height:400},{left:100,top:50,width:800,height:600}),{x:0,y:0});
+});
+
+test('panning updates the minimap viewport without rebuilding its graph',()=>{
+ let writes=0,routes=0,layouts=0,viewport;const attrs={},machine=example();machine.comments=[{id:'note',x:10,y:20,text:'Notes'}];const map={set innerHTML(value){writes++;viewport={attrs:{},setAttribute(name,value){this.attrs[name]=String(value)}}},querySelector:()=>viewport,setAttribute:(name,value)=>attrs[name]=value},renderer=setupMinimap(map,{getMachine:()=>machine,routeEdges:m=>{routes++;return routeEdges(m)},commentLayout:comment=>{layouts++;return commentLayout(comment)}});
+ renderer.rebuild({x:0,y:0,width:800,height:600});const first=viewport;for(let i=1;i<=100;i++)renderer.update({x:i*2,y:i,width:800,height:600});assert.equal(writes,1);assert.equal(routes,1);assert.equal(layouts,1);assert.equal(viewport,first);assert.equal(viewport.attrs.x,'200');assert.equal(viewport.attrs.y,'100');assert.ok(attrs.viewBox.split(' ').map(Number).every(Number.isFinite));machine.states[0].x+=100;renderer.rebuild({x:200,y:100,width:800,height:600});assert.equal(writes,2);assert.equal(routes,2);assert.notEqual(viewport,first);
+});
+
+test('debounced input work runs once after a burst and can flush before debugging',()=>{
+ const timers=new Map();let id=0,runs=0,value='',processed='';const task=createDebouncedTask(()=>{runs++;processed=value},{delay:120,setTimer:(fn,delay)=>{assert.equal(delay,120);timers.set(++id,fn);return id},clearTimer:key=>timers.delete(key)});
+ for(let i=0;i<50;i++){value+='a';task.schedule()}assert.equal(runs,0);assert.equal(timers.size,1);assert.equal(task.pending(),true);task.flush();assert.equal(processed,'a'.repeat(50));assert.equal(runs,1);assert.equal(timers.size,0);assert.equal(task.pending(),false);task.flush();assert.equal(runs,1);task.schedule();task.cancel();assert.equal(timers.size,0);assert.equal(runs,1);
+});
+
+test('input events schedule analysis without tokenizing or saving each keystroke',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function handleInputChange('),app.indexOf('function test(){'));let queued=0;const context={inputTestVersion:0,tokenizationCache:{cancel(){}},stepper:{reset:options=>assert.equal(options.notify,false)},hideInputTokenHover(){},setInputPending:value=>assert.equal(value,true),inputWork:{schedule:()=>queued++},save(){throw Error('synchronous save')},test(){throw Error('synchronous tokenization')}};runInNewContext(script,context);for(let i=0;i<20;i++)context.handleInputChange();assert.equal(queued,20);
+});
+
+test('caret tracing is coalesced and paused while new input is waiting for analysis',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function scheduleInputFocus('),app.indexOf("$('input').onclick="));let calls=0;const frames=[],context={inputAnalysisPending:false,inputFocusFrame:null,stepper:{active:()=>false},requestAnimationFrame:fn=>{frames.push(fn);return frames.length},focusInputToken:()=>calls++};runInNewContext(script,context);context.scheduleInputFocus();context.scheduleInputFocus();context.scheduleInputFocus();assert.equal(frames.length,1);frames[0]();assert.equal(calls,1);context.inputAnalysisPending=true;context.scheduleInputFocus();assert.equal(frames.length,1);
+});
+
+
+test('long input analysis runs in a worker and reuses unchanged machine data',async()=>{
+ const workers=[],handle=createWorkerHandler(),factory=()=>{const worker={sent:[],postMessage(data){this.sent.push(data)},terminate(){this.terminated=true}};workers.push(worker);return worker};let synchronous=0;const analyzer=createLexerAnalyzer(()=>{synchronous++;return []},{workerFactory:factory,threshold:4}),machine=example();machine.tester={input:'old saved input'};
+ const first=analyzer.get(machine,'hello 42');assert.equal(synchronous,0);assert.equal(workers.length,1);assert.equal('tester' in workers[0].sent[0].machine,false);workers[0].onmessage({data:handle(workers[0].sent[0])});const tokens=await first;assert.deepEqual(tokens.map(token=>token.token),['IDENT','WS','NUMBER']);assert.equal(analyzer.get(machine,'hello 42'),tokens);
+ machine.states[0].x+=100;const second=analyzer.get(machine,'world 17');assert.equal(workers[0].sent[1].machine,undefined);workers[0].onmessage({data:handle(workers[0].sent[1])});assert.equal((await second)[0].value,'world');
+});
+
+test('resuming typing cancels obsolete worker work and ignores late responses',async()=>{
+ const workers=[],analyzer=createLexerAnalyzer(tokenize,{threshold:1,workerFactory:()=>{const worker={postMessage(data){this.data=data},terminate(){this.terminated=true}};workers.push(worker);return worker}}),old=analyzer.get(example(),'old');const aborted=assert.rejects(old,error=>error.name==='AbortError');analyzer.cancel();await aborted;assert.equal(workers[0].terminated,true);const fresh=analyzer.get(example(),'fresh');workers[0].onmessage({data:{id:workers[0].data.id,tokens:[]}});workers[1].onmessage({data:{id:workers[1].data.id,tokens:tokenize(example(),'fresh')}});assert.equal((await fresh)[0].value,'fresh');
+});
+
+test('worker results retain full token text while compacting duplicate trace visits',()=>{
+ const handle=createWorkerHandler(),input='a'.repeat(30000),result=handle({id:1,machine:example(),input});assert.equal(result.tokens[0].value,input);assert.deepEqual(result.tokens[0].traceStates,['s0','s1']);assert.deepEqual(result.tokens[0].traceEdges,[0,1]);assert.equal(handle({id:2,input:'42'}).tokens[0].token,'NUMBER');const broken=example();broken.edges[0].label='';assert.match(handle({id:3,machine:broken,input:'x'}).error.message,/empty/);
+});
+
+test('all output tokens and their full values render together without pagination',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function renderTokenOutput('),app.indexOf('function renderTestError(')),output={},visibleTokens=Array.from({length:1229},(_,i)=>({token:'NUMBER',offset:i,value:String(i)}));visibleTokens[0].value='a'.repeat(10000);const context={visibleTokens,$:()=>output,tokenColorClass:()=>'',esc:value=>value,lastFocusedOutputToken:null};runInNewContext(source+'renderTokenOutput();',context);assert.equal((output.innerHTML.match(/data-token-index=/g)??[]).length,1229);assert.ok(output.innerHTML.includes(visibleTokens[0].value));assert.doesNotMatch(output.innerHTML,/token-pagination|token-page|of 1229 tokens/);
+});
+
+test('large input highlighting covers the visible range and refreshes when scrolled',()=>{
+ const source=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'a'.repeat(1000),top:400,getBoundingClientRect(){return {top:this.top,bottom:this.top+5,height:5}}},mirror={};Object.defineProperty(mirror,'textContent',{set(value){this.firstChild={data:value}}});const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...values){super(values)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{left:0,right:10,top:this.start,bottom:this.end}]}})}};
+ context.tokens=Array.from({length:1000},(_,offset)=>({token:'IDENT',offset,value:'a'}));runInNewContext(source+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');highlights.render(tokens);",context);const first=[...registry.get('lexica-token-color-1')];assert.ok(first.length<60);assert.ok(first.some(range=>range.start===400));input.top=800;context.highlights.refresh();const next=[...registry.get('lexica-token-color-1')];assert.ok(next.length<60);assert.ok(next.some(range=>range.start===800));assert.ok(!next.some(range=>range.start===400));
+});
+
+test('skipped tokens do not expose hover tooltips or hover highlights',()=>{
+ const source=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'a 1'},mirror={};Object.defineProperty(mirror,'textContent',{set(value){this.firstChild={data:value}}});const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...values){super(values)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{left:this.start*10,right:this.end*10,top:0,bottom:20}]}})}};context.tokens=[{token:'IDENT',offset:0,value:'a'},{token:'WS',offset:1,value:' ',skip:true},{token:'NUMBER',offset:2,value:'1'}];runInNewContext(source+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');highlights.render(tokens);",context);assert.equal(context.highlights.tokenAtPoint(5,5).token,'IDENT');assert.equal(context.highlights.tokenAtPoint(15,5),null);context.highlights.hover(context.tokens[1]);assert.equal(registry.has('lexica-hover-token-color-1'),false);
+});
+
+
+test('late background analysis cannot overwrite newer input results',async()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput=")),jobs=[],elements={input:{value:'hello'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};let focused=0;
+ const context={inputTestVersion:0,inputWork:{cancel(){}},setInputPending(value){context.inputAnalysisPending=value},tokenizationCache:{get:()=>new Promise(resolve=>jobs.push(resolve))},renderedTokens:null,renderedShowSkipped:null,hideInputTokenHover(){},traceToken(){},markFailures(){},errorNav:{update(){}},machine:example(),$:id=>elements[id],tokenColorClass:()=>'',esc:value=>value,renderInputHighlights(){},focusInputToken:()=>focused++,visibleTokens:[]};runInNewContext(source,context);context.test();elements.input.value='42';context.test();jobs[0](tokenize(example(),'hello'));await Promise.resolve();assert.equal(elements.tokens.innerHTML,undefined);jobs[1](tokenize(example(),'42'));await Promise.resolve();assert.equal(context.allInputTokens[0].value,'42');assert.match(elements.tokens.innerHTML,/NUMBER/);assert.doesNotMatch(elements.tokens.innerHTML,/hello/);assert.equal(focused,1);assert.equal(context.inputAnalysisPending,false);
+});
+
+test('typing debounce can adapt to input size while keeping only the latest job',()=>{
+ let length=10,next=0;const timers=new Map(),delays=[],task=createDebouncedTask(()=>{},{delay:()=>length>=4096?250:120,setTimer:(fn,delay)=>{delays.push(delay);timers.set(++next,fn);return next},clearTimer:id=>timers.delete(id)});task.schedule();length=10000;task.schedule();assert.deepEqual(delays,[120,250]);assert.equal(timers.size,1);task.cancel();
+});
+
+
+test('adjacent error characters form continuous underlines without joining skipped whitespace',()=>{
+ const tokens=[{token:'ERROR',offset:0,value:'"'},{token:'WS',offset:1,value:' ',skip:true},{token:'ERROR',offset:2,value:'$'},{token:'ERROR',offset:3,value:'{'},{token:'ERROR',offset:4,value:'😀'}];assert.deepEqual(errorSpans(tokens),[{start:0,end:1},{start:2,end:6}]);const segments=underlineSegments([{left:12,right:28,top:10,bottom:24},{left:12,right:12,top:24,bottom:38},{left:0,right:6,top:-30,bottom:-15}],{left:1,top:1,bottom:100});assert.deepEqual(segments,[{left:11,top:22,width:16,phase:-5}]);
+});
+
+test('error underline overlay uses merged spans and clears when errors are removed',()=>{
+ const source=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'" ${'},mirror={},layer={getBoundingClientRect:()=>({left:0,top:0,bottom:100})};Object.defineProperty(mirror,'textContent',{set(value){this.firstChild={data:value}}});const context={errorSpans,underlineSegments,input,mirror,layer,CSS:{highlights:new Map()},Highlight:class extends Set{constructor(...values){super(values)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{left:this.start*8,right:this.end*8,top:10,bottom:24}]}})}};context.tokens=[{token:'ERROR',offset:0,value:'"'},{token:'WS',offset:1,value:' ',skip:true},{token:'ERROR',offset:2,value:'$'},{token:'ERROR',offset:3,value:'{'}];runInNewContext(source+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1',layer);highlights.render(tokens);",context);assert.equal((layer.innerHTML.match(/input-error-squiggle/g)??[]).length,2);assert.match(layer.innerHTML,/width:16px/);context.highlights.render([]);assert.equal(layer.innerHTML,'');
+});
+
+test('property positions retain their world anchor during panning and clamp only near viewport edges',()=>{
+ const world={x:400,y:300},size={width:240,height:200},rect={left:0,top:0,width:800,height:600},viewport={width:800,height:600};const before=worldToScreen(world,{x:0,y:0,width:800,height:600},rect),after=worldToScreen(world,{x:100,y:50,width:800,height:600},rect);assert.deepEqual(before,{x:400,y:300});assert.deepEqual(after,{x:300,y:250});assert.deepEqual(clampInspectorPosition(after,size,viewport),after);assert.deepEqual(clampInspectorPosition({x:750,y:-100},size,viewport),{x:548,y:12});assert.deepEqual(clampInspectorPosition(before,size,viewport),before);
+});
+
+test('starting a pan keeps existing properties open',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function startPan('),app.indexOf("$('canvas').onpointerdown=")),context={pan:null,view:()=>({x:0,y:0,width:800,height:600}),document:{body:{classList:{add(){}}}},showProperties(){throw Error('panning closed properties')}};runInNewContext(source,context);context.startPan({clientX:50,clientY:60,preventDefault(){}});assert.equal(context.pan.x,50);assert.equal(context.pan.moved,false);
+});
+
+test('pixel trackpad panning preserves small diagonal deltas and never remaps to an axis',()=>{
+ assert.deepEqual(wheelPanDelta({deltaMode:0,deltaX:.15,deltaY:8,shiftKey:false},600),{x:.15,y:8});assert.deepEqual(wheelPanDelta({deltaMode:0,deltaX:0,deltaY:8,shiftKey:true},600),{x:0,y:8});assert.deepEqual(wheelPanDelta({deltaMode:0,deltaX:7,deltaY:.1,shiftKey:true},600),{x:7,y:.1});assert.deepEqual(wheelPanDelta({deltaMode:1,deltaX:0,deltaY:3,shiftKey:true},600),{x:48,y:0});
+});
+
+
+test('pan and zoom close properties when the world anchor leaves the canvas beside the tester',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function inspectorViewport('),app.indexOf('const inspectorResizeObserver')),classes=new Set(),canvas={left:0,top:0,width:600,height:800},panel={style:{},getBoundingClientRect:()=>({width:240,height:200})};let v={x:0,y:0,width:600,height:800};
+ const context={placeInspector,clampInspectorPosition,screenToWorld,worldToScreen,view:()=>v,inspectorAnchor:null,inspectorKey:'',selection:{type:'state',id:'s0'},editorSettings:{simplified:true},requestAnimationFrame(){},document:{body:{classList:{toggle(name,on){on?classes.add(name):classes.delete(name)},contains:name=>classes.has(name)}},querySelector:()=>panel,querySelectorAll:()=>[]},$:id=>id==='canvas'?{getBoundingClientRect:()=>canvas}:{setAttribute(){}},window:{innerWidth:1000,innerHeight:800}};
+ runInNewContext(script,context);context.showProperties(true,{clientX:550,clientY:300});assert.ok(parseFloat(panel.style.left)+240<=588);const x=parseFloat(panel.style.left);v={...v,x:20};context.clampInspector(true);assert.equal(parseFloat(panel.style.left),x-20);assert.equal(classes.has('properties-hidden'),false);v={...v,x:-400};context.clampInspector(true);assert.equal(classes.has('properties-hidden'),true);assert.equal(context.inspectorAnchor,null);
+ context.showProperties(true,{clientX:200,clientY:300});v={x:10000,y:0,width:600,height:800};context.clampInspector(true);assert.equal(classes.has('properties-hidden'),true);
+});
+
+test('editing a long input reuses unchanged output cards and keeps the full list',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function renderTokenOutput('),app.indexOf('function renderTestError(')),parse=html=>[...html.matchAll(/data-token-index="(\d+)"/g)].map(match=>({dataset:{tokenIndex:match[1]}})),output={children:[],set innerHTML(value){this.children=parse(value)}};
+ const context={visibleTokens:Array.from({length:1229},(_,i)=>({token:'NUMBER',value:String(i)})),$:()=>output,tokenColorClass:()=>'',esc:value=>value,lastFocusedOutputToken:null,document:{createRange:()=>({setStart(node,index){this.node=node;this.start=index},setEnd(node,index){this.end=index},deleteContents(){this.node.children.splice(this.start,this.end-this.start)},createContextualFragment:parse,insertNode(nodes){this.node.children.splice(this.start,0,...nodes)}})}};
+ runInNewContext(source,context);context.renderTokenOutput();const old=[...output.children];context.visibleTokens=context.visibleTokens.map((t,i)=>i===600?{...t,value:'edited'}:t);context.renderTokenOutput();assert.equal(output.children.length,1229);assert.equal(output.children[599],old[599]);assert.notEqual(output.children[600],old[600]);assert.equal(output.children[601],old[601]);
+ context.visibleTokens=[...context.visibleTokens.slice(0,600),{token:'IDENT',value:'extra'},...context.visibleTokens.slice(600)];context.renderTokenOutput();assert.equal(output.children.length,1230);assert.equal(output.children[602],old[601]);assert.equal(output.children[602].dataset.tokenIndex,'602');
 });
