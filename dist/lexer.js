@@ -1,18 +1,19 @@
-import {stateLabel,transitionLabel} from './labels.js?v=16';
+import {stateLabel,transitionLabel} from './labels.js?v=17';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
 export {destination,enablePortal,renamePortal,statePortalBox} from './portals.js';
-import {routeEdges} from './layout.js?v=40';
+import {routeEdges} from './layout.js?v=41';
 export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.tester!==undefined&&(!m.tester||typeof m.tester!=='object'||Array.isArray(m.tester)||typeof m.tester.input!=='string'||(m.tester.showSkipped!==undefined&&typeof m.tester.showSkipped!=='boolean')))throw Error('Invalid lexer tester data.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
+ if(m.counters!==undefined&&(!Array.isArray(m.counters)||m.counters.some((c,i)=>!c||typeof c.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.name)||m.counters.findIndex(x=>x?.name===c.name)!==i)))throw Error('Invalid counter definition.');
  if(m.comments!==undefined&&!Array.isArray(m.comments))throw Error('Invalid comments.');
  const commentIds=new Set();for(const c of m.comments??[]){if(typeof c.id!=='string'||commentIds.has(c.id)||typeof c.text!=='string'||c.text.length>10000||!Number.isFinite(c.x)||!Number.isFinite(c.y))throw Error('Invalid comment label.');commentIds.add(c.id)}
  const ids=new Set();for(const s of m.states){if(typeof s.id!=='string'||ids.has(s.id)||!Number.isFinite(s.x)||!Number.isFinite(s.y)||typeof s.name!=='string'||typeof s.token!=='string'||(s.portal!==undefined&&typeof s.portal!=='string')||(s.accepting!==undefined&&typeof s.accepting!=='boolean'))throw Error('Invalid or duplicate state.');ids.add(s.id)}
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
- for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert)}return m;
+ for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert);if(e.memory!==undefined){const r=e.memory;if(!r||typeof r!=='object'||Array.isArray(r)||!m.counters?.some(c=>c.name===r.counter)||(r.guard!==undefined&&(!r.guard||!['eq','ne','lt','lte','gt','gte'].includes(r.guard.op)||!Number.isSafeInteger(r.guard.value)))||(r.effect!==undefined&&!['increment','decrement'].includes(r.effect)))throw Error('Invalid transition memory rule.')}}return m;
 }
 export function parseMachine(text){
  if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
@@ -21,7 +22,7 @@ export function parseMachine(text){
  return validate(machine);
 }
 export function matcher(label,invert=false){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>invert?!r.test(c):r.test(c)}
-export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
+export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);if(e.memory!==undefined){const r=e.memory;if(!r||typeof r!=='object'||Array.isArray(r)||!m.counters?.some(c=>c.name===r.counter)||(r.guard!==undefined&&(!r.guard||!['eq','ne','lt','lte','gt','gte'].includes(r.guard.op)||!Number.isSafeInteger(r.guard.value)))||(r.effect!==undefined&&!['increment','decrement'].includes(r.effect)))throw Error('Invalid transition memory rule.')}return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
@@ -30,16 +31,17 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0){
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
-  let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
-  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,...extra});
+  let state=m.start,end=pos,last=null,memory=Object.fromEntries((m.counters??[]).map(c=>[c.name,0])),pathStates=[state],pathEdges=[];
+  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,state,memory:{...memory},traceStates:[...pathStates],traceEdges:[...pathEdges],message,...extra});
   if(stepping)yield frame('start',pos,'Start token at '+pos);
   while(end<input.length){
-   const c=String.fromCodePoint(input.codePointAt(end)),next=edges.filter(e=>e.from===state&&e.test(c));
+   const c=String.fromCodePoint(input.codePointAt(end)),next=edges.filter(e=>{if(e.from!==state||!e.test(c))return false;const g=e.memory?.guard;if(!g)return true;const n=memory[e.memory.counter];return g.op==='eq'?n===g.value:g.op==='ne'?n!==g.value:g.op==='lt'?n<g.value:g.op==='lte'?n<=g.value:g.op==='gt'?n>g.value:n>=g.value});
    if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+states.get(state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});
    if(!next.length){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
-   state=next[0].to;pathStates.push(state);pathEdges.push(next[0].index);const offset=end;end+=c.length;
-   if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges]};
-   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' → '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
+   const edge=next[0];state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
+   if(edge.memory?.effect==='increment')memory[edge.memory.counter]++;else if(edge.memory?.effect==='decrement')memory[edge.memory.counter]--;
+   if(isAccepting(states.get(state)))last={end,state:states.get(state),memory:{...memory},pathStates:[...pathStates],pathEdges:[...pathEdges]};
+   if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' → '+states.get(state).name+(edge.memory?.effect?' · '+edge.memory.counter+(edge.memory.effect==='increment'?'++':'--')+' = '+memory[edge.memory.counter]:''),{end,character:c,accepting:isAccepting(states.get(state))});
   }
   let token;
   if(!last){token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
@@ -55,6 +57,7 @@ export function toTikz(m,standalone=true){
  validate(m);const names=new Map(m.states.map((s,i)=>[s.id,'q'+i]));
  const coord=p=>`(${(p.x/60).toFixed(3)},${(-p.y/60).toFixed(3)})`;
  const lines=['\\begin{tikzpicture}[>=stealth,semithick,', '  every state/.style={minimum size=12mm,inner sep=0pt,font=\\scriptsize}]'];
+ if(m.counters?.length)lines.push('  % Lexer-specific counter rules; counters start at zero for each token scan.');
  for(const link of commentLinks(m))lines.push('  \\draw[dashed,gray] '+coord(link.from)+' -- '+coord(link.to)+';');
  for(const s of m.states){const label=stateLabel(s.name),content=label.lines.length===1?'\\resizebox{10mm}{!}{\\strut '+tex(s.name)+'}':'\\resizebox{8.7mm}{'+Math.min(8,label.lines.length*2.3).toFixed(1)+'mm}{\\shortstack{'+label.lines.map(line=>'\\strut '+tex(line)).join('\\\\')+'}}';lines.push('  \\node[state'+(s.id===m.start?',initial,initial text={}':'')+(isAccepting(s)?',accepting,label=below:{\\scriptsize\\texttt{'+tex(s.token)+(s.skip?' (skip)':'')+'}}':'')+'] ('+names.get(s.id)+') at '+coord(s)+' {'+content+'};');}
 
