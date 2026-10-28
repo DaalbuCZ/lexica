@@ -1,4 +1,3 @@
-import {createViewportController,screenToWorld} from './dist/viewport.js';
 import {setupMinimap} from './dist/minimap.js';
 import {placeInspector} from './dist/inspector-placement.js';
 import {simpleCharacterClass,characterClassExpression,readEditorSettings} from './dist/editor-settings.js';
@@ -665,29 +664,14 @@ test('panning updates the minimap viewport without rebuilding its graph',()=>{
  renderer.rebuild({x:0,y:0,width:800,height:600});const first=viewport;for(let i=1;i<=100;i++)renderer.update({x:i*2,y:i,width:800,height:600});assert.equal(writes,1);assert.equal(routes,1);assert.equal(layouts,1);assert.equal(viewport,first);assert.equal(viewport.attrs.x,'200');assert.equal(viewport.attrs.y,'100');assert.ok(attrs.viewBox.split(' ').map(Number).every(Number.isFinite));machine.states[0].x+=100;renderer.rebuild({x:200,y:100,width:800,height:600});assert.equal(writes,2);assert.equal(routes,2);assert.notEqual(viewport,first);
 });
 
-test('viewport batches input bursts while retaining every pan and zoom delta',()=>{
- const pending=new Map(),painted=[],metrics=[],canvas={viewBox:{baseVal:{x:0,y:0,width:800,height:600}},clientWidth:800,clientHeight:600,setAttribute:(name,value)=>painted.push(value)};let nextId=0;
- const controller=createViewportController(canvas,(v,size)=>metrics.push({v,size}),{requestFrame:fn=>{pending.set(++nextId,fn);return nextId},cancelFrame:id=>pending.delete(id)});
- for(let i=0;i<100;i++){const v=controller.get();controller.set({...v,x:v.x+2,y:v.y+1})}
- assert.equal(pending.size,1);assert.equal(painted.length,0);assert.deepEqual(controller.get(),{x:200,y:100,width:800,height:600});
- controller.flush();assert.equal(pending.size,0);assert.deepEqual(painted,['200 100 800 600']);assert.deepEqual(metrics[0].size,{width:800,height:600});
- for(let i=0;i<10;i++){const v=controller.get();controller.set({...v,width:v.width*.8,height:v.height*.8})}
- assert.equal(pending.size,1);assert.equal(painted.length,1);const paint=pending.values().next().value;pending.clear();paint();assert.equal(painted.length,2);assert.ok(Math.abs(controller.get().width-800*.8**10)<1e-9);
- controller.set(controller.get());controller.set({x:NaN,y:0,width:800,height:600});assert.equal(pending.size,0);
-});
-
-test('pointer mapping uses the latest view before painting, including letterboxed canvases',()=>{
- const rect={left:10,top:20,width:800,height:600},v={x:100,y:200,width:1600,height:800};
- assert.deepEqual(screenToWorld({clientX:10,clientY:120},v,rect),{x:100,y:200});
- assert.deepEqual(screenToWorld({clientX:410,clientY:320},v,rect),{x:900,y:600});
- assert.deepEqual(screenToWorld({clientX:410,clientY:320},{...v,x:160},rect),{x:960,y:600});
-});
-
-test('application pan and zoom paints never rebuild graph geometry',()=>{
+test('pan and zoom use the known-good direct update path without rebuilding graph geometry',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function view(){'),app.indexOf('function startPan('));
- let frame,canvasWrites=0,mapUpdates=0;const grid={style:{}},canvas={viewBox:{baseVal:{x:0,y:0,width:800,height:600}},clientWidth:800,clientHeight:600,setAttribute(){canvasWrites++}};
- const context={$:()=>canvas,createViewportController:(canvas,onChange)=>createViewportController(canvas,onChange,{requestFrame:fn=>{frame=fn;return 1},cancelFrame(){}}),document:{querySelector:()=>grid},updateMapViewport:()=>mapUpdates++,drawMap:()=>assert.fail('rebuilt minimap during pan'),draw:()=>assert.fail('rebuilt diagram during pan')};
+ let canvasWrites=0,mapUpdates=0;const grid={style:{}},current={x:0,y:0,width:800,height:600},canvas={viewBox:{baseVal:current},clientWidth:800,clientHeight:600,setAttribute(name,value){canvasWrites++;const [x,y,width,height]=value.split(' ').map(Number);Object.assign(current,{x,y,width,height})}};
+ const context={$:()=>canvas,document:{querySelector:()=>grid},updateMapViewport:()=>mapUpdates++,drawMap:()=>assert.fail('rebuilt minimap during pan'),draw:()=>assert.fail('rebuilt diagram during pan')};
  runInNewContext(source,context);
- for(let i=1;i<=240;i++)context.setView({x:i,y:i/2,width:800,height:600});
- assert.equal(canvasWrites,0);frame();assert.equal(canvasWrites,1);assert.equal(mapUpdates,1);assert.equal(context.view().x,240);
+ for(let i=1;i<=240;i++){
+  context.setView({x:i,y:i/2,width:800,height:600});
+  assert.equal(context.view().x,i);assert.equal(canvasWrites,i);assert.equal(mapUpdates,i);
+ }
+ assert.equal(grid.style.backgroundPosition,'-290px -170px');
 });
