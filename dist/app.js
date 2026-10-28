@@ -1,3 +1,4 @@
+import {setupMinimap} from './minimap.js';
 import {machineWithTester,restoreTester} from './tester-state.js?v=47';
 import {setupErrorNavigation} from './error-navigation.js?v=46';
 import {setupInputHighlights} from './input-highlights.js?v=44';
@@ -86,7 +87,7 @@ function syncGrid(){
  const x=(canvas.clientWidth-v.width*scale)/2-v.x*scale-size/2,y=(canvas.clientHeight-v.height*scale)/2-v.y*scale-size/2;
  const grid=document.querySelector('.canvas-wrap');grid.style.backgroundSize=`${size}px ${size}px`;grid.style.backgroundPosition=`${x}px ${y}px`;
 }
-function setView(v){$('canvas').setAttribute('viewBox',`${v.x} ${v.y} ${v.width} ${v.height}`);syncGrid();drawMap()}
+function setView(v){$('canvas').setAttribute('viewBox',`${v.x} ${v.y} ${v.width} ${v.height}`);syncGrid();updateMapViewport()}
 function startPan(e){e.preventDefault();showProperties(false);pan={x:e.clientX,y:e.clientY,v:view()};document.body.classList.add('panning')}
 $('canvas').onpointerdown=e=>{if((source||commentSource)&&e.button===0&&!e.target.closest('[data-node],[data-edge],[data-comment],[data-comment-link]')){if(commentSource){cancelConnect();return}const p=point(e);add(p.x,p.y,source);return}if(e.button===1||space){startPan(e);return}if(e.button===0&&!e.target.closest('[data-node],[data-edge],[data-comment],[data-comment-link]')){showProperties(false);if(toolMode==='select'){if(!e.shiftKey)clearSelection();marquee={start:point(e),end:point(e)};draw()}else{clearSelection();markSelection();startPan(e)}}};
 $('canvas').oncontextmenu=e=>e.preventDefault();
@@ -112,10 +113,9 @@ $('fit').onclick=fit;$('arrange').onclick=()=>{saveLayoutSettings();checkpoint()
 function zoom(factor,p){showProperties(false);const v=view(),center=p??{x:v.x+v.width/2,y:v.y+v.height/2};if(v.width*factor<160||v.width*factor>30000)return;setView({x:center.x+(v.x-center.x)*factor,y:center.y+(v.y-center.y)*factor,width:v.width*factor,height:v.height*factor})}
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);$('canvas').addEventListener('wheel',e=>{e.preventDefault();if(e.ctrlKey||e.metaKey){if(e.deltaY)zoom(e.deltaY>0?1.25:.8,point(e));return}const v=view(),canvas=$('canvas'),unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1,dx=e.shiftKey&&!e.deltaX?e.deltaY:e.deltaX,dy=e.shiftKey&&!e.deltaX?0:e.deltaY;setView({...v,x:v.x+dx*unit*v.width/canvas.clientWidth,y:v.y+dy*unit*v.height/canvas.clientHeight})},{passive:false});
 $('toggle-properties').onclick=()=>showProperties(document.body.classList.contains('properties-hidden'));$('close-properties').onclick=()=>showProperties(false);$('toggle-tester').onclick=()=>{const collapsed=document.body.classList.toggle('tester-collapsed');$('toggle-tester').setAttribute('aria-label',collapsed?'Expand tester':'Collapse tester');$('toggle-tester').title=collapsed?'Expand tester':'Collapse tester';$('toggle-tester').setAttribute('aria-expanded',String(!collapsed));requestAnimationFrame(syncInputLayout)};
-function drawMap(){
- const map=$('minimap'),v=view(),xs=machine.states.map(s=>s.x),ys=machine.states.map(s=>s.y);for(const c of machine.comments??[]){const size=commentLayout(c);xs.push(c.x,c.x+size.w);ys.push(c.y,c.y+size.h)}if(!xs.length){xs.push(v.x+v.width/2);ys.push(v.y+v.height/2)}let x=Math.min(...xs,v.x)-100,y=Math.min(...ys,v.y)-120,w=Math.max(...xs,v.x+v.width)-x+100,h=Math.max(...ys,v.y+v.height)-y+100;const ratio=170/106;if(w/h<ratio){const next=h*ratio;x-=(next-w)/2;w=next}else{const next=w/ratio;y-=(next-h)/2;h=next}map.setAttribute('viewBox',`${x} ${y} ${w} ${h}`);
- map.innerHTML=(machine.comments??[]).map(c=>{const size=commentLayout(c);return `<rect class="map-comment" x="${c.x}" y="${c.y}" width="${size.w}" height="${size.h}"/>`}).join('')+routeEdges(machine).map(r=>`<path d="${r.d}"/>`).join('')+machine.states.map(s=>`<circle cx="${s.x}" cy="${s.y}" r="24"/>`).join('')+`<rect class="map-viewport" x="${v.x}" y="${v.y}" width="${v.width}" height="${v.height}"/>`;
-}
+function drawMap(){minimapController.rebuild(view())}
+function updateMapViewport(){minimapController.update(view())}
+const minimapController=setupMinimap($('minimap'),{getMachine:()=>machine,routeEdges,commentLayout});
 let mapDragging=false,mapTransform=null;
 function navigateMap(e){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(mapTransform??$('minimap').getScreenCTM().inverse()),v=view();setView({...v,x:p.x-v.width/2,y:p.y-v.height/2})}
 $('minimap').onpointerdown=e=>{e.preventDefault();mapDragging=true;mapTransform=$('minimap').getScreenCTM().inverse();$('minimap').setPointerCapture(e.pointerId);navigateMap(e)};$('minimap').onpointermove=e=>{if(mapDragging)navigateMap(e)};$('minimap').onpointerup=()=>{mapDragging=false;mapTransform=null};$('minimap').onpointercancel=()=>{mapDragging=false;mapTransform=null};

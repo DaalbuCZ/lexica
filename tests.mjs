@@ -1,3 +1,4 @@
+import {setupMinimap} from './dist/minimap.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
 test('ambiguity is reported instead of selecting a random transition',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});assert.throws(()=>tokenize(m,'a'),/Ambiguous/)});
@@ -628,4 +629,16 @@ test('saved machines restore tester text and skipped-token preference, including
  restoreTester({...m,tester:{input:''}},restored,restoredSkip);assert.equal(restored.value,'');assert.equal(restoredSkip.checked,false);
  restored.value='keep current text';restoreTester(m,restored,restoredSkip);assert.equal(restored.value,'keep current text');
  for(const tester of [null,[],{input:42},{input:'x',showSkipped:'yes'}])assert.throws(()=>validate({...m,tester}),/tester/);
+});
+
+test('panning updates the minimap viewport without rebuilding its graph',()=>{
+ let writes=0,routes=0,layouts=0,viewport;const attrs={},machine=example();machine.comments=[{id:'note',x:10,y:20,text:'Notes'}];const map={set innerHTML(value){writes++;viewport={attrs:{},setAttribute(name,value){this.attrs[name]=String(value)}}},querySelector:()=>viewport,setAttribute:(name,value)=>attrs[name]=value},renderer=setupMinimap(map,{getMachine:()=>machine,routeEdges:m=>{routes++;return routeEdges(m)},commentLayout:comment=>{layouts++;return commentLayout(comment)}});
+ renderer.rebuild({x:0,y:0,width:800,height:600});const first=viewport;for(let i=1;i<=100;i++)renderer.update({x:i*2,y:i,width:800,height:600});assert.equal(writes,1);assert.equal(routes,1);assert.equal(layouts,1);assert.equal(viewport,first);assert.equal(viewport.attrs.x,'200');assert.equal(viewport.attrs.y,'100');assert.ok(attrs.viewBox.split(' ').map(Number).every(Number.isFinite));machine.states[0].x+=100;renderer.rebuild({x:200,y:100,width:800,height:600});assert.equal(writes,2);assert.equal(routes,2);assert.notEqual(viewport,first);
+});
+
+test('pan and zoom update synchronously without replacing DOM subtrees',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function view(){'),app.indexOf('function startPan('));
+ let writes=0,updates=0;const current={x:0,y:0,width:800,height:600},canvas={viewBox:{baseVal:current},clientWidth:800,clientHeight:600,setAttribute(name,value){writes++;const [x,y,width,height]=value.split(' ').map(Number);Object.assign(current,{x,y,width,height})}},grid={style:{}};
+ const context={$:()=>canvas,document:{querySelector:()=>grid},updateMapViewport:()=>updates++,drawMap:()=>assert.fail('minimap subtree replaced')};runInNewContext(source,context);
+ for(let i=1;i<=100;i++){context.setView({x:i,y:2*i,width:800/i,height:600/i});assert.equal(current.x,i);assert.equal(writes,i);assert.equal(updates,i)}
 });
