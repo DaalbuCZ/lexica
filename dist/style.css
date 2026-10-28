@@ -441,8 +441,8 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 /* Recognize successive tokens, hold the result, then reset together. */
 @property --recognized{syntax:"<number>";inherits:true;initial-value:0}
 .lexer-loading{gap:0;font-family:'DM Sans',sans-serif}
-.loading-scene{width:min(480px,calc(100vw - 32px));padding:26px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 65%,transparent);box-shadow:0 18px 65px #00000008}
-.loading-brand{display:flex;justify-content:center;gap:10px;align-items:center;font-size:30px;font-weight:700;letter-spacing:-1px;margin-bottom:20px}
+.loading-scene{width:min(360px,calc(100vw - 48px))}
+.loading-brand{position:absolute;top:clamp(24px,6vh,56px);left:50%;transform:translateX(-50%);display:flex;justify-content:center;gap:10px;align-items:center;font-size:30px;font-weight:700;letter-spacing:-1px}
 .loading-brand>.logo{width:35px;height:37px;border-radius:8px;font-size:33px}
 .loading-code{display:flex;align-items:center;justify-content:center;gap:0;min-height:78px;padding-top:14px;font:18px 'IBM Plex Mono',monospace}
 .loading-token{--recognized:0;position:relative;display:inline-block;padding:10px calc(5px + var(--recognized)*3px);margin-right:calc(var(--recognized)*10px);border:1px solid hsl(var(--h) 50% 65% / calc(var(--recognized)*.6));border-radius:7px;background:hsl(var(--h) 65% 70% / calc(var(--recognized)*.2));animation:token-recognize-1 3.8s cubic-bezier(.2,.8,.2,1) infinite}
@@ -451,7 +451,7 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .loading-token:nth-child(3){animation-name:token-recognize-3}
 .loading-token:nth-child(4){animation-name:token-recognize-4}
 .loading-token b{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font:9px 'IBM Plex Mono',monospace;letter-spacing:.05em;opacity:var(--recognized);color:hsl(var(--h) 65% 42%);translate:0 calc((1 - var(--recognized))*5px)}
-.loading-track{height:3px;margin:18px 0 0;overflow:hidden;border-radius:2px;background:var(--line)}
+.loading-track{height:3px;margin:24px 0 0;overflow:hidden;border-radius:2px;background:var(--line)}
 .loading-track i{display:block;width:22%;height:100%;margin:0;background:var(--green);border-radius:2px;animation:token-scan 3.8s ease-in-out infinite}
 @keyframes token-recognize-1{0%,8%,94%,100%{--recognized:0;transform:translateY(0) scale(1)}18%{--recognized:1;transform:translateY(-8px) scale(1.08)}22%{--recognized:1;transform:translateY(2px) scale(.985)}26%,88%{--recognized:1;transform:translateY(0) scale(1)}}
 @keyframes token-recognize-2{0%,23%,94%,100%{--recognized:0;transform:translateY(0) scale(1)}33%{--recognized:1;transform:translateY(-8px) scale(1.08)}37%{--recognized:1;transform:translateY(2px) scale(.985)}41%,88%{--recognized:1;transform:translateY(0) scale(1)}}
@@ -460,7 +460,7 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 @keyframes token-scan{0%,7%{transform:translateX(-120%)}75%,100%{transform:translateX(460%)}}
 [data-theme=dark] .loading-token b{color:hsl(var(--h) 75% 78%)}
 @media(prefers-reduced-motion:reduce){.loading-token{animation:none;--recognized:1}.loading-track i{animation:none;width:100%;opacity:.4}}
-@media(max-width:450px){.loading-scene{padding:22px}.loading-code{font-size:16px}.loading-token{margin-right:calc(var(--recognized)*7px)}}
+@media(max-width:450px){.loading-code{font-size:16px}.loading-token{margin-right:calc(var(--recognized)*7px)}}
 /* Use the panel's remaining space instead of subtracting guessed control heights. */
 .tester{display:flex;flex-direction:column}
 .tester>.panel-title,.tester>.step-controls,.tester>.step-memory{flex-shrink:0}
