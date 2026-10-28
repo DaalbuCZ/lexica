@@ -11,6 +11,7 @@ export function validate(m){
  if(m.cells!==undefined&&!Array.isArray(m.cells))throw Error('Memory cells must be an array.');
  const cells=new Map();for(const cell of m.cells??[]){if(!cell||typeof cell.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name)||cells.has(cell.name)||!Number.isSafeInteger(cell.initial??0))throw Error('Invalid or duplicate memory cell.');cells.set(cell.name,cell)}
  if(m.tester!==undefined&&(!m.tester||typeof m.tester!=='object'||Array.isArray(m.tester)||typeof m.tester.input!=='string'||(m.tester.showSkipped!==undefined&&typeof m.tester.showSkipped!=='boolean')))throw Error('Invalid lexer tester data.');
+ if(m.startArrow!==undefined&&(!m.startArrow||!Number.isFinite(m.startArrow.x)||!Number.isFinite(m.startArrow.y)))throw Error('Invalid start arrow position.');
  if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
  if(m.comments!==undefined&&!Array.isArray(m.comments))throw Error('Invalid comments.');
  const commentIds=new Set();for(const c of m.comments??[]){if(typeof c.id!=='string'||commentIds.has(c.id)||typeof c.text!=='string'||c.text.length>10000||!Number.isFinite(c.x)||!Number.isFinite(c.y))throw Error('Invalid comment label.');commentIds.add(c.id)}

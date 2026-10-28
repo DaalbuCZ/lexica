@@ -57,7 +57,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const target of ['s2',null]){
   let pointerup,inserted;
-  const context={commentSource:null,source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
+  const context={startArrowDrag:null,commentSource:null,source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
    point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{}}),
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
@@ -93,7 +93,7 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
  let pointermove;
- const context={commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ const context={startArrowDrag:null,commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
 
@@ -279,7 +279,7 @@ test('right-drag joins comments and states in either direction and cancels on bl
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
   let release,joined,added,cancelled=0;
-  const context={marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  const context={startArrowDrag:null,marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
   if(scenario==='comment-to-blank'){assert.equal(added,undefined);assert.equal(cancelled,1)}else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
  }
@@ -371,12 +371,11 @@ test('toolbar popovers open beside vertical docks and stay within the viewport',
  }
 });
 
-test('properties flip around the click and return to their anchor after content shrinks',()=>{
+test('properties sit beside the selected object regardless of click position',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function inspectorViewport('),app.indexOf('const inspectorResizeObserver'));
- const panel={style:{},height:200,getBoundingClientRect(){return {width:240,height:this.height}}},target={dataset:{edge:'0'},getBoundingClientRect:()=>({left:-3000,top:-2000,width:7000,height:5000})};
- const context={placeInspector,clampInspectorPosition,screenToWorld,worldToScreen,view:()=>({x:0,y:0,width:745,height:919}),inspectorAnchor:null,inspectorKey:'',selection:{type:'edge',index:0},editorSettings:{simplified:false},requestAnimationFrame(){},document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:()=>panel,querySelectorAll:()=>[target]},$:id=>id==='canvas'?{getBoundingClientRect:()=>({left:0,top:0,width:745,height:919})}:{setAttribute(){}},window:{innerWidth:745,innerHeight:919}};
- runInNewContext(script+"showProperties(true,{clientX:400,clientY:600});",context);assert.equal(panel.style.left,'416px');assert.equal(panel.style.top,'585px');panel.height=600;context.clampInspector();assert.equal(panel.style.top,'307px');panel.height=200;context.clampInspector();assert.equal(panel.style.top,'585px');
- context.showProperties(true,{clientX:700,clientY:900});assert.equal(panel.style.left,'444px');assert.equal(panel.style.top,'707px');context.showProperties(false);assert.equal(context.inspectorAnchor,null);
+ const panel={style:{},getBoundingClientRect:()=>({width:240,height:200})},target={dataset:{node:'s0'},getBoundingClientRect:()=>({left:300,top:300,width:72,height:72})};
+ const context={placeInspector,clampInspectorPosition,screenToWorld,worldToScreen,view:()=>({x:0,y:0,width:745,height:919}),inspectorAnchor:null,inspectorKey:'',selection:{type:'state',id:'s0'},editorSettings:{simplified:false},requestAnimationFrame(){},document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:()=>panel,querySelectorAll:()=>[target]},$:id=>id==='canvas'?{getBoundingClientRect:()=>({left:0,top:0,width:745,height:919})}:{setAttribute(){}},window:{innerWidth:745,innerHeight:919}};
+ runInNewContext(script,context);context.showProperties(true,{clientX:320,clientY:310});assert.equal(panel.style.left,'388px');assert.equal(panel.style.top,'236px');context.showProperties(false);assert.equal(context.inspectorAnchor,null);
 });
 
 test('inspector placement respects visual viewport bounds and prefers flipping over edge clamping',()=>{
@@ -482,7 +481,7 @@ test('routing reuses unchanged graph geometry and invalidates when nodes, rules 
 });
 test('pointer redraws are coalesced into one animation frame using the latest model',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let drawFrame='),app.indexOf('function render(){'));
- let frames=[],draws=0,maps=0;const context={requestAnimationFrame:fn=>{frames.push(fn);return frames.length},draw:()=>draws++,drawMap:()=>maps++};runInNewContext(script,context);
+ let frames=[],draws=0,maps=0;const context={drag:null,touchGesture:null,startArrowDrag:null,requestAnimationFrame:fn=>{frames.push(fn);return frames.length},draw:()=>draws++,drawMap:()=>maps++};runInNewContext(script,context);
  runInNewContext('queueDraw();queueDraw();queueDraw();',context);assert.equal(frames.length,1);assert.equal(draws,0);frames[0]();assert.equal(draws,1);assert.equal(maps,1);
  runInNewContext('queueDraw();',context);assert.equal(frames.length,2);
 });
@@ -656,7 +655,7 @@ test('debugger buttons share a live session and input clicks retarget without di
  const ids=['input','step-controls','step-toggle','step-prev','step-next','step-prev-token','step-next-token','step-stop','step-status','step-memory'],elements=Object.fromEntries(ids.map(id=>[id,{setAttribute(){},replaceChildren(){}}])),events={};
  elements.input.value='hello 42 world';elements.input.selectionStart=7;elements.input.addEventListener=(name,fn)=>events[name]=fn;
  let resets=0,frame;const context={document:{getElementById:id=>elements[id],querySelector:()=>({classList:{add(){},remove(){}}}),createElement:()=>({append(){}})},createDebugSession,getMachine:()=>example(),getTokens:()=>tokenize(example(),elements.input.value),traceToken:value=>frame=value,markFailures(){},highlights:{clearStep(){},step:()=>null},onReset:()=>resets++};
- runInNewContext(source+'\nvar controller=setupStepping({getMachine,getTokens,traceToken,markFailures,highlights,onReset});',context);context.controller.toggle();assert.equal(frame.tokenStart,6);elements['step-next'].onclick();assert.equal(frame.character,'4');elements['step-next-token'].onclick();assert.equal(frame.tokenStart,8);elements['step-prev-token'].onclick();assert.equal(frame.tokenStart,6);elements.input.selectionStart=1;events.click();assert.equal(frame.tokenStart,0);assert.equal(context.controller.active(),true);assert.equal(resets,0);events.input();assert.equal(context.controller.active(),false);assert.equal(resets,1);context.controller.toggle();assert.equal(elements['step-toggle'].hidden,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);assert.equal(elements['step-toggle'].hidden,false);assert.equal(elements['step-controls'].hidden,true);
+ runInNewContext(source+'\nvar controller=setupStepping({getMachine,getTokens,traceToken,markFailures,highlights,onReset});',context);context.controller.toggle();assert.equal(frame.tokenStart,6);elements['step-next'].onclick();assert.equal(frame.character,'4');elements['step-next-token'].onclick();assert.equal(frame.tokenStart,8);elements['step-prev-token'].onclick();assert.equal(frame.tokenStart,6);elements.input.selectionStart=1;events.click();assert.equal(frame.tokenStart,0);elements.input.selectionStart=7;events.keyup({key:'ArrowRight'});assert.equal(frame.tokenStart,6);assert.equal(context.controller.active(),true);assert.equal(resets,0);events.input();assert.equal(context.controller.active(),false);assert.equal(resets,1);context.controller.toggle();assert.equal(elements['step-toggle'].hidden,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);assert.equal(elements['step-toggle'].hidden,false);assert.equal(elements['step-controls'].hidden,true);
 });
 
 test('Unicode regex escape pairs are one character for static transition diagnostics',()=>{
@@ -845,4 +844,34 @@ test('editing a long input reuses unchanged output cards and keeps the full list
  const context={visibleTokens:Array.from({length:1229},(_,i)=>({token:'NUMBER',value:String(i)})),$:()=>output,tokenColorClass:()=>'',esc:value=>value,lastFocusedOutputToken:null,document:{createRange:()=>({setStart(node,index){this.node=node;this.start=index},setEnd(node,index){this.end=index},deleteContents(){this.node.children.splice(this.start,this.end-this.start)},createContextualFragment:parse,insertNode(nodes){this.node.children.splice(this.start,0,...nodes)}})}};
  runInNewContext(source,context);context.renderTokenOutput();const old=[...output.children];context.visibleTokens=context.visibleTokens.map((t,i)=>i===600?{...t,value:'edited'}:t);context.renderTokenOutput();assert.equal(output.children.length,1229);assert.equal(output.children[599],old[599]);assert.notEqual(output.children[600],old[600]);assert.equal(output.children[601],old[601]);
  context.visibleTokens=[...context.visibleTokens.slice(0,600),{token:'IDENT',value:'extra'},...context.visibleTokens.slice(600)];context.renderTokenOutput();assert.equal(output.children.length,1230);assert.equal(output.children[602],old[601]);assert.equal(output.children[602].dataset.tokenIndex,'602');
+});
+
+import {startArrowGeometry} from './dist/start-arrow.js';
+import {captureDragGeometry,updateDragGeometry} from './dist/drag-geometry.js';
+test('a movable start arrow persists independently of its single destination and validates its coordinates',()=>{
+ const m=example(),first=startArrowGeometry(m);assert.equal(first.origin.x,m.states[0].x-100);
+ m.startArrow={x:-500,y:800};m.start='s2';const moved=startArrowGeometry(m),target=m.states[2];assert.deepEqual(moved.origin,m.startArrow);assert.ok(Math.abs(Math.hypot(moved.target.x-target.x,moved.target.y-target.y)-42)<1e-8);
+ assert.deepEqual(parseMachine(JSON.stringify(m)).startArrow,m.startArrow);assert.deepEqual(startArrowGeometry(m,{x:10,y:20}).target,{x:10,y:20});m.start=null;assert.ok(!startArrowGeometry(m).d.includes('NaN'));m.startArrow.x='bad';assert.throws(()=>validate(m),/start arrow/);
+});
+
+test('drag frames keep the same SVG objects, update attached curves and restore geometry when moved back',()=>{
+ const m=example(),routes=routeEdges(m),snapshot=captureDragGeometry(m,routes);let writes=0,queries=0;
+ const element=(attrs={})=>({attrs:{...attrs},getAttribute(name){return this.attrs[name]??null},setAttribute(name,value){writes++;this.attrs[name]=String(value)}});
+ const nodes=m.states.map(s=>Object.assign(element({transform:`translate(${s.x} ${s.y})`}),{dataset:{node:s.id}}));
+ const edges=m.edges.map((e,i)=>{const path=element({d:routes[i].d}),text=element(),box=element();return {dataset:{edge:String(i)},path,text,box,querySelectorAll:()=>[path],querySelector:selector=>selector==='.edge-text'?text:selector==='.edge-label-box'?box:null}});
+ const root={querySelectorAll(selector){queries++;return selector==='[data-node]'?nodes:selector==='[data-edge]'?edges:[]}};
+ m.states[1].x+=100;m.states[1].y-=250;updateDragGeometry(root,m,snapshot);assert.equal(nodes[1].attrs.transform,'translate(500 -105)');assert.notEqual(edges[0].path.attrs.d,routes[0].d);assert.notEqual(edges[1].path.attrs.d,routes[1].d);assert.equal(queries,4);
+ const count=writes;updateDragGeometry(root,m,snapshot);assert.equal(writes,count);assert.equal(queries,4);
+ m.states[1].x-=100;m.states[1].y+=250;updateDragGeometry(root,m,snapshot);assert.equal(edges[0].path.attrs.d,routes[0].d);assert.equal(edges[1].path.attrs.d,routes[1].d);assert.equal(nodes[1],snapshot.bindings.nodes[1]);
+});
+
+test('graphs above sixty states retain collision avoidance for parallel transition labels',()=>{
+ const m={start:'s0',states:Array.from({length:65},(_,i)=>({id:'s'+i,name:'q'+i,token:'',x:i<2?i*450:10000+i*150,y:i<2?0:10000})),edges:[{from:'s0',to:'s1',label:'first'},{from:'s0',to:'s1',label:'second'}]};
+ const [a,b]=routeEdges(m);assert.ok(Math.abs(a.label.x-b.label.x)>(a.label.w+b.label.w)/2||Math.abs(a.label.y-b.label.y)>(a.label.h+b.label.h)/2);assert.notEqual(a.d,b.d);
+});
+
+test('node drag frames do not rebuild the diagram or minimap',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let drawFrame='),app.indexOf('function render(){'));let frame,updates=0,arrows=0;
+ const context={drag:{geometry:{}},touchGesture:null,startArrowDrag:null,machine:{},$:()=>({}),requestAnimationFrame:fn=>{frame=fn;return 1},updateDragGeometry:()=>updates++,updateStartArrow:()=>arrows++,draw:()=>assert.fail('full redraw during drag'),drawMap:()=>assert.fail('minimap rebuilt during drag')};
+ runInNewContext(script+'queueDraw();queueDraw();',context);frame();assert.equal(updates,1);assert.equal(arrows,1);
 });

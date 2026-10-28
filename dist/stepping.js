@@ -10,6 +10,7 @@ export function setupStepping({getMachine,getTokens,canStart,traceToken,markFail
  function move(method){if(!session){start();return}session[method]();show()}
  const next=()=>move('next'),previous=()=>move('previous'),nextToken=()=>move('nextToken'),previousToken=()=>move('previousToken');
  $('step-toggle').onclick=toggle;$('step-stop').onclick=()=>reset();$('step-next').onclick=next;$('step-prev').onclick=previous;$('step-next-token').onclick=nextToken;$('step-prev-token').onclick=previousToken;
+ input.addEventListener('keyup',event=>{if(session&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key)&&!event.altKey){session.seek(input.selectionStart??0);show()}});
  input.addEventListener('input',()=>reset());input.addEventListener('click',()=>{if(session){session.seek(input.selectionStart??0);show()}});
  return {reset,toggle,next,previous,nextToken,previousToken,active:()=>session!==null};
 }

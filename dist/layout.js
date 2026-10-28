@@ -154,7 +154,7 @@ export function routeEdges(machine){
  return routes;
 }
 function computeRoutes(machine){
- if(machine.edges.length>60||machine.states.length>60)return computeQuickRoutes(machine);
+
  const reserved=machine.states.flatMap(s=>[{x:s.x,y:s.y,w:90,h:90},...(s.portal?[statePortalBox(s)]:[]),...(s.token?[{x:s.x,y:s.y+57,w:Math.max(70,s.token.length*7),h:20}]:[])]),routes=[];
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {from,dx,dy,length:dx*dx+dy*dy}});
@@ -172,17 +172,5 @@ function computeRoutes(machine){
  }
  best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
  }
- return routes;
-}
-function computeQuickRoutes(machine){
- const states=new Map(machine.states.map(state=>[state.id,state])),groups=new Map(),routes=[],directions=new Set(machine.edges.map(edge=>JSON.stringify([edge.from,edge.to])));
- for(const [index,edge] of machine.edges.entries()){const target=destination(machine,edge),key=edge.portal!=null?JSON.stringify([edge.from,'portal',edge.portal]):JSON.stringify([edge.from,target?.id]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(index)}
- for(const [key,indices] of groups){const edge=machine.edges[indices[0]],a=states.get(edge.from),b=destination(machine,edge),loop=a===b,portal=edge.portal!=null;for(const [rank,index] of indices.entries()){
-  const e=machine.edges[index],lane=rank-(indices.length-1)/2;let p0,p3,c1,c2,portalBox=null;
-  if(portal){const direction=lane%2===0?1:-1,dx=direction*130,dy=lane*40;p0={x:a.x+dx/Math.hypot(dx,dy)*37,y:a.y+dy/Math.hypot(dx,dy)*37};p3={x:a.x+dx,y:a.y+dy};const width=Math.max(60,(e.portal?.length??1)*7+20);portalBox={x:p3.x+direction*width/2,y:p3.y,w:width,h:22};c1=at(p0,p3,1/3);c2=at(p0,p3,2/3)}
-  else if(loop){const angle=(Math.PI*2*(rank+indices.length/2))/Math.max(4,indices.length),rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});p0=rotate(-22,-29);p3=rotate(22,-29);c1=rotate(-95-Math.abs(lane)*20,-125-Math.abs(lane)*20);c2=rotate(95+Math.abs(lane)*20,-125-Math.abs(lane)*20)}
-  else{const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,bend=lane*58+(directions.has(JSON.stringify([e.to,e.from]))?36:0),mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend},start=Math.atan2(mid.y-a.y,mid.x-a.x),finish=Math.atan2(mid.y-b.y,mid.x-b.x);p0={x:a.x+Math.cos(start)*37,y:a.y+Math.sin(start)*37};p3={x:b.x+Math.cos(finish)*42,y:b.y+Math.sin(finish)*42};c1=at(p0,mid,2/3);c2=at(p3,mid,2/3)}
-  const route={p0,p3,c1,c2,d:`M ${p0.x} ${p0.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p3.x} ${p3.y}`,label:{x:(p0.x+3*c1.x+3*c2.x+p3.x)/8,y:(p0.y+3*c1.y+3*c2.y+p3.y)/8-13,w:transitionLabel(e).length*7+14,h:22}};if(portal)route.portalBox=portalBox;routes[index]=route;
- }}
  return routes;
 }

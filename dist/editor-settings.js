@@ -47,7 +47,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
       <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
       <p>Controls trackpad and touchscreen pinching.</p>
     </section>
-    <section class="setting-section"><h3>Debug tools</h3><div class="setting-row"><span><strong>Loading animation</strong><small>Replay the animation. Press Esc to close.</small></span><button type="button" id="preview-loading">Preview</button></div></section>`;
+`;
   document.body.append(dialog);
 
   const sync = () => {
@@ -76,7 +76,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   };
   document.body.classList.toggle('simplified-view', editorSettings.simplified);
   const hint = document.getElementById('modehint');
-  if (hint && editorSettings.simplified) hint.textContent = 'Click a state or transition to edit · Drag + to connect';
+  if (hint && editorSettings.simplified) hint.textContent = 'Double-click to edit · Right-drag a state to connect';
 }
 
 export function simpleCharacterClass(label, inverted = false) {
