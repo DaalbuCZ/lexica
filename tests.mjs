@@ -1,3 +1,4 @@
+import {stackCell,guardOps,effectOps,needsValue} from './dist/memory.js';
 import {createTokenizationCache} from './dist/lexer-cache.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
@@ -398,7 +399,7 @@ test('input caret and selections highlight matching tokens and traces without mo
  const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
  const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
  const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){},scrollIntoView:()=>scrolled=`[data-token-index="${i}"]`}));
- const context={inputAnalysisPending:false,activeTokenCards:[],lastFocusedCard:null,tokensAtSelection,stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>elements[+selector.match(/\d+/)[0]]},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ const context={tokenOutput:{reveal(){}},inputAnalysisPending:false,activeTokenCards:[],lastFocusedCard:null,tokensAtSelection,stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>elements[+selector.match(/\d+/)[0]]},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
  runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
  input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
@@ -738,7 +739,7 @@ import {simpleTransitionLabel} from './dist/editor-settings.js';
 
 test('simplified captions remove regex brackets without changing stored rules or advanced expressions',()=>{
  const edge={label:'[^a-z]',invert:true},before=JSON.stringify(edge);assert.equal(simpleTransitionLabel(edge),'a-z');assert.equal(simpleTransitionLabel({label:'[a-z]',invert:true}),'not a-z');assert.equal(simpleTransitionLabel({label:'abc'}),'abc');assert.equal(simpleTransitionLabel({label:''}),'…');assert.equal(JSON.stringify(edge),before);
- assert.equal(simpleTransitionLabel({label:'[0-9]',guard:{cell:'n',op:'odd',value:0},effect:{cell:'n',op:'add',value:1}}),'0-9 · n odd 0 · n += 1');
+ assert.equal(simpleTransitionLabel({label:'[0-9]',guard:{cell:'n',op:'odd',value:0},effect:{cell:'n',op:'add',value:1}}),'0-9 · n odd · n += 1');
 });
 
 test('pinch zoom preserves its world anchor while scaling and moving across letterboxed views',()=>{
@@ -771,7 +772,7 @@ test('add buttons arm a placement and the canvas click commits the exact cursor 
 test('memory popover controls edit only their own fields and preserve guard references',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function bindMemoryCells('),app.indexOf('function machineProperties('));
  const machine={cells:[{name:'counter',initial:0}],edges:[{guard:{cell:'counter',op:'==',value:0},effect:{cell:'counter',op:'add',value:1}}]},name={dataset:{cellName:'0'},value:'depth'},value={dataset:{cellValue:'0'},value:'3'},remove={dataset:{cellDelete:'0'}},add={},messages=[];
- const root={querySelectorAll:selector=>selector==='[data-cell-name]'?[name]:selector==='[data-cell-value]'?[value]:[remove],querySelector:()=>add},context={machine,toast:message=>messages.push(message),properties(){},updateMachine:change=>change(machine)};
+ const root={querySelectorAll:selector=>selector==='[data-cell-name]'?[name]:selector==='[data-cell-value]'?[value]:[remove],querySelector:selector=>selector==='[data-add-memory-cell]'?add:null},context={stackCell,machine,toast:message=>messages.push(message),properties(){},updateMachine:change=>change(machine)};
  runInNewContext(source,context);context.bindMemoryCells(machine.cells,root);name.onchange();assert.equal(machine.cells[0].name,'depth');assert.equal(machine.edges[0].guard.cell,'depth');assert.equal(machine.edges[0].effect.cell,'depth');value.onchange();assert.equal(machine.cells[0].initial,3);remove.onclick();assert.equal(machine.cells.length,1);assert.match(messages[0],/Remove this cell/);add.onclick();assert.equal(machine.cells.length,2);
 });
 
@@ -847,4 +848,29 @@ test('properties commits focused changes before rebuilding and ignores recursive
 test('incremental cache invalidates speculative lookahead and restores counter checkpoints',()=>{
  const m={start:'a',machineType:'extended',cells:[{name:'n',initial:0}],states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:1,y:1},{id:'c',name:'c',token:'',x:2,y:2}],edges:[{from:'a',to:'b',label:'a',effect:{cell:'n',op:'add',value:1}},{from:'b',to:'c',label:'b'},{from:'c',to:'b',label:'c'}]},cache=createTokenizationCache(tokenize);
  for(const input of ['aaaaabbbbb','aaaaabbbbc','aaaaaa','aabaa','😀aaaa'])assert.deepEqual(cache.get(m,input),tokenize(m,input));
+});
+
+function stackMachine(){return {machineType:'extended',start:'a',cells:[{name:'s',type:'stack',initial:[7]},{name:'n',initial:0}],states:[{id:'a',name:'start',token:'',x:0,y:0},{id:'b',name:'accepted',token:'TOKEN',x:100,y:0}],edges:[{from:'a',to:'b',label:'\\(',effect:{cell:'s',op:'push',value:11}},{from:'a',to:'b',label:'\\)',guard:{cell:'s',op:'==',value:11},effect:{cell:'s',op:'pop'}},{from:'a',to:'b',label:'x',guard:{cell:'s',op:'==',value:7},effect:{cell:'s',op:'clear'}},{from:'a',to:'b',label:'n',guard:{cell:'s',op:'empty'},effect:{cell:'n',op:'add',value:1}}]}}
+test('numeric stacks push, inspect top, pop and clear alongside counters with immutable snapshots',()=>{
+ const m=stackMachine(),frames=[...lexerSteps(m,'()xn)')],emits=frames.filter(f=>f.result);
+ assert.deepEqual(emits.map(f=>f.memory.s),[[7,11],[7],[],[],[]]);assert.equal(emits[3].memory.n,1);assert.equal(emits[4].token,'ERROR');assert.deepEqual(frames[0].memory.s,[7]);assert.deepEqual(m.cells[0].initial,[7]);assert.deepEqual(parseMachine(JSON.stringify(m)),m);
+ m.edges[1].guard={cell:'s',op:'notEmpty'};m.cells[0].initial=[];assert.equal(tokenize(m,')')[0].token,'ERROR');
+ m.edges[1].guard={cell:'s',op:'!=' ,value:1};assert.equal(tokenize(m,')')[0].token,'ERROR');
+});
+test('stack validation rejects mixed types and invalid values',()=>{
+ for(const mutate of [m=>m.cells[0].initial=[1.5],m=>m.cells[0].initial=0,m=>m.edges[0].effect.value='1',m=>m.edges[0].effect.op='add',m=>m.edges[3].effect.op='push',m=>m.edges[0].guard={cell:'s',op:'odd',value:0}]){const m=stackMachine();mutate(m);assert.throws(()=>validate(m))}
+});
+test('stack changes roll back on failed lookahead and survive incremental edits and worker caching',()=>{
+ const m=stackMachine();m.states.push({id:'c',name:'speculative',token:'',x:200,y:0});m.edges.push({from:'b',to:'c',label:'z',effect:{cell:'s',op:'push',value:99}});
+ const emits=[...lexerSteps(m,'(z)')].filter(f=>f.result);assert.deepEqual(emits.map(f=>f.memory.s),[[7,11],[7,11],[7]]);
+ const cache=createTokenizationCache(tokenize),worker=createWorkerHandler();for(const input of ['()xn','()xnn','()x','(()','()']){assert.deepEqual(cache.get(m,input),tokenize(m,input));assert.deepEqual(worker({id:1,machine:m,input}).tokens,tokenize(m,input))}
+ assert.equal(simpleTransitionLabel({label:'a',guard:{cell:'s',op:'empty'},effect:{cell:'s',op:'pop'}}),'a · s is empty · s pop');
+});
+
+test('memory rule editor switches stack rules to counter rules with valid defaults',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function bindMemoryTransitionControls('),app.indexOf('function edgeDestinationName('));
+ const machine=stackMachine();machine.edges[0].guard={cell:'s',op:'empty'};machine.edges[0].effect={cell:'s',op:'pop'};
+ const fields={};for(const kind of ['guard','effect'])for(const suffix of ['enabled','cell','op','value'])fields[kind+'-'+suffix]={value:suffix==='cell'?'n':'',addEventListener(){}};
+ const context={machine,stackCell,guardOps,effectOps,needsValue,$:id=>fields[id],updateMachine:change=>{change(machine);validate(machine)}};
+ runInNewContext(source,context);context.bindMemoryTransitionControls(0);fields['guard-cell'].onchange();fields['effect-cell'].onchange();assert.deepEqual(machine.edges[0].guard,{cell:'n',op:'==',value:0});assert.deepEqual(machine.edges[0].effect,{cell:'n',op:'add',value:0});
 });

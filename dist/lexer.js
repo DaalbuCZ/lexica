@@ -1,3 +1,4 @@
+import {validCell,guardOps,effectOps,needsValue,guardAllows,memoryEffect,stackCell} from './memory.js';
 import {stateLabel,transitionLabel} from './labels.js';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
@@ -7,7 +8,7 @@ export function validate(m){
  if(!m||!Array.isArray(m.states)||!Array.isArray(m.edges))throw Error('A machine needs states and transitions.');
  if(m.machineType!==undefined&&!['fsm','extended'].includes(m.machineType))throw Error('Invalid machine type.');
  if(m.cells!==undefined&&!Array.isArray(m.cells))throw Error('Memory cells must be an array.');
- const cells=new Map();for(const cell of m.cells??[]){if(!cell||typeof cell.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name)||cells.has(cell.name)||!Number.isSafeInteger(cell.initial??0))throw Error('Invalid or duplicate memory cell.');cells.set(cell.name,cell)}
+ const cells=new Map();for(const cell of m.cells??[]){if(!cell||typeof cell.name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name)||cells.has(cell.name)||!validCell(cell))throw Error('Invalid or duplicate memory cell.');cells.set(cell.name,cell)}
  if(m.tester!==undefined&&(!m.tester||typeof m.tester!=='object'||Array.isArray(m.tester)||typeof m.tester.input!=='string'||(m.tester.showSkipped!==undefined&&typeof m.tester.showSkipped!=='boolean')))throw Error('Invalid lexer tester data.');
   if(m.labelBoxes!==undefined&&typeof m.labelBoxes!=='boolean')throw Error('Invalid label box setting.');
  if(m.comments!==undefined&&!Array.isArray(m.comments))throw Error('Invalid comments.');
@@ -15,7 +16,7 @@ export function validate(m){
  const ids=new Set();for(const s of m.states){if(typeof s.id!=='string'||ids.has(s.id)||!Number.isFinite(s.x)||!Number.isFinite(s.y)||typeof s.name!=='string'||typeof s.token!=='string'||(s.portal!==undefined&&typeof s.portal!=='string')||(s.accepting!==undefined&&typeof s.accepting!=='boolean'))throw Error('Invalid or duplicate state.');ids.add(s.id)}
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
- for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert);if(e.guard!==undefined){const g=e.guard;if(!g||!cells.has(g.cell)||!['==','!=','>','>=','<','<=','odd','even'].includes(g.op)||!Number.isSafeInteger(g.value))throw Error('Invalid transition guard.')}if(e.effect!==undefined){const a=e.effect;if(!a||!cells.has(a.cell)||!['add','set'].includes(a.op)||!Number.isSafeInteger(a.value))throw Error('Invalid transition side effect.')}}return m;
+ for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.label)matcher(e.label,e.invert);if(e.guard!==undefined){const g=e.guard;if(!g||!cells.has(g.cell)||!guardOps(cells.get(g.cell)).includes(g.op)||(needsValue(g.op)&&!Number.isSafeInteger(g.value)))throw Error('Invalid transition guard.')}if(e.effect!==undefined){const a=e.effect;if(!a||!cells.has(a.cell)||!effectOps(cells.get(a.cell)).includes(a.op)||(needsValue(a.op)&&!Number.isSafeInteger(a.value)))throw Error('Invalid transition side effect.')}}return m;
 }
 export function parseMachine(text){
  if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
@@ -24,7 +25,6 @@ export function parseMachine(text){
  return validate(machine);
 }
 export function matcher(label,invert=false){if(!label)throw Error('Transition cannot be empty.');let r;try{r=new RegExp('^(?:'+label+')$','u')}catch{throw Error('Invalid character expression: '+label)}if(r.test(''))throw Error('Transitions must consume one character.');return c=>invert?!r.test(c):r.test(c)}
-function guardAllows(guard,value){if(!guard)return true;switch(guard.op){case'==':return value===guard.value;case'!=':return value!==guard.value;case'>':return value>guard.value;case'>=':return value>=guard.value;case'<':return value<guard.value;case'<=':return value<=guard.value;case'odd':return Math.abs(value%2)===1;case'even':return value%2===0;default:return false}}
 export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
@@ -33,9 +33,9 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0,startMemory=null
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
  const outgoing=new Map();for(const edge of edges){if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)}
  const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
- const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...(startMemory??initialMemory)};
- const enabled=(edge,mem)=>!extended||!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]);
- const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
+ const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,stackCell(c)?[...(c.initial??[])]:c.initial??0]));let memory={...(startMemory??initialMemory)};
+ const enabled=(edge,mem)=>!extended||((!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]))&&(edge.effect?.op!=='pop'||mem[edge.effect.cell].length>0));
+ const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=memoryEffect(edge.effect,mem[edge.effect.cell]);if(!Array.isArray(next)&&!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){

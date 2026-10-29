@@ -1,3 +1,4 @@
+import {memoryRuleLabel} from './memory.js';
 const STORAGE_KEY = 'lexica-editor-settings';
 
 export function readEditorSettings(storage) {
@@ -33,7 +34,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     <div class="dialog-heading"><h2 id="settings-heading">Settings</h2><button type="button" id="settings-close" aria-label="Close settings">✕</button></div>
     <section class="setting-section"><h3>Machine</h3>
       <label class="setting-choice"><input type="radio" name="machine-type" value="fsm"><span><strong>Standard FSM</strong><small>Character transitions.</small></span></label>
-      <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Memory counters, guards, and side effects.</small></span></label>
+      <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Counters, numeric stacks, guards, and side effects.</small></span></label>
     </section>
     <section class="setting-section"><h3>Editing</h3>
       <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw boxes around transition labels.</small></span></label>
@@ -92,5 +93,5 @@ export function characterClassExpression(characters) {
 
 export function simpleTransitionLabel(edge){
  const set=simpleCharacterClass(edge.label,edge.invert),match=set?`${set.inverted?'not ':''}${set.characters||'…'}`:edge.label||'…';
- return match+(edge.guard?` · ${edge.guard.cell} ${edge.guard.op} ${edge.guard.value}`:'')+(edge.effect?` · ${edge.effect.cell} ${edge.effect.op==='add'?'+=':':='} ${edge.effect.value}`:'');
+ return match+(edge.guard?' · '+memoryRuleLabel(edge.guard):'')+(edge.effect?' · '+memoryRuleLabel(edge.effect):'');
 }
