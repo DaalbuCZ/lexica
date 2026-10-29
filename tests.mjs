@@ -381,12 +381,12 @@ test('tester resize clamps dimensions, supports every dock, persists and cancels
  assert.equal(testerSize(900,'right',800,600),560);assert.equal(testerSize(10,'bottom',800,600),140);
  const script=readFileSync(new URL('./dist/tester-resize.js',import.meta.url),'utf8').replaceAll('export ','')+'\nsetupTesterResize();';
  for(const dock of ['top','bottom','left','right']){
-  const css={},attributes={},saved={},handle={setAttribute:(k,v)=>attributes[k]=v,setPointerCapture(){},hasPointerCapture:()=>false},vertical=['left','right'].includes(dock);
+  const tasks=new Map();let frames=0,notifications=0;const css={},attributes={},saved={},handle={setAttribute:(k,v)=>attributes[k]=v,setPointerCapture(){},hasPointerCapture:()=>false},vertical=['left','right'].includes(dock);
   const body={dataset:{testerDock:dock},style:{setProperty:(k,v)=>css[k]=v},classList:{add(){},remove(){}}};
   const panel={getBoundingClientRect:()=>({width:parseFloat(css['--tester-width']),height:parseFloat(css['--tester-height'])})};
-  runInNewContext(script,{document:{body,getElementById:()=>handle,querySelector:()=>panel},window:{innerWidth:800,innerHeight:600,addEventListener(){},dispatchEvent(){}},localStorage:{getItem:()=>null,setItem:(k,v)=>saved[k]=v},Event:class{}});
+  runInNewContext(script,{document:{body,getElementById:()=>handle,querySelector:()=>panel},window:{innerWidth:800,innerHeight:600,addEventListener(){},dispatchEvent(){notifications++}},localStorage:{getItem:()=>null,setItem:(k,v)=>saved[k]=v},Event:class{},requestAnimationFrame:fn=>{tasks.set(++frames,fn);return frames},cancelAnimationFrame:id=>tasks.delete(id)});
   const event={button:0,pointerId:1,clientX:400,clientY:300,preventDefault(){},stopPropagation(){}};
-  handle.onpointerdown(event);handle.onpointermove({...event,clientX:450,clientY:350});handle.onpointerup(event);
+  handle.onpointerdown(event);for(let i=1;i<=50;i++)handle.onpointermove({...event,clientX:400+i,clientY:300+i});assert.equal(tasks.size,1);assert.equal(notifications,0);handle.onpointerup(event);assert.equal(tasks.size,0);assert.equal(notifications,1);
   const key=vertical?'width':'height',expected=(vertical?320:190)+(['top','left'].includes(dock)?50:-50);
   assert.equal(JSON.parse(saved['lexica-tester-size'])[key],expected);assert.equal(attributes['aria-orientation'],vertical?'vertical':'horizontal');
   handle.onpointerdown(event);handle.onpointermove({...event,clientX:500,clientY:400});handle.onpointercancel(event);assert.equal(parseFloat(css[vertical?'--tester-width':'--tester-height']),expected);

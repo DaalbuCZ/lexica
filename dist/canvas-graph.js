@@ -25,7 +25,7 @@ export function graphPalette(dark,style){
 }
 
 export function createGraphCanvas(canvas,minimap){
- const ctx=canvas.getContext('2d'),mapCtx=minimap.getContext('2d');let view={x:0,y:0,width:1200,height:700},scene=null,mapView={...view},paths=[];
+ const ctx=canvas.getContext('2d'),mapCtx=minimap.getContext('2d');let view={x:0,y:0,width:1200,height:700},scene=null,mapView={...view},paths=[],pathRoutes=null;
  function transform(){return canvasTransform(view,canvas.clientWidth,canvas.clientHeight)}
  function point(event){return clientToWorld({x:event.clientX,y:event.clientY},canvas.getBoundingClientRect(),transform())}
  function surface(element,context,v){const ratio=globalThis.devicePixelRatio||1,width=element.clientWidth,height=element.clientHeight;if(!width||!height)return null;const w=Math.round(width*ratio),h=Math.round(height*ratio);if(element.width!==w||element.height!==h){element.width=w;element.height=h}context.setTransform(1,0,0,1,0,0);context.clearRect(0,0,w,h);const t=canvasTransform(v,width,height);context.setTransform(ratio*t.scale,0,0,ratio*t.scale,ratio*t.x,ratio*t.y);context.lineJoin='round';return t}
@@ -33,7 +33,7 @@ export function createGraphCanvas(canvas,minimap){
  function draw(next){scene=next;const {machine,routes,selectedStates,selectedComments,selectedCommentLinks,edgeSelected,source,commentSource,connectPoint,previewPath,marquee,trace,failures}=scene,c=colors(),labelFor=scene.label??transitionLabel;if(!surface(canvas,ctx,view))return;
   const traceStates=new Set(trace?.traceStates??[]),traceEdges=new Set(trace?.traceEdges??[]),failureStates=new Set(failures.states),failureEdges=new Set(failures.edges),current=trace?.kind?(trace.state??trace.traceStates?.at(-1)):null,currentEdge=trace?.kind==='character'?trace.traceEdges?.at(-1):null;
   ctx.lineWidth=1.8;ctx.strokeStyle=c.noteLine;ctx.setLineDash([6/transform().scale,5/transform().scale]);for(const link of commentLinks(machine)){ctx.strokeStyle=selectedCommentLinks.has(commentLinkKey(link.commentId,link.nodeId))?c.green:c.noteLine;line(ctx,link.from,link.to)}ctx.setLineDash([]);
-  paths=routes.map(r=>new Path2D(r.d));
+  if(pathRoutes!==routes){paths=routes.map(r=>new Path2D(r.d));pathRoutes=routes}
   for(let i=0;i<routes.length;i++){const e=machine.edges[i],r=routes[i],bad=!!transitionError(machine,e)||failureEdges.has(i)||(trace?.token==='ERROR'&&traceEdges.has(i)),active=currentEdge===i;ctx.strokeStyle=bad?c.error:active?c.step:traceEdges.has(i)?c.trace:edgeSelected(e,i)?c.green:c.edge;ctx.lineWidth=active?4:bad||traceEdges.has(i)||edgeSelected(e,i)?3:1.6;ctx.stroke(paths[i]);arrow(ctx,r,ctx.strokeStyle)}
   if(source&&connectPoint&&previewPath){ctx.strokeStyle=c.green;ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.stroke(new Path2D(previewPath));ctx.setLineDash([])}
   for(const s of machine.states){const selected=selectedStates.has(s.id),bad=failureStates.has(s.id)||(trace?.token==='ERROR'&&traceStates.has(s.id)),active=current===s.id,color=bad?c.error:active?c.step:traceStates.has(s.id)?c.trace:selected?c.selected:source===s.id?c.green:c.edge;
