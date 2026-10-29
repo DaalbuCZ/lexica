@@ -1,30 +1,20 @@
-export function setupInputHighlights(input,mirror,colorClass){
- const native=typeof CSS!=='undefined'&&CSS.highlights&&typeof Highlight!=='undefined',names=Array.from({length:10},(_,i)=>'lexica-token-color-'+i).concat('lexica-error');
+import {errorSpans,underlineSegments} from './error-underlines.js';
+export function setupInputHighlights(input,mirror,colorClass,errorLayer=null){
+ const native=typeof CSS!=='undefined'&&CSS.highlights&&typeof Highlight!=='undefined',names=Array.from({length:10},(_,i)=>'lexica-token-color-'+i).concat('lexica-error');let tokens=[],frame=null,hoveredToken=null,errors=[];const hoverNames=Array.from({length:10},(_,i)=>'lexica-hover-token-color-'+i).concat('lexica-hover-error');
  const escape=text=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function range(start,end){const r=document.createRange(),length=input.value.length;r.setStart(mirror.firstChild,Math.max(0,Math.min(length,start)));r.setEnd(mirror.firstChild,Math.max(0,Math.min(length,end)));return r}
- const firstRect=r=>r.getClientRects()[0]??null;
- function clearStep(){if(native)CSS.highlights.delete('lexica-step');else for(const mark of mirror.querySelectorAll('.step-character'))mark.replaceWith(document.createTextNode(mark.textContent))}
- function render(tokens){
-  clearStep();
-  if(native){
-   // One text node preserves tabs, ligatures, combining marks and joined emoji exactly as typed.
-   mirror.textContent=input.value+'\u200b';const groups=new Map(names.map(name=>[name,[]]));
-   for(const t of tokens)if(!t.skip)groups.get(t.token==='ERROR'?'lexica-error':'lexica-'+colorClass(t.token)).push(range(t.offset,t.offset+t.value.length));
-   for(const [name,ranges] of groups)CSS.highlights.set(name,new Highlight(...ranges));
-  }else mirror.innerHTML=tokens.map(t=>`<span class="${t.skip?'token-gap':'token-mark '+(t.token==='ERROR'?'error':colorClass(t.token))}" data-input-offset="${t.offset}">${escape(t.value)}</span>`).join('')+'&#8203;';
+ function range(start,end){const r=document.createRange(),length=input.value.length;start=Math.max(0,Math.min(length,start));end=Math.max(start,Math.min(length,end));if(native){r.setStart(mirror.firstChild,start);r.setEnd(mirror.firstChild,end);return r}const walker=document.createTreeWalker(mirror,NodeFilter.SHOW_TEXT);let node,total=0,started=false;while(node=walker.nextNode()){const limit=total+node.textContent.length;if(!started&&start<=limit){r.setStart(node,start-total);started=true}if(end<=limit){r.setEnd(node,end-total);return r}total=limit}return r}
+ function renderFallback(){const cuts=new Set([0,input.value.length]);for(const token of tokens){cuts.add(token.offset);cuts.add(token.offset+token.value.length)}if(frame){for(const n of [frame.tokenStart,frame.tokenEnd,frame.offset,frame.end])if(Number.isInteger(n))cuts.add(n)}const points=[...cuts].filter(n=>n>=0&&n<=input.value.length).sort((a,b)=>a-b);let ti=0;mirror.innerHTML=points.slice(0,-1).map((start,i)=>{const end=points[i+1];while(ti+1<tokens.length&&tokens[ti].offset+tokens[ti].value.length<=start)ti++;const token=tokens[ti],classes=[];if(token&&!token.skip)classes.push('token-mark',token.token==='ERROR'?'error':colorClass(token.token));if(hoveredToken&&start>=hoveredToken.offset&&end<=hoveredToken.offset+hoveredToken.value.length)classes.push('token-hover',hoveredToken.token==='ERROR'?'token-hover-error':colorClass(hoveredToken.token));if(frame&&start>=frame.tokenStart&&end<=frame.tokenEnd)classes.push('step-token');if(frame&&['character','blocked'].includes(frame.kind)&&start>=frame.offset&&end<=frame.end)classes.push('step-character');return `<span class="${classes.join(' ')}">${escape(input.value.slice(start,end))}</span>`}).join('')+'&#8203;';renderErrors(0,tokens.length)}
+ function clearStep(){frame=null;if(native){CSS.highlights.delete('lexica-step');CSS.highlights.delete('lexica-current-token')}else renderFallback()}
+ function renderErrors(first,last){if(!errorLayer)return;const bounds=errorLayer.getBoundingClientRect(),start=tokens[first]?.offset??0,end=last>first?tokens[last-1].offset+tokens[last-1].value.length:0;const rectangles=[];if(end>start)for(const span of errors)if(span.end>start&&span.start<end)rectangles.push(...rects(Math.max(start,span.start),Math.min(end,span.end)));errorLayer.innerHTML=underlineSegments(rectangles,bounds).map(segment=>`<span class="input-error-squiggle" style="left:${segment.left}px;top:${segment.top}px;width:${segment.width}px;background-position-x:${segment.phase}px"></span>`).join('')}
+ function refresh(){
+  if(!mirror.firstChild){if(errorLayer)errorLayer.innerHTML='';return}if(!native){renderErrors(0,tokens.length);return}let first=0,last=tokens.length;
+  const groups=new Map(names.map(name=>[name,[]]));for(let i=first;i<last;i++){const token=tokens[i];if(!token.skip)groups.get(token.token==='ERROR'?'lexica-error':'lexica-'+colorClass(token.token)).push(range(token.offset,token.offset+token.value.length))}for(const [name,ranges] of groups)CSS.highlights.set(name,new Highlight(...ranges));renderErrors(first,last);
  }
- function rect(start,end){
-  if(native)return mirror.firstChild?firstRect(range(start,end)):null;
-  return mirror.querySelector(`[data-input-offset="${start}"]`)?.getClientRects()[0]??null;
- }
- function step(frame){
-  clearStep();if(!(frame.end>frame.offset))return null;
-  if(native){if(!mirror.firstChild)return null;const r=range(frame.offset,frame.end),highlight=new Highlight(r);highlight.priority=1;CSS.highlights.set('lexica-step',highlight);return firstRect(r)}
-  for(const span of mirror.querySelectorAll('[data-input-offset]')){
-   const text=span.textContent,offset=+span.dataset.inputOffset,start=Math.max(0,frame.offset-offset),end=Math.min(text.length,frame.end-offset);if(start>=end)continue;
-   const mark=document.createElement('mark');mark.className='step-character';mark.textContent=text.slice(start,end);span.replaceChildren(document.createTextNode(text.slice(0,start)),mark,document.createTextNode(text.slice(end)));
-  }
-  return mirror.querySelector('.step-character')?.getBoundingClientRect()??null;
- }
- return {render,rect,step,clearStep};
+ function render(nextTokens){hover(null);tokens=nextTokens;errors=errorSpans(tokens);frame=null;if(native){CSS.highlights.delete('lexica-step');CSS.highlights.delete('lexica-current-token');mirror.textContent=input.value+'\u200b';refresh()}else renderFallback()}
+ function rects(start,end){if(!mirror.firstChild)return [];return [...range(start,end).getClientRects()]}
+ function tokenAtPoint(x,y){const first=0,last=tokens.length;for(let i=first;i<last;i++){const token=tokens[i];if(!token.skip&&rects(token.offset,token.offset+token.value.length).some(rect=>x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom))return token}return null}
+ function rect(start,end){return rects(start,end)[0]??null}
+ function step(nextFrame){clearStep();frame=nextFrame;if(native){if(frame.tokenEnd>frame.tokenStart){const token=new Highlight(range(frame.tokenStart,frame.tokenEnd));token.priority=1;CSS.highlights.set('lexica-current-token',token)}if(['character','blocked'].includes(frame.kind)&&frame.end>frame.offset){const character=new Highlight(range(frame.offset,frame.end));character.priority=3;CSS.highlights.set('lexica-step',character)}}else renderFallback();return rect(frame.offset,frame.end>frame.offset?frame.end:Math.min(input.value.length,frame.offset+1))}
+ function hover(token){if(token?.skip)token=null;if(hoveredToken===token)return;hoveredToken=token;if(native){for(const name of hoverNames)CSS.highlights.delete(name);if(token&&mirror.firstChild){const highlight=new Highlight(range(token.offset,token.offset+token.value.length));highlight.priority=2;CSS.highlights.set(token.token==='ERROR'?'lexica-hover-error':'lexica-hover-'+colorClass(token.token),highlight)}}else renderFallback()}
+ return {render,rect,rects,step,clearStep,hover,refresh,tokenAtPoint};
 }

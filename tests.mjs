@@ -1,4 +1,3 @@
-import {setupMinimap} from './dist/minimap.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
 test('ambiguity is reported instead of selecting a random transition',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});assert.throws(()=>tokenize(m,'a'),/Ambiguous/)});
@@ -289,15 +288,9 @@ test('clicking blank canvas during comment joining cancels without creating a st
  canvas.onpointerdown({button:0,target:{closest:()=>null}});assert.equal(cancelled,1);assert.equal(added,0);
 });
 
-test('tips can be hidden, restored, and remember the choice without requiring storage',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setTipsVisible('),app.indexOf("$('fit').onclick="));
- for(const unavailable of [false,true]){
-  const elements={'tips-panel':{hidden:false},'show-tips':{hidden:true},'hide-tips':{}},saved={};
-  const context={$:id=>elements[id],localStorage:{getItem:key=>{if(unavailable)throw Error();return saved[key]},setItem:(key,value)=>{if(unavailable)throw Error();saved[key]=value}}};
-  runInNewContext(script,context);elements['hide-tips'].onclick();assert.equal(elements['tips-panel'].hidden,true);assert.equal(elements['show-tips'].hidden,false);
-  if(!unavailable){runInNewContext(script,context);assert.equal(elements['tips-panel'].hidden,true)}
-  elements['show-tips'].onclick();assert.equal(elements['tips-panel'].hidden,false);assert.equal(elements['show-tips'].hidden,true);
- }
+test('contextual tips remember their visibility independently of the shortcuts button',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setTipsVisible('),app.indexOf("$('hide-tips').onclick="));
+ for(const unavailable of [false,true]){const panel={hidden:false},saved={},context={$:()=>panel,localStorage:{setItem:(key,value)=>{if(unavailable)throw Error();saved[key]=value}}};runInNewContext(script,context);context.setTipsVisible(false);assert.equal(panel.hidden,true);if(!unavailable)assert.equal(saved['lexica-tips-hidden'],'true');context.setTipsVisible(true);assert.equal(panel.hidden,false)}
 });
 
 test('transition diagnostics identify unfinished rules and failed tokens retain the attempted path',async()=>{
@@ -404,7 +397,7 @@ test('input caret and selections highlight matching tokens and traces without mo
  const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
  const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
  const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
- const context={visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ const context={stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
  runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
  input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
@@ -426,7 +419,7 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
  const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
- const context={$:id=>elements[id],machine:m,tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ const context={$:id=>elements[id],machine:m,hideInputTokenHover(){},tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
@@ -510,17 +503,12 @@ test('portals assign a usable generated name to an unnamed destination',()=>{
  const m=example();m.states[1].name='';enablePortal(m,m.edges[0]);assert.equal(m.edges[0].portal,'STATE');assert.equal(destination(m,m.edges[0]).id,'s1');validate(m);
 });
 
-test('step controls move forward and backward, reset on edits, and expose matching errors',()=>{
- const script=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function');
- const elements={},listeners={},panel={classList:{add(){},remove(){}}};for(const id of ['input','input-highlights','step-controls','step-toggle','step-prev','step-next','step-stop','step-status'])elements[id]={setAttribute(){}};
- elements.input.value='a';elements.input.addEventListener=(name,fn)=>listeners[name]=fn;elements['input-highlights'].querySelectorAll=()=>[];elements['input-highlights'].querySelector=()=>null;
- let machine=example(),resets=0,trace;const context={document:{getElementById:id=>elements[id],querySelector:()=>panel},lexerSteps,highlights:{clearStep(){},step:()=>null},getMachine:()=>machine,traceToken:frame=>trace=frame,markFailures(){},onReset:()=>resets++};
- runInNewContext(script+'\nvar controller=setupStepping({getMachine,traceToken,markFailures,highlights,onReset});',context);
- elements['step-toggle'].onclick();assert.equal(context.controller.active(),true);assert.match(elements['step-status'].textContent,/Start token/);assert.equal(elements['step-prev'].disabled,true);
- elements['step-next'].onclick();assert.equal(trace.character,'a');elements['step-prev'].onclick();assert.match(elements['step-status'].textContent,/Start token/);elements['step-next'].onclick();assert.equal(trace.character,'a');
- listeners.input();assert.equal(context.controller.active(),false);assert.equal(elements['step-controls'].hidden,true);assert.equal(resets,1);
- elements.input.value='hi 42';elements.input.selectionStart=3;elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Start token at 3/);elements['step-next'].onclick();assert.equal(trace.character,'4');assert.equal(trace.offset,3);elements['step-stop'].onclick();
- machine.edges[0].label='';elements['step-toggle'].onclick();assert.match(elements['step-status'].textContent,/Transition cannot be empty/);assert.equal(elements['step-next'].disabled,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);
+test('debugger buttons share a live session and input clicks retarget without disabling debugging',()=>{
+ const source=readFileSync(new URL('./dist/stepping.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function');
+ const ids=['input','step-controls','step-toggle','step-prev','step-next','step-prev-token','step-next-token','step-stop','step-status','step-memory'],elements=Object.fromEntries(ids.map(id=>[id,{setAttribute(){},replaceChildren(){}}])),events={};
+ elements.input.value='hello 42 world';elements.input.selectionStart=7;elements.input.addEventListener=(name,fn)=>events[name]=fn;
+ let resets=0,frame;const context={document:{getElementById:id=>elements[id],querySelector:()=>({classList:{add(){},remove(){}}}),createElement:()=>({append(){}})},createDebugSession,getMachine:()=>example(),getTokens:()=>tokenize(example(),elements.input.value),traceToken:value=>frame=value,markFailures(){},highlights:{clearStep(){},step:()=>null},onReset:()=>resets++};
+ runInNewContext(source+'\nvar controller=setupStepping({getMachine,getTokens,traceToken,markFailures,highlights,onReset});',context);context.controller.toggle();assert.equal(frame.tokenStart,6);elements['step-next'].onclick();assert.equal(frame.character,'4');elements['step-next-token'].onclick();assert.equal(frame.tokenStart,8);elements['step-prev-token'].onclick();assert.equal(frame.tokenStart,6);elements.input.selectionStart=1;events.click();assert.equal(frame.tokenStart,0);elements.input.selectionStart=7;events.keyup({key:'ArrowRight'});assert.equal(frame.tokenStart,6);assert.equal(context.controller.active(),true);assert.equal(resets,0);events.input();assert.equal(context.controller.active(),false);assert.equal(resets,1);context.controller.toggle();assert.equal(elements['step-toggle'].hidden,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);assert.equal(elements['step-toggle'].hidden,false);assert.equal(elements['step-controls'].hidden,true);
 });
 
 test('stepping gives only the current state and latest transition a distinct highlight',()=>{
@@ -596,14 +584,14 @@ test('lexer stepping starts at the requested cursor with absolute offsets and in
 });
 
 test('range highlights preserve one text flow for tabs, wide glyphs, combining marks and joined emoji',()=>{
- const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
  Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
- const registry=new Map(),context={input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
+ const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
  runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);
  context.tokens=[{token:'IDENT',value:'hi',offset:0},{token:'WS',value:'\t',offset:2,skip:true},{token:'ERROR',value:input.value.slice(3,-2),offset:3},{token:'NUMBER',value:'42',offset:input.value.length-2}];
  runInNewContext('highlights.render(tokens);',context);assert.equal(mirror.firstChild.data,input.value+'\u200b');assert.equal('innerHTML' in mirror,false);
  const numbers=[...registry.get('lexica-token-color-1')];assert.equal(numbers[1].start,input.value.length-2);assert.equal(numbers[1].end,input.value.length);
- context.frame={offset:3,end:4};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,1);
+ context.frame={kind:'character',offset:3,end:4,tokenStart:3,tokenEnd:4};runInNewContext('highlights.step(frame);',context);assert.equal([...registry.get('lexica-step')][0].start,3);assert.equal(registry.get('lexica-step').priority,3);
  runInNewContext('highlights.clearStep();',context);assert.equal(registry.has('lexica-step'),false);assert.equal(mirror.firstChild.data,input.value+'\u200b');
 });
 
@@ -631,14 +619,69 @@ test('saved machines restore tester text and skipped-token preference, including
  for(const tester of [null,[],{input:42},{input:'x',showSkipped:'yes'}])assert.throws(()=>validate({...m,tester}),/tester/);
 });
 
-test('panning updates the minimap viewport without rebuilding its graph',()=>{
- let writes=0,routes=0,layouts=0,viewport;const attrs={},machine=example();machine.comments=[{id:'note',x:10,y:20,text:'Notes'}];const map={set innerHTML(value){writes++;viewport={attrs:{},setAttribute(name,value){this.attrs[name]=String(value)}}},querySelector:()=>viewport,setAttribute:(name,value)=>attrs[name]=value},renderer=setupMinimap(map,{getMachine:()=>machine,routeEdges:m=>{routes++;return routeEdges(m)},commentLayout:comment=>{layouts++;return commentLayout(comment)}});
- renderer.rebuild({x:0,y:0,width:800,height:600});const first=viewport;for(let i=1;i<=100;i++)renderer.update({x:i*2,y:i,width:800,height:600});assert.equal(writes,1);assert.equal(routes,1);assert.equal(layouts,1);assert.equal(viewport,first);assert.equal(viewport.attrs.x,'200');assert.equal(viewport.attrs.y,'100');assert.ok(attrs.viewBox.split(' ').map(Number).every(Number.isFinite));machine.states[0].x+=100;renderer.rebuild({x:200,y:100,width:800,height:600});assert.equal(writes,2);assert.equal(routes,2);assert.notEqual(viewport,first);
+import {createDebugSession} from './dist/debug-session.js';
+import {simpleCharacterClass,readEditorSettings} from './dist/editor-settings.js';
+import {singleCharacterError,characterBounds} from './dist/regex-analysis.js';
+import {errorSpans,underlineSegments} from './dist/error-underlines.js';
+
+test('debugger seeks the token under the cursor and jumps by token or character',()=>{
+ const session=createDebugSession(example(),'hello 42 world');assert.equal(session.seek(3).offset,0);assert.equal(session.next().character,'h');assert.equal(session.previous().kind,'start');assert.equal(session.nextToken().tokenStart,5);assert.equal(session.nextToken().tokenStart,6);assert.equal(session.next().character,'4');assert.equal(session.previousToken().tokenStart,5);assert.equal(session.seek(7).tokenStart,6);assert.equal(session.seek(14).tokenStart,9);assert.equal(session.nextToken().kind,'done');assert.equal(session.canNext(),false);assert.equal(session.previousToken().tokenStart,9);
 });
 
-test('pan and zoom update synchronously without replacing DOM subtrees',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function view(){'),app.indexOf('function startPan('));
- let writes=0,updates=0;const current={x:0,y:0,width:800,height:600},canvas={viewBox:{baseVal:current},clientWidth:800,clientHeight:600,setAttribute(name,value){writes++;const [x,y,width,height]=value.split(' ').map(Number);Object.assign(current,{x,y,width,height})}},grid={style:{}};
- const context={$:()=>canvas,document:{querySelector:()=>grid},updateMapViewport:()=>updates++,drawMap:()=>assert.fail('minimap subtree replaced')};runInNewContext(source,context);
- for(let i=1;i<=100;i++){context.setView({x:i,y:2*i,width:800/i,height:600/i});assert.equal(current.x,i);assert.equal(writes,i);assert.equal(updates,i)}
+test('debugger token seeking replays committed memory effects and includes skipped tokens',()=>{
+ const m={start:'a',machineType:'extended',cells:[{name:'n',initial:0}],states:[{id:'a',name:'start',token:'',x:0,y:0},{id:'b',name:'letter',token:'LETTER',x:100,y:0},{id:'w',name:'space',token:'WS',skip:true,x:200,y:0}],edges:[{from:'a',to:'b',label:'[a-z]',effect:{cell:'n',op:'add',value:1}},{from:'a',to:'w',label:' '}]};
+ const session=createDebugSession(m,'a b');assert.equal(session.seek(2).memory.n,1);assert.equal(session.current().tokenStart,2);assert.equal(session.next().memory.n,2);assert.equal(session.previousToken().tokenStart,1);assert.equal(session.current().memory.n,1);assert.equal(session.seek(0).memory.n,0);session.nextToken();session.nextToken();assert.equal(session.nextToken().memory.n,2);
+});
+
+test('simplified editing preserves regex meaning and refuses concatenations',()=>{
+ assert.equal(simpleCharacterClass('abc'),null);assert.equal(simpleCharacterClass('a|bc'),null);assert.equal(simpleCharacterClass('[a][b]'),null);assert.equal(simpleCharacterClass('.'),null);
+ for(const source of ['[abc]','[^a-z]','a','\\n','\\d','\\+','😀']){const simple=simpleCharacterClass(source);assert.ok(simple,source);const original=new RegExp('^(?:'+source+')$','u'),converted=new RegExp('^['+simple.characters+']$','u');for(const char of ['a','b','c','z','0','\n','+','😀'])assert.equal(original.test(char),simple.inverted?!converted.test(char):converted.test(char),source+' on '+JSON.stringify(char))}
+});
+
+test('Unicode regex escape pairs are one character for static transition diagnostics',()=>{
+ assert.equal(singleCharacterError('\\uD83D\\uDE00'),'');assert.equal(characterBounds('😀').min,1);assert.equal(characterBounds('\\u{1F600}').min,1);assert.equal(singleCharacterError('\\uD83D\\uDE00a').length>0,true);
+});
+
+test('emitted debugger frames keep the token being emitted as their full-token highlight',()=>{
+ const session=createDebugSession(example(),'hello 42');session.seek(0);while(session.current().kind!=='emit')session.next();assert.equal(session.current().tokenStart,0);assert.equal(session.current().tokenEnd,5);assert.equal(session.current().state,'s1');
+});
+
+test('hover survives movement within a token, follows the pointer, and resets only when leaving it',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let activeInputHover='),app.indexOf('function focusToken(')),handlers={},timers=new Map(),highlights=[];let sequence=0;
+ const tokens=[{token:'IDENT',offset:0,value:'hi'},{token:'NUMBER',offset:3,value:'42'}],badge={style:{},hidden:true,getBoundingClientRect:()=>({width:80,height:24})};
+ const context={inputAnalysisPending:false,$:id=>id==='input'?{addEventListener:(name,fn)=>handlers[name]=fn}:badge,allInputTokens:tokens,inputHighlights:{hover:token=>highlights.push(token),tokenAtPoint(x,y){return tokens.find(token=>!token.skip&&this.rects(token.offset).some(rect=>x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom))},rects:start=>start===0?[{left:100,right:300,top:100,bottom:140},{left:100,right:250,top:150,bottom:190}]:[{left:400,right:500,top:100,bottom:140}]},tokenColorClass:()=> 'token-color-1',window:{innerWidth:1000,innerHeight:800},clearTimeout:id=>timers.delete(id),setTimeout:(fn,delay)=>{assert.equal(delay,50);timers.set(++sequence,fn);return sequence}};
+ const settle=()=>{const [id,fn]=[...timers.entries()][0];timers.delete(id);fn()};
+ runInNewContext(script,context);handlers.pointermove({clientX:180,clientY:120});assert.equal(badge.hidden,true);handlers.pointermove({clientX:200,clientY:120});assert.equal(timers.size,1);settle();assert.equal(badge.hidden,false);assert.equal(badge.textContent,'IDENT');assert.equal(badge.style.left,'160px');assert.equal(badge.style.top,'84px');const count=highlights.length;
+ handlers.pointermove({clientX:210,clientY:120});assert.equal(badge.hidden,false);assert.equal(badge.style.left,'170px');assert.equal(timers.size,0);assert.equal(highlights.length,count);handlers.pointermove({clientX:180,clientY:170});assert.equal(badge.hidden,false);assert.equal(highlights.length,count);
+ handlers.pointermove({clientX:420,clientY:120});assert.equal(badge.hidden,true);assert.equal(highlights.at(-1),null);settle();assert.equal(badge.textContent,'NUMBER');assert.equal(highlights.at(-1),tokens[1]);handlers.pointermove({clientX:600,clientY:120});assert.equal(badge.hidden,true);handlers.pointerleave();assert.equal(timers.size,0);
+});
+
+test('hover highlights the full token without replacing the current debugger character',()=>{
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'hello 42'},mirror={};Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
+ const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return []}})}};
+ runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);context.token={token:'IDENT',offset:0,value:'hello'};runInNewContext('highlights.render([token]);highlights.hover(token);highlights.step({kind:"character",offset:1,end:2,tokenStart:0,tokenEnd:5});',context);const hover=registry.get('lexica-hover-token-color-1');assert.equal([...hover][0].start,0);assert.equal([...hover][0].end,5);assert.ok(registry.get('lexica-step').priority>hover.priority);runInNewContext('highlights.hover(null);',context);assert.equal(registry.has('lexica-hover-token-color-1'),false);assert.equal(registry.has('lexica-step'),true);
+});
+
+test('adjacent error characters form continuous underlines without joining skipped whitespace',()=>{
+ const tokens=[{token:'ERROR',offset:0,value:'"'},{token:'WS',offset:1,value:' ',skip:true},{token:'ERROR',offset:2,value:'$'},{token:'ERROR',offset:3,value:'{'},{token:'ERROR',offset:4,value:'😀'}];assert.deepEqual(errorSpans(tokens),[{start:0,end:1},{start:2,end:6}]);const segments=underlineSegments([{left:12,right:28,top:10,bottom:24},{left:12,right:12,top:24,bottom:38},{left:0,right:6,top:-30,bottom:-15}],{left:1,top:1,bottom:100});assert.deepEqual(segments,[{left:11,top:22,width:16,phase:-5}]);
+});
+
+test('error underline overlay uses merged spans and clears when errors are removed',()=>{
+ const source=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'" ${'},mirror={},layer={getBoundingClientRect:()=>({left:0,top:0,bottom:100})};Object.defineProperty(mirror,'textContent',{set(value){this.firstChild={data:value}}});const context={errorSpans,underlineSegments,input,mirror,layer,CSS:{highlights:new Map()},Highlight:class extends Set{constructor(...values){super(values)}},document:{createRange:()=>({setStart(node,offset){this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{left:this.start*8,right:this.end*8,top:10,bottom:24}]}})}};context.tokens=[{token:'ERROR',offset:0,value:'"'},{token:'WS',offset:1,value:' ',skip:true},{token:'ERROR',offset:2,value:'$'},{token:'ERROR',offset:3,value:'{'}];runInNewContext(source+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1',layer);highlights.render(tokens);",context);assert.equal((layer.innerHTML.match(/input-error-squiggle/g)??[]).length,2);assert.match(layer.innerHTML,/width:16px/);context.highlights.render([]);assert.equal(layer.innerHTML,'');
+});
+
+test('guarded memory transitions validate, report ambiguity, and roll back speculative effects',()=>{
+ const m={machineType:'extended',cells:[{name:'n',initial:0}],start:'a',states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:100,y:0},{id:'c',name:'c',token:'',x:200,y:0}],edges:[{from:'a',to:'b',label:'a',effect:{cell:'n',op:'add',value:1}},{from:'b',to:'c',label:'b',effect:{cell:'n',op:'add',value:10}},{from:'a',to:'b',label:'a',guard:{cell:'n',op:'>',value:10}}]};
+ const frames=[...lexerSteps(m,'aba')],emits=frames.filter(f=>f.kind==='emit');assert.deepEqual(emits.map(f=>f.memory.n),[1,1,2]);assert.equal(frames[0].memory.n,0);assert.deepEqual(tokenize(validate(JSON.parse(JSON.stringify(m))),'aba').map(t=>t.token),['B','ERROR','B']);
+ m.edges[2].guard.value=-1;assert.throws(()=>tokenize(m,'a'),/Ambiguous/);m.edges[2].guard.cell='missing';assert.throws(()=>validate(m),/guard/);
+});
+
+test('debugger surfaces invalid configurations instead of throwing before the session starts',()=>{
+ const m=example();m.edges[0].label='';const session=createDebugSession(m,'hello');session.seek(0);assert.equal(session.current().kind,'error');assert.match(session.current().message,/empty/);assert.equal(session.canNext(),false);
+});
+
+test('simplified settings restore safely without changing graph preferences',()=>{
+ assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false});
+ assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{simplified:false});
 });

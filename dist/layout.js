@@ -1,6 +1,6 @@
 import {forceSimulation,forceManyBody,forceLink,forceX,forceY,forceCollide} from 'd3-force';
 import {springSettings} from './spring-settings.js';
-import {transitionLabel} from './labels.js?v=17';
+import {transitionLabel} from './labels.js?v=16';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
 import {destination,statePortalBox,enablePortal} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.

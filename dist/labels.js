@@ -6,4 +6,4 @@ export function stateLabel(name){
  return {lines,fontSize,lineHeight,y:fontSize/3-(lines.length-1)*lineHeight/2,width:lines.length>1?52:60};
 }
 
-export function transitionLabel(edge){const label=edge.invert?'not ('+edge.label+')':edge.label,r=edge.memory;if(!r)return label;const guard=r.guard?`${r.counter} ${({eq:'=',ne:'≠',lt:'<',lte:'≤',gt:'>',gte:'≥'})[r.guard.op]} ${r.guard.value}`:'',effect=r.effect?`${r.counter}${r.effect==='increment'?'++':'--'}`:'';return label+' ['+[guard,effect].filter(Boolean).join(' / ')+']'}
+export function transitionLabel(edge){return edge.invert?'not ('+edge.label+')':edge.label}
