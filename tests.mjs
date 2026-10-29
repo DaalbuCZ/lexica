@@ -350,7 +350,7 @@ test('panel grips persist keyboard and drag docking, and cancel without changing
 test('toolbar popovers open beside vertical docks and stay within the viewport',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function setupPopover('),app.indexOf("setupPopover('layout-toggle'"));
  for(const [dock,left,expected] of [['left',18,'74px'],['right',680,'432px']]){
-  const handlers={},menu={style:{},addEventListener:(name,fn)=>handlers[name]=fn},toggle={getBoundingClientRect:()=>({left,top:400,bottom:432})};
+  const handlers={},menu={style:{},addEventListener:(name,fn)=>handlers[name]=fn},toggle={setAttribute(){},getBoundingClientRect:()=>({left,top:400,bottom:432})};
   const context={$:id=>id==='menu'?menu:toggle,document:{body:{dataset:{toolbarDock:dock}},querySelector:()=>({getBoundingClientRect:()=>({left,right:left+48,top:76})})},window:{innerWidth:745,innerHeight:919}};
   runInNewContext(script+"setupPopover('toggle','menu');",context);handlers.beforetoggle({newState:'open'});assert.equal(menu.style.left,expected);assert.equal(menu.style.top,'400px');
  }
@@ -765,4 +765,11 @@ test('add buttons arm a placement and the canvas click commits the exact cursor 
  for(const type of ['state','comment']){let handler,commits=[];const elements={canvas:{focus(){},addEventListener:(_,fn)=>handler=fn},modehint:{}},context={placingState:false,placingComment:false,placementPoint:null,source:null,commentSource:null,graph:{hitClient:()=>null},point:e=>({x:e.clientX,y:e.clientY}),$:id=>elements[id],cancelConnect(){context.placingState=false;context.placingComment=false},showProperties(){},document:{body:{classList:{add(){}}}},add:(x,y)=>commits.push({type:'state',x,y}),addComment:p=>commits.push({type:'comment',...p})};
   runInNewContext(begin+click,context);context.beginPlacement(type);assert.equal(commits.length,0);assert.equal(context.placingState,type==='state');assert.equal(context.placingComment,type==='comment');handler({button:0,clientX:180,clientY:230,preventDefault(){},stopImmediatePropagation(){}});assert.deepEqual(commits,[{type,x:180,y:230}]);
  }
+});
+
+test('memory popover controls edit only their own fields and preserve guard references',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),source=app.slice(app.indexOf('function bindMemoryCells('),app.indexOf('function machineProperties('));
+ const machine={cells:[{name:'counter',initial:0}],edges:[{guard:{cell:'counter',op:'==',value:0},effect:{cell:'counter',op:'add',value:1}}]},name={dataset:{cellName:'0'},value:'depth'},value={dataset:{cellValue:'0'},value:'3'},remove={dataset:{cellDelete:'0'}},add={},messages=[];
+ const root={querySelectorAll:selector=>selector==='[data-cell-name]'?[name]:selector==='[data-cell-value]'?[value]:[remove],querySelector:()=>add},context={machine,toast:message=>messages.push(message),properties(){},updateMachine:change=>change(machine)};
+ runInNewContext(source,context);context.bindMemoryCells(machine.cells,root);name.onchange();assert.equal(machine.cells[0].name,'depth');assert.equal(machine.edges[0].guard.cell,'depth');assert.equal(machine.edges[0].effect.cell,'depth');value.onchange();assert.equal(machine.cells[0].initial,3);remove.onclick();assert.equal(machine.cells.length,1);assert.match(messages[0],/Remove this cell/);add.onclick();assert.equal(machine.cells.length,2);
 });
