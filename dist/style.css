@@ -520,10 +520,5 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 
 .resizing-tester #input-highlights,.resizing-tester .input-error-lines{display:none}
 
-.resizing-tester .input-wrap{overflow:hidden}
-.resizing-tester #input{width:var(--resizing-input-width);max-width:none}
 .resizing-tester #input{will-change:transform;transform:translateZ(0);contain:strict}
 .resizing-tester #canvas{will-change:transform}
-
-.resizing-tester #tokens{width:var(--resizing-tokens-width);max-width:none;contain:layout paint}
-.resizing-tester .test-grid>div{overflow:hidden}
