@@ -294,7 +294,6 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 /* Promoted editor controls */
 #theme-control{margin:4px 0 8px}
 #theme-control #theme-toggle{margin:0;padding:8px 10px;gap:8px;justify-content:flex-start}
-.simplified-view #toggle-properties{display:none}
 .simple-memory{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
 .simple-memory summary{cursor:pointer;font-size:11px;font-weight:600;padding:5px 0}
 .simple-memory[open]{padding-bottom:4px}
@@ -483,7 +482,6 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .token{height:auto;min-height:48px;max-width:100%;overflow-wrap:anywhere;white-space:pre-wrap;align-self:flex-start;padding:8px 10px}
 .token b{white-space:normal}
 #step-stop .tool-icon{width:13px;height:13px}
-.simplified-view #toggle-properties{display:none!important}
 
 #settings-dialog[open]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px}
 #settings-dialog .dialog-heading{grid-column:1/-1}
@@ -495,12 +493,17 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .input-error-lines{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;border-radius:5px}
 .input-error-squiggle{position:absolute;height:4px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4' viewBox='0 0 6 4'%3E%3Cpath d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23e56e69' stroke-width='1.2'/%3E%3C/svg%3E");background-repeat:repeat-x;background-size:6px 4px}
 
-.simple-editor .simple-toggle{align-items:center;min-height:24px}
-.simple-editor .simple-toggle>input{margin:0}
-.simple-editor .simple-toggle>span{line-height:1.4}
+.simple-editor .simple-toggle{display:grid;grid-template-columns:14px minmax(0,1fr);align-items:center;min-height:28px}
+.simple-editor .simple-toggle>input{display:block;width:14px;height:14px;align-self:center;margin:0}
+.simple-editor .simple-toggle>span{display:flex;align-items:center;min-height:18px;line-height:18px}
+.simple-editor .simple-toggle strong{display:block;line-height:18px}
 @media(max-width:650px){.simplified-view .inspector{padding:12px}}
 
 /* Canvas owns the graph pixels; controls remain ordinary HTML. */
 #canvas{display:block;width:100%;height:100%;touch-action:none}
 .minimap #minimap{display:block;width:170px;height:106px;touch-action:none;cursor:crosshair}
 @media(max-width:650px){.minimap #minimap{width:112px;height:70px}}
+.placing-state #canvas{cursor:crosshair}
+.toolbar #memory-cells{display:flex;padding:7px 9px}
+.toolbar #memory-cells[hidden]{display:none}
+#settings-dialog #pinch-sensitivity{width:140px;max-width:45%;accent-color:var(--green)}

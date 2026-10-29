@@ -3,9 +3,10 @@ const STORAGE_KEY = 'lexica-editor-settings';
 export function readEditorSettings(storage) {
   try {
     const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(STORAGE_KEY) || '{}');
-    return {simplified: saved.simplified === true};
+    const sensitivity=Number(saved.pinchSensitivity);
+    return {simplified:saved.simplified===true,pinchSensitivity:Number.isFinite(sensitivity)?Math.max(.2,Math.min(2,sensitivity)):1};
   } catch {
-    return {simplified: false};
+    return {simplified:false,pinchSensitivity:1};
   }
 }
 
@@ -17,7 +18,7 @@ export function updateEditorSettings(changes) {
   document.body.classList.toggle('simplified-view', editorSettings.simplified);
 }
 
-export function setupEditorSettings(getMachineType, onChange, onMachineTypeChange) {
+export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onMachineTypeChange) {
   const menu = document.getElementById('app-menu');
   const button = document.createElement('button');
   button.id = 'settings-open';
@@ -35,9 +36,13 @@ export function setupEditorSettings(getMachineType, onChange, onMachineTypeChang
       <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Memory counters, guards, and side effects.</small></span></label>
     </section>
     <section class="setting-section"><h3>Editing</h3>
+      <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw boxes around transition labels.</small></span></label>
       <label class="setting-choice"><input type="checkbox" id="simplified-setting"><span><strong>Simplified view</strong><small>Use character sets and compact properties.</small></span></label>
     </section>
 <section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
+    <section class="setting-section"><h3>Pinch zoom</h3>
+      <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
+    </section>
     <section class="setting-section"><h3>Appearance</h3>
       <div class="setting-row"><span><strong>Theme</strong><small>Switch between light and dark.</small></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
     </section>
@@ -48,6 +53,9 @@ export function setupEditorSettings(getMachineType, onChange, onMachineTypeChang
   const sync = () => {
     dialog.querySelector(`[name="machine-type"][value="${getMachineType()}"]`).checked = true;
     dialog.querySelector('#simplified-setting').checked = editorSettings.simplified;
+    dialog.querySelector('#label-boxes').checked=getLabelBoxes();
+    dialog.querySelector('#pinch-sensitivity').value=editorSettings.pinchSensitivity;
+    dialog.querySelector('#pinch-sensitivity-value').value=editorSettings.pinchSensitivity.toFixed(1)+'×';
   };
   const changed = changes => { updateEditorSettings(changes); sync(); onChange(changes); };
   button.onclick = () => { menu.hidePopover(); sync(); dialog.showModal(); };
@@ -59,6 +67,7 @@ export function setupEditorSettings(getMachineType, onChange, onMachineTypeChang
   });
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
+  dialog.querySelector('#pinch-sensitivity').oninput=e=>{updateEditorSettings({pinchSensitivity:Number(e.target.value)});sync()};
   document.body.classList.toggle('simplified-view', editorSettings.simplified);
 }
 
@@ -79,4 +88,9 @@ export function simpleCharacterClass(label, inverted = false) {
 
 export function characterClassExpression(characters) {
   return `[${characters}]`;
+}
+
+export function simpleTransitionLabel(edge){
+ const set=simpleCharacterClass(edge.label,edge.invert),match=set?`${set.inverted?'not ':''}${set.characters||'…'}`:edge.label||'…';
+ return match+(edge.guard?` · ${edge.guard.cell} ${edge.guard.op} ${edge.guard.value}`:'')+(edge.effect?` · ${edge.effect.cell} ${edge.effect.op==='add'?'+=':':='} ${edge.effect.value}`:'');
 }

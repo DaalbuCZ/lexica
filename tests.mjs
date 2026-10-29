@@ -204,7 +204,7 @@ test('comment joining finishes after one destination, in either direction, like 
 });
 
 test('both layout dropdowns persist across reloads and reject invalid saved choices',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function restoreLayoutSettings('),app.indexOf("$('label-boxes').onclick"));
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function restoreLayoutSettings('),app.indexOf("$('label-boxes').onchange"));
  const saved={'lexica-layout-mode':'circle','lexica-layout-density':'0.35'};
  const boot=()=>{const fields={'layout-mode':{value:'tree'},'layout-density':{value:'0.75'}};runInNewContext(script,{$:id=>fields[id],localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}});return fields};
  let fields=boot();assert.equal(fields['layout-mode'].value,'circle');assert.equal(fields['layout-density'].value,'0.35');
@@ -306,13 +306,13 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
 test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch zooms',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf("$('zoom-in').onclick="),app.indexOf('\n',app.indexOf("$('zoom-in').onclick=")));
  let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
- runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),Math});
+ runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),wheelZoomFactor,editorSettings:{pinchSensitivity:1},Math});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,106);assert.equal(next.y,20);
- wheel({...event,ctrlKey:true});assert.equal(zoomed[0],1.25);
- wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],.8);
+ wheel({...event,ctrlKey:true});assert.equal(zoomed[0],wheelZoomFactor(10));
+ wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],wheelZoomFactor(-120));
  elements['zoom-in'].onclick();assert.equal(zoomed[0],.8);elements['zoom-out'].onclick();assert.equal(zoomed[0],1.25);
- wheel({...event,deltaY:1000,ctrlKey:true});assert.equal(zoomed[0],1.25);
+ wheel({...event,deltaY:1000,ctrlKey:true});assert.equal(zoomed[0],wheelZoomFactor(1000));
 });
 
 test('inverted transitions complement one-character matches and survive saves, copies, and TeX',async()=>{
@@ -676,9 +676,9 @@ test('debugger surfaces invalid configurations instead of throwing before the se
 });
 
 test('simplified settings restore safely without changing graph preferences',()=>{
- assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true});
- assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false});
- assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{simplified:false});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true,pinchSensitivity:2});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false,pinchSensitivity:1});
+ assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{simplified:false,pinchSensitivity:1});
 });
 
 
@@ -713,6 +713,7 @@ test('Canvas paints current routes and hit-tests states, labels, portals and com
   renderer.draw(scene);renderer.drawMap();assert.equal(canvas.width,800);assert.equal(map.width,170);assert.ok(calls.some(c=>c.method==='stroke'&&c.stroke==='#a71abb'&&c.width===4));
   assert.deepEqual(renderer.hit(m.states[1]),{type:'state',id:'s1'});assert.deepEqual(renderer.hit({x:1005,y:1005}),{type:'comment',id:'note'});
   const r=scene.routes.at(-1);assert.deepEqual(renderer.hit(r.portalBox),{type:'edge',index:m.edges.length-1});assert.deepEqual(renderer.hit({x:scene.routes[0].label.x,y:scene.routes[0].label.y-5}),{type:'edge',index:0});
+  scene.label=simpleTransitionLabel;const captionStart=calls.length;renderer.draw(scene);assert.ok(calls.slice(captionStart).some(c=>c.method==='fillText'&&c.args[0]===simpleTransitionLabel(m.edges[0])));
   const before=scene.routes[0].d;m.states[1].x+=200;scene.routes=routeEdges(m);renderer.draw(scene);assert.notEqual(scene.routes[0].d,before);assert.ok(calls.some(c=>c.method==='stroke'&&c.args[0]?.d===scene.routes[0].d));const bounds=graphBounds(m,scene.routes);assert.ok(bounds.x+bounds.width>=1000);assert.ok(bounds.y+bounds.height>=1000);
  }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;if(previousPath===undefined)delete globalThis.Path2D;else globalThis.Path2D=previousPath}
 });
@@ -727,4 +728,41 @@ test('Canvas editor undo and redo preserve positions and connections',()=>{
 test('Canvas retains the light-blue dark theme highlights and reads shared theme variables',()=>{
  const dark=graphPalette(true),light=graphPalette(false);assert.equal(dark.green,'#a9d5ff');assert.equal(dark.selected,'#c7e5ff');assert.equal(dark.selectedFill,'#3d566b');assert.equal(dark.trace,'#c5e4ff');assert.equal(dark.step,'#efb0ff');assert.equal(dark.mapFill,'#a3c9e025');assert.equal(light.green,'#386b4e');assert.equal(light.trace,'#14864d');
  const custom=graphPalette(true,{getPropertyValue:name=>name==='--green'?' #123456 ':name==='--step-color'?' #abcdef ':''});assert.equal(custom.green,'#123456');assert.equal(custom.step,'#abcdef');
+});
+
+
+import {wheelZoomFactor,pinchView,setupCanvasGestures} from './dist/canvas-gestures.js';
+import {placementPreview} from './dist/placement.js';
+import {simpleTransitionLabel} from './dist/editor-settings.js';
+
+test('simplified captions remove regex brackets without changing stored rules or advanced expressions',()=>{
+ const edge={label:'[^a-z]',invert:true},before=JSON.stringify(edge);assert.equal(simpleTransitionLabel(edge),'a-z');assert.equal(simpleTransitionLabel({label:'[a-z]',invert:true}),'not a-z');assert.equal(simpleTransitionLabel({label:'abc'}),'abc');assert.equal(simpleTransitionLabel({label:''}),'…');assert.equal(JSON.stringify(edge),before);
+ assert.equal(simpleTransitionLabel({label:'[0-9]',guard:{cell:'n',op:'odd',value:0},effect:{cell:'n',op:'add',value:1}}),'0-9 · n odd 0 · n += 1');
+});
+
+test('pinch zoom preserves its world anchor while scaling and moving across letterboxed views',()=>{
+ for(const size of [{width:800,height:600},{width:500,height:900}])for(const factor of [.05,.8,2,100]){
+  const initial={x:-300,y:200,width:1600,height:800},anchor={x:400,y:350},center={x:170,y:220},next=pinchView(initial,anchor,center,size,factor),t=canvasTransform(next,size.width,size.height),point=clientToWorld(center,{left:0,top:0},t);
+  assert.ok(Math.abs(point.x-anchor.x)<1e-8);assert.ok(Math.abs(point.y-anchor.y)<1e-8);assert.ok(next.width>=160&&next.width<=30000);assert.equal(next.width/next.height,2);
+ }
+ assert.equal(wheelZoomFactor(0),1);assert.ok(wheelZoomFactor(-5)<1);assert.ok(wheelZoomFactor(5)>1);assert.ok(wheelZoomFactor(5,2)>wheelZoomFactor(5,1));
+});
+
+test('two-finger gestures interrupt dragging, zoom around the midpoint, and consume remaining touches',()=>{
+ const handlers={},canvas={clientWidth:800,clientHeight:600,addEventListener:(name,fn)=>handlers[name]=fn,setPointerCapture(){},getBoundingClientRect:()=>({left:20,top:40})};let v={x:0,y:0,width:800,height:600},interrupts=0,stops=0;
+ setupCanvasGestures(canvas,{getView:()=>v,setView:next=>v=next,toWorld:event=>clientToWorld({x:event.clientX,y:event.clientY},canvas.getBoundingClientRect(),canvasTransform(v,800,600)),onInterrupt:()=>interrupts++});
+ const event=(id,x,y)=>({pointerType:'touch',pointerId:id,clientX:x,clientY:y,preventDefault(){},stopImmediatePropagation:()=>stops++});
+ handlers.pointerdown(event(1,120,140));assert.equal(interrupts,0);handlers.pointerdown(event(2,220,140));assert.equal(interrupts,1);handlers.pointermove(event(2,320,140));assert.equal(v.width,400);const point=clientToWorld({x:220,y:140},canvas.getBoundingClientRect(),canvasTransform(v,800,600));assert.equal(point.x,150);assert.equal(point.y,100);
+ handlers.pointerup(event(2,320,140));const before=stops;handlers.pointermove(event(1,100,140));assert.equal(stops,before+1);handlers.pointercancel(event(1,100,140));handlers.pointerdown(event(3,100,100));assert.equal(interrupts,1);
+});
+
+test('placement ghosts follow the cursor without changing the machine and predict comment attachment',()=>{
+ const m=example(),before=JSON.stringify(m),state=placementPreview(m,'state',{x:50,y:90}),note=placementPreview(m,'comment',{x:410,y:150});assert.equal(state.item.name,'q4');assert.equal(state.item.x,50);assert.equal(note.item.x,410);assert.deepEqual(note.item.nodeIds,['s1']);assert.equal(JSON.stringify(m),before);assert.equal(placementPreview(m,'state',null),null);
+});
+
+test('add buttons arm a placement and the canvas click commits the exact cursor position once',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),begin=app.slice(app.indexOf('function beginPlacement('),app.indexOf('function addComment(')),click=app.slice(app.indexOf("$('canvas').addEventListener('pointerdown',e=>{const hit="),app.indexOf('async function copyItems'));
+ for(const type of ['state','comment']){let handler,commits=[];const elements={canvas:{focus(){},addEventListener:(_,fn)=>handler=fn},modehint:{}},context={placingState:false,placingComment:false,placementPoint:null,source:null,commentSource:null,graph:{hitClient:()=>null},point:e=>({x:e.clientX,y:e.clientY}),$:id=>elements[id],cancelConnect(){context.placingState=false;context.placingComment=false},showProperties(){},document:{body:{classList:{add(){}}}},add:(x,y)=>commits.push({type:'state',x,y}),addComment:p=>commits.push({type:'comment',...p})};
+  runInNewContext(begin+click,context);context.beginPlacement(type);assert.equal(commits.length,0);assert.equal(context.placingState,type==='state');assert.equal(context.placingComment,type==='comment');handler({button:0,clientX:180,clientY:230,preventDefault(){},stopImmediatePropagation(){}});assert.deepEqual(commits,[{type,x:180,y:230}]);
+ }
 });
