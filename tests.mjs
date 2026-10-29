@@ -889,3 +889,32 @@ test('incremental analysis reuses converged suffixes and matches full lexing thr
  let seed=12345;const next=()=>seed=(seed*1664525+1013904223)>>>0;
  for(let i=0;i<150;i++){const at=next()%(input.length+1),remove=next()%5,insert=['a',' ','42','😀','\n',''][next()%6];input=input.slice(0,at)+insert+input.slice(at+remove);assert.deepEqual(cache.get(m,input),tokenize(m,input));}
 });
+
+import {tokenRows,visibleTokenRows} from './dist/virtual-token-output.js';
+test('virtual token flow preserves variable card widths and wrapped row heights',()=>{
+ const sizes=[{width:80,height:48},{width:100,height:65},{width:250,height:120},{width:40,height:48}];
+ const rows=tokenRows(sizes,200);assert.deepEqual(rows,[{start:0,end:2,y:0,height:65},{start:2,end:3,y:71,height:120},{start:3,end:4,y:197,height:48}]);
+ assert.equal(tokenRows(sizes,400).length,2);
+ const many=tokenRows(Array.from({length:20000},()=>({width:80,height:48})),200),window=visibleTokenRows(many,54000,216);
+ assert.ok(window.last-window.first<=10);assert.ok(many[window.first].y<=54000);assert.ok(many[window.last-1].y>=54216);
+ const end=visibleTokenRows(many,539950,216);assert.equal(end.last,many.length);
+});
+
+test('virtual cards reuse fitting measurements during resize and mount only nearby rows',()=>{
+ const previous=globalThis.ResizeObserver;let resize,reads=0;globalThis.ResizeObserver=class{constructor(fn){resize=fn}observe(){}};
+ try{
+  class Box{
+   constructor(){this.style={};this.children=[];this.parentNode=null;this.clientWidth=400;this.clientHeight=200;this.scrollTop=0;this.classList={add(){},remove(){}};this.listeners={};this.ownerDocument=doc}
+   append(node){node.parentNode=this;this.children.push(node)}
+   replaceChildren(...nodes){this.children=[];nodes.forEach(node=>this.append(node))}
+   remove(){if(this.parentNode){const siblings=this.parentNode.children;siblings.splice(siblings.indexOf(this),1);this.parentNode=null}}
+   set innerHTML(html){this.children=[];for(const match of html.matchAll(/data-token-index="(\d+)" data-width="(\d+)"/g)){const node=new Box();node.index=+match[1];node.natural=+match[2];this.append(node)}}
+   getBoundingClientRect(){reads++;return {width:Math.min(this.natural,this.style.maxWidth==='none'?Infinity:parseFloat(this.style.maxWidth)||Infinity),height:48}}
+   setAttribute(){} addEventListener(name,fn){this.listeners[name]=fn}
+  }
+  const doc={createElement:()=>new Box()},element=new Box(),output=createTokenOutput(element,(t,i)=>`<i data-token-index="${i}" data-width="${t.value}"></i>`,{schedule(){},cancelFrame(){}});
+  output.render(Array.from({length:10000},(_,i)=>({token:'ID',value:i%2?'80':'100'})));
+  assert.ok(element.children[0].children.length<40);const initialReads=reads;element.clientWidth=600;resize();assert.equal(reads,initialReads);
+  element.scrollTop=20000;element.listeners.scroll();assert.ok(element.children[0].children[0].index>0);assert.ok(element.children[0].children.length<64);
+ }finally{if(previous===undefined)delete globalThis.ResizeObserver;else globalThis.ResizeObserver=previous}
+});

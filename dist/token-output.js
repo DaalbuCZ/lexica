@@ -1,8 +1,10 @@
+import {createVirtualTokenOutput} from './virtual-token-output.js';
 export function createTokenOutput(element,markup,{schedule=requestAnimationFrame,cancelFrame=cancelAnimationFrame,onComplete=()=>{}}={}){
+ const virtual=element.addEventListener?createVirtualTokenOutput(element,markup,{schedule,cancelFrame,onComplete}):null;
  let frame=null,version=0,rendered=[],nodes=[];
- function cancel(){version++;if(frame!==null)cancelFrame(frame);frame=null;element.setAttribute('aria-busy','false')}
+ function cancel(){virtual?.cancel();version++;if(frame!==null)cancelFrame(frame);frame=null;element.setAttribute('aria-busy','false')}
  function render(tokens){
-  cancel();const id=version;let index=0;element.setAttribute('aria-busy','true');
+  cancel();if(tokens.length>500&&virtual){rendered=[];nodes=[];virtual.render(tokens);return}virtual?.reset();const id=version;let index=0;element.setAttribute('aria-busy','true');
   const template=element.ownerDocument.createElement('template');
   function append(){
    if(id!==version)return;frame=null;let changes=0;
@@ -21,7 +23,7 @@ export function createTokenOutput(element,markup,{schedule=requestAnimationFrame
   else{if(!rendered.length||element.firstElementChild!==nodes[0]){element.replaceChildren();rendered=[];nodes=[]}append()}
  }
 
- return {render,cancel};
+ return {render,cancel,reveal:index=>virtual?.reveal(index)};
 }
 
 export function tokensAtSelection(tokens,start,end,inputLength){

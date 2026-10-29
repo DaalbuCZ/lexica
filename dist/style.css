@@ -522,3 +522,10 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 
 .resizing-tester #input{will-change:transform;transform:translateZ(0);contain:strict}
 .resizing-tester #canvas{will-change:transform}
+
+#tokens.virtual-token-flow{display:block;scrollbar-gutter:stable;contain:strict}
+.virtual-token-surface{position:relative;width:100%}
+.token-measure{position:absolute;left:9px;top:9px;visibility:hidden;pointer-events:none;display:flex;flex-wrap:wrap;gap:6px}
+#tokens .token-measure>.token{width:max-content;max-width:100%;content-visibility:visible;contain-intrinsic-size:none}
+
+#tokens[aria-busy=true]{pointer-events:none}
