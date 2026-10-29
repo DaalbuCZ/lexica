@@ -509,5 +509,7 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 #settings-dialog #pinch-sensitivity{width:140px;max-width:45%;accent-color:var(--green)}
 
 .tester.analysis-pending #input-highlights,.tester.analysis-pending .input-error-lines{visibility:hidden}
-.tester.analysis-pending #tokens{opacity:.65;pointer-events:none}
+.tester.analysis-pending #tokens{pointer-events:none}
+.tester.analysis-pending #input{color:#53634b;-webkit-text-fill-color:#53634b}
+[data-theme=dark] .tester.analysis-pending #input{color:#edf1f5;-webkit-text-fill-color:#edf1f5}
 #tokens .token{content-visibility:auto;contain-intrinsic-size:auto 48px}

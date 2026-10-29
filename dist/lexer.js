@@ -28,12 +28,12 @@ function guardAllows(guard,value){if(!guard)return true;switch(guard.op){case'==
 export function transitionError(m,e){try{matcher(e.label,e.invert);destination(m,e);return ''}catch(error){return error.message}}
 export function isAccepting(state){return !!state.token&&state.accepting!==false}
 export function setAccepting(state,value){state.accepting=value;if(value&&!state.token)state.token=state.name.toUpperCase()||'TOKEN'}
-export function* lexerSteps(m,input,stepping=true,startOffset=0){
+export function* lexerSteps(m,input,stepping=true,startOffset=0,startMemory=null){
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
  const outgoing=new Map();for(const edge of edges){if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)}
  const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
- const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
+ const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...(startMemory??initialMemory)};
  const enabled=(edge,mem)=>!extended||!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]);
  const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=edge.effect.op==='set'?edge.effect.value:mem[edge.effect.cell]+edge.effect.value;if(!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
@@ -54,6 +54,7 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0){
   let token;
   if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
   else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:pathStates.slice(0,last.statesLength),traceEdges:pathEdges.slice(0,last.edgesLength)};pos=last.end}
+  token.inspectedEnd=end;token.memoryAfter={...memory};
   yield frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' \u00b7 ':'')+(token.skip?'Skip ':'Emit ')+token.token,{end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}});
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input',memory:{...memory}};

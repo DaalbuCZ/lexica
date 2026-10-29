@@ -1,11 +1,25 @@
 export function createTokenOutput(element,markup,{schedule=requestAnimationFrame,cancelFrame=cancelAnimationFrame,onComplete=()=>{}}={}){
- let frame=null,version=0;
+ let frame=null,version=0,rendered=[],nodes=[];
  function cancel(){version++;if(frame!==null)cancelFrame(frame);frame=null;element.setAttribute('aria-busy','false')}
  function render(tokens){
-  cancel();const id=version;let index=0;element.innerHTML='';element.setAttribute('aria-busy','true');
-  function append(){if(id!==version)return;frame=null;const end=Math.min(tokens.length,index+250),html=tokens.slice(index,end).map((token,i)=>markup(token,index+i)).join('');if(index===0)element.innerHTML=html;else element.insertAdjacentHTML('beforeend',html);index=end;if(index<tokens.length)frame=schedule(append);else{element.setAttribute('aria-busy','false');onComplete()}}
-  if(!tokens.length){element.innerHTML='<span class="empty">Type some input to see tokens.</span>';element.setAttribute('aria-busy','false');onComplete()}else append();
+  cancel();const id=version;let index=0;element.setAttribute('aria-busy','true');
+  function append(){
+   if(id!==version)return;frame=null;const end=Math.min(tokens.length,index+250);
+   for(;index<end;index++){
+    const html=markup(tokens[index],index);if(id!==version)return;
+    if(rendered[index]===html&&nodes[index]===element.children[index])continue;
+    const template=element.ownerDocument.createElement('template');template.innerHTML=html;
+    const node=template.content.firstElementChild,old=element.children[index];
+    if(old)old.replaceWith(node);else element.append(node);
+    if(id!==version)return;rendered[index]=html;nodes[index]=node;
+   }
+   if(index<tokens.length)frame=schedule(append);
+   else{while(element.children.length>tokens.length)element.lastElementChild.remove();rendered.length=tokens.length;nodes.length=tokens.length;element.setAttribute('aria-busy','false');onComplete()}
+  }
+  if(!tokens.length){element.innerHTML='<span class="empty">Type some input to see tokens.</span>';rendered=[];nodes=[];element.setAttribute('aria-busy','false');onComplete()}
+  else{if(!rendered.length)element.replaceChildren();append()}
  }
+
  return {render,cancel};
 }
 

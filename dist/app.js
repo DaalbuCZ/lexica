@@ -131,7 +131,12 @@ function renderSimpleState(s){
  if($('skip'))$('skip').onchange=()=>{checkpoint();s.skip=$('skip').checked;changed()};
  if(!editorSettings.simplified)$('delete').onclick=remove;
 }
+let updatingProperties=false;
 function properties(){
+ if(updatingProperties)return;updatingProperties=true;
+ try{const active=document.activeElement;if($('properties').contains(active))active.blur();renderProperties()}finally{updatingProperties=false}
+}
+function renderProperties(){
  if($('memory-menu').matches(':popover-open'))machineProperties($('memory-properties'));
  const total=selectedStates.size+selectedEdges.size+selectedComments.size+selectedCommentLinks.size;
  $('delete-selection').hidden=!(editorSettings.simplified&&total===1&&(selection.type==='state'||selection.type==='edge'));

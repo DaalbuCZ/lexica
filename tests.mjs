@@ -1,3 +1,4 @@
+import {createTokenizationCache} from './dist/lexer-cache.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
 test('ambiguity is reported instead of selecting a random transition',()=>{const m=example();m.edges.push({from:'s0',to:'s2',label:'[a-z]'});assert.throws(()=>tokenize(m,'a'),/Ambiguous/)});
@@ -418,7 +419,7 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
- const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{setAttribute(){}},'show-skipped':{checked:false},'input-highlights':{}};
+ const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:tokenTestElement(),'show-skipped':{checked:false},'input-highlights':{}};
  const context={$:id=>elements[id],machine:m,inputTestVersion:0,inputWork:{cancel(){}},lexerAnalyzer:{get:tokenize},setInputPending(){},tokenOutput:createTokenOutput(elements.tokens,t=>t.token+(t.skip?' · skip':''),{schedule(){},cancelFrame(){}}),inputHighlights:{render(){}},hideInputTokenHover(){},tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
@@ -809,8 +810,8 @@ test('blocked workers fall back to the native lexer without disabling the tester
 });
 
 test('token output appends every full value in bounded batches and cancels stale renders',()=>{
- const tasks=new Map();let sequence=0,complete=0;const element={innerHTML:'',setAttribute(){},insertAdjacentHTML(_,html){this.innerHTML+=html}},output=createTokenOutput(element,(t,i)=>`${i}:${t.value}|`,{schedule:fn=>{tasks.set(++sequence,fn);return sequence},cancelFrame:id=>tasks.delete(id),onComplete:()=>complete++}),tokens=Array.from({length:1300},(_,i)=>({value:'full-'+i}));
- output.render(tokens);assert.ok(element.innerHTML.includes('full-249|'));assert.ok(!element.innerHTML.includes('full-250|'));while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.ok(element.innerHTML.includes('1299:full-1299|'));assert.equal(complete,1);output.render(tokens);output.render([{value:'latest'}]);while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.equal(element.innerHTML,'0:latest|');
+ const tasks=new Map();let sequence=0,complete=0;const element=tokenTestElement(),output=createTokenOutput(element,(t,i)=>`${i}:${t.value}|`,{schedule:fn=>{tasks.set(++sequence,fn);return sequence},cancelFrame:id=>tasks.delete(id),onComplete:()=>complete++}),tokens=Array.from({length:1300},(_,i)=>({value:'full-'+i}));
+ output.render(tokens);assert.ok(element.innerHTML.includes('full-249|'));assert.ok(!element.innerHTML.includes('full-250|'));while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.ok(element.innerHTML.includes('1299:full-1299|'));assert.equal(complete,1);const first=element.children[0];output.render(tokens);assert.equal(element.children[0],first);output.render([{value:'latest'}]);while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.equal(element.innerHTML,'0:latest|');
 });
 
 test('input debounce runs only the latest work and flushes before debugger startup',()=>{
@@ -822,3 +823,28 @@ test('input debounce runs only the latest work and flushes before debugger start
  const classic=routeEdges(m),simplified=routeEdges(m,simpleTransitionLabel);
  assert.equal(simplified[0].label.w,simpleTransitionLabel(edge).length*7+14);assert.ok(simplified[0].label.w>classic[0].label.w);assert.equal(routeEdges(m),classic);assert.equal(routeEdges(m,simpleTransitionLabel),simplified);
  });
+
+function tokenTestElement(){
+ const element={children:[],setAttribute(){},replaceChildren(){this.children=[]},append(node){this.children.push(node)},get lastElementChild(){return this.children.at(-1)},get innerHTML(){return this.children.map(n=>n.html).join('')},set innerHTML(html){this.children=html?[node(html)]:[]}};
+ function node(html){return {html,replaceWith(next){element.children[element.children.indexOf(this)]=next},remove(){element.children.splice(element.children.indexOf(this),1)}}}
+ element.ownerDocument={createElement(){return {set innerHTML(html){this.content={firstElementChild:node(html)}}}}};return element;
+}
+
+test('incremental lexer matches full analysis across edits and memory changes',()=>{
+ const m=example(),cache=createTokenizationCache(tokenize);
+ let input='hello 42 world '.repeat(80);let old=cache.get(m,input);
+ for(const [position,remove,text] of [[100,0,'x'],[0,1,' '],[500,8,'42'],[1000,0,'😀'],[10,20,'']]){
+  input=input.slice(0,position)+text+input.slice(position+remove);
+  const next=cache.get(m,input);assert.deepEqual(next,tokenize(m,input));if(position===100)assert.equal(next[0],old[0]);old=next;
+ }
+});
+
+test('properties commits focused changes before rebuilding and ignores recursive renders',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let updatingProperties='),app.indexOf('function renderProperties(){'));
+ let committed=false,renders=0;const active={blur(){committed=true;runInNewContext('properties()',context)}},context={document:{activeElement:active},$:()=>({contains:()=>true}),renderProperties(){assert.ok(committed);renders++}};
+ runInNewContext(script+'properties()',context);assert.equal(renders,1);
+});
+test('incremental cache invalidates speculative lookahead and restores counter checkpoints',()=>{
+ const m={start:'a',machineType:'extended',cells:[{name:'n',initial:0}],states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:1,y:1},{id:'c',name:'c',token:'',x:2,y:2}],edges:[{from:'a',to:'b',label:'a',effect:{cell:'n',op:'add',value:1}},{from:'b',to:'c',label:'b'},{from:'c',to:'b',label:'c'}]},cache=createTokenizationCache(tokenize);
+ for(const input of ['aaaaabbbbb','aaaaabbbbc','aaaaaa','aabaa','😀aaaa'])assert.deepEqual(cache.get(m,input),tokenize(m,input));
+});
