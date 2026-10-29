@@ -41,12 +41,12 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  const start=app.slice(app.indexOf('function startDrag('),app.indexOf('function view('));
  const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const target of ['s2',null]){
-  let pointerup,inserted;
+  let pointerup,inserted;const canvas={setPointerCapture(){}};
   const context={commentSource:null,source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
-   point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>({setPointerCapture:()=>{}}),
+   point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>canvas,graph:{hitClient:()=>target?{type:'state',id:target}:null},
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
-   document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'?(target?{dataset:{node:target}}:null):selector==='[data-comment]'?null:{}}),body:{classList:{remove:()=>{}}}}};
+   document:{elementFromPoint:()=>canvas,body:{classList:{remove:()=>{}}}}};
   runInNewContext(start+release,context);
   context.startDrag({button:0,ctrlKey:true,clientX:10,clientY:20,stopPropagation(){},preventDefault(){}},'s0');
   assert.equal(context.source,'s0');
@@ -264,7 +264,7 @@ test('right-drag joins comments and states in either direction and cancels on bl
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
   let release,joined,added,cancelled=0;
-  const context={marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  const context={graph:{hitClient:()=>scenario==='comment-to-state'?{type:'state',id:'s2'}:scenario==='state-to-comment'?{type:'comment',id:'note'}:null},marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
   if(scenario==='comment-to-blank'){assert.equal(added,undefined);assert.equal(cancelled,1)}else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
  }
@@ -284,7 +284,7 @@ test('direct links to shared destinations keep sibling branches close in tree an
 test('clicking blank canvas during comment joining cancels without creating a state',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("$('canvas').onpointerdown="),app.indexOf("$('canvas').oncontextmenu="));
  const canvas={};let cancelled=0,added=0;
- const context={$:()=>canvas,source:null,commentSource:'note',cancelConnect:()=>cancelled++,add:()=>added++};runInNewContext(script,context);
+ const context={graph:{hitClient:()=>null},space:false,$:()=>canvas,source:null,commentSource:'note',cancelConnect:()=>cancelled++,add:()=>added++};runInNewContext(script,context);
  canvas.onpointerdown({button:0,target:{closest:()=>null}});assert.equal(cancelled,1);assert.equal(added,0);
 });
 
@@ -360,7 +360,7 @@ test('properties use the full canvas height with a side-docked tester and stay i
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\n',app.indexOf('function showProperties(')));
  for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
   const panel={style:{},offsetWidth:240,offsetHeight:500};
-  const context={selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
+  const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
   runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
   assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
  }
@@ -511,14 +511,9 @@ test('debugger buttons share a live session and input clicks retarget without di
  runInNewContext(source+'\nvar controller=setupStepping({getMachine,getTokens,traceToken,markFailures,highlights,onReset});',context);context.controller.toggle();assert.equal(frame.tokenStart,6);elements['step-next'].onclick();assert.equal(frame.character,'4');elements['step-next-token'].onclick();assert.equal(frame.tokenStart,8);elements['step-prev-token'].onclick();assert.equal(frame.tokenStart,6);elements.input.selectionStart=1;events.click();assert.equal(frame.tokenStart,0);elements.input.selectionStart=7;events.keyup({key:'ArrowRight'});assert.equal(frame.tokenStart,6);assert.equal(context.controller.active(),true);assert.equal(resets,0);events.input();assert.equal(context.controller.active(),false);assert.equal(resets,1);context.controller.toggle();assert.equal(elements['step-toggle'].hidden,true);elements['step-stop'].onclick();assert.equal(context.controller.active(),false);assert.equal(elements['step-toggle'].hidden,false);assert.equal(elements['step-controls'].hidden,true);
 });
 
-test('stepping gives only the current state and latest transition a distinct highlight',()=>{
+test('debugger changes repaint the Canvas without changing machine data',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function traceToken('),app.indexOf("$('tokens').onpointerover="));
- const element=dataset=>{const classes=new Set();return {dataset,classes,classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)}}},nodes=[element({node:'a'}),element({node:'b'})],edges=[element({edge:'0'}),element({edge:'1'})];
- const context={document:{querySelectorAll:selector=>selector==='[data-node]'?nodes:edges}};runInNewContext(script,context);
- context.frame={kind:'character',state:'b',traceStates:['a','b'],traceEdges:[0,1]};runInNewContext('traceToken(frame)',context);
- assert.equal(nodes[0].classes.has('trace-highlight'),true);assert.equal(nodes[0].classes.has('step-current'),false);assert.equal(nodes[1].classes.has('step-current'),true);assert.equal(edges[0].classes.has('step-current'),false);assert.equal(edges[1].classes.has('step-current'),true);
- context.frame={traceStates:['a','b'],traceEdges:[0,1]};runInNewContext('traceToken(frame)',context);assert.ok([...nodes,...edges].every(el=>!el.classes.has('step-current')));
- runInNewContext('traceToken(null)',context);assert.ok([...nodes,...edges].every(el=>el.classes.size===0));
+ const frames=[],context={graphTrace:null,draw:()=>frames.push(context.graphTrace)};runInNewContext(script,context);const frame={kind:'character',state:'b',traceStates:['a','b'],traceEdges:[0,1]};context.traceToken(frame);assert.equal(frames[0],frame);context.traceToken(null);assert.equal(frames[1],null);
 });
 
 test('spring layout separates states, preserves lexer semantics and comment offsets, and is deterministic from the same positions',()=>{
@@ -684,4 +679,52 @@ test('simplified settings restore safely without changing graph preferences',()=
  assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true});
  assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false});
  assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{simplified:false});
+});
+
+
+
+import {canvasTransform,clientToWorld,graphBounds,createGraphCanvas,graphPalette} from './dist/canvas-graph.js';
+import {createHash} from 'node:crypto';
+
+test('Canvas coordinate conversion preserves pointer anchors at every zoom and aspect ratio',()=>{
+ for(const [width,height] of [[800,600],[400,900],[1600,500]])for(const zoom of [.1,1,8]){
+  const view={x:-200,y:350,width:1200*zoom,height:700*zoom},t=canvasTransform(view,width,height),rect={left:320,top:60},world={x:141,y:287};
+  const result=clientToWorld({x:rect.left+t.x+world.x*t.scale,y:rect.top+t.y+world.y*t.scale},rect,t);assert.ok(Math.abs(result.x-world.x)<1e-8);assert.ok(Math.abs(result.y-world.y)<1e-8);
+ }
+});
+
+function routingFixture(){
+ const m=example();for(let i=0;i<72;i++)m.states.push({id:'q'+i,name:'State '+i,token:i%4?'':'TOKEN',x:Math.cos(i*.7)*(300+i*8),y:Math.sin(i*.7)*(300+i*8)});
+ for(let i=0;i<72;i++){m.edges.push({from:i?'q'+(i-1):'s0',to:'q'+i,label:i%3?'[a-z]':'[0-9]'});if(i%5===0)m.edges.push({from:'q'+i,to:'q'+i,label:'x'})}
+ m.states[10].portal='Target';m.edges.push({from:'q3',to:'q6',label:'p',portal:'Target'});m.comments=[{id:'note',text:'Routing obstacle',x:240,y:-140}];return m;
+}
+test('routing broad phase retains the exact original curves and label collision decisions',()=>{
+ const m=routingFixture(),routes=[];for(let i=0;i<8;i++){m.states[i].x+=25;m.states[i].y-=17;routes.push(routeEdges(m))}
+ assert.equal(createHash('sha256').update(JSON.stringify(routes)).digest('hex'),'bbf89f564c84bb9f0f63ccae2098418f71aaca68c51604734f73c9ecba190b7f');
+});
+
+test('Canvas paints current routes and hit-tests states, labels, portals and comments without SVG nodes',()=>{
+ const previousDocument=globalThis.document,previousPath=globalThis.Path2D;globalThis.document={documentElement:{dataset:{theme:'light'}}};globalThis.Path2D=class{constructor(d){this.d=d}};
+ try{
+  const calls=[],context=()=>new Proxy({isPointInStroke:()=>false},{get(target,key){return key in target?target[key]:(...args)=>calls.push({method:key,args,stroke:target.strokeStyle,width:target.lineWidth})},set(target,key,value){target[key]=value;return true}});
+  const canvas={clientWidth:800,clientHeight:600,getContext:()=>main,getBoundingClientRect:()=>({left:0,top:0})},map={clientWidth:170,clientHeight:106,getContext:()=>mini},main=context(),mini=context(),renderer=createGraphCanvas(canvas,map),m=example();
+  m.states[1].portal='IDENT';m.comments=[{id:'note',text:'Canvas note',x:1000,y:1000}];m.edges.push({from:'s0',to:'s1',label:'p',portal:'IDENT'});
+  const scene={machine:m,routes:routeEdges(m),selectedStates:new Set(),selectedComments:new Set(),selectedCommentLinks:new Set(),edgeSelected:()=>false,failures:{states:[],edges:[]},trace:{kind:'character',state:'s1',traceStates:['s0','s1'],traceEdges:[0]}};
+  renderer.draw(scene);renderer.drawMap();assert.equal(canvas.width,800);assert.equal(map.width,170);assert.ok(calls.some(c=>c.method==='stroke'&&c.stroke==='#a71abb'&&c.width===4));
+  assert.deepEqual(renderer.hit(m.states[1]),{type:'state',id:'s1'});assert.deepEqual(renderer.hit({x:1005,y:1005}),{type:'comment',id:'note'});
+  const r=scene.routes.at(-1);assert.deepEqual(renderer.hit(r.portalBox),{type:'edge',index:m.edges.length-1});assert.deepEqual(renderer.hit({x:scene.routes[0].label.x,y:scene.routes[0].label.y-5}),{type:'edge',index:0});
+  const before=scene.routes[0].d;m.states[1].x+=200;scene.routes=routeEdges(m);renderer.draw(scene);assert.notEqual(scene.routes[0].d,before);assert.ok(calls.some(c=>c.method==='stroke'&&c.args[0]?.d===scene.routes[0].d));const bounds=graphBounds(m,scene.routes);assert.ok(bounds.x+bounds.width>=1000);assert.ok(bounds.y+bounds.height>=1000);
+ }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;if(previousPath===undefined)delete globalThis.Path2D;else globalThis.Path2D=previousPath}
+});
+
+
+test('Canvas editor undo and redo preserve positions and connections',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("$('undo').onclick="),app.indexOf('function fit(')),buttons={undo:{},redo:{}},before=example(),after=structuredClone(before);after.states[0].x+=150;
+ let renders=0;const context={$:id=>buttons[id],history:[JSON.stringify(before)],future:[],machine:after,source:'s0',commentSource:'note',clearSelection(){},changed:()=>renders++};runInNewContext(script,context);buttons.undo.onclick();assert.deepEqual(JSON.parse(JSON.stringify(context.machine)),before);assert.equal(context.source,null);assert.equal(context.commentSource,null);buttons.redo.onclick();assert.deepEqual(JSON.parse(JSON.stringify(context.machine)),after);assert.equal(renders,2);
+});
+
+
+test('Canvas retains the light-blue dark theme highlights and reads shared theme variables',()=>{
+ const dark=graphPalette(true),light=graphPalette(false);assert.equal(dark.green,'#a9d5ff');assert.equal(dark.selected,'#c7e5ff');assert.equal(dark.selectedFill,'#3d566b');assert.equal(dark.trace,'#c5e4ff');assert.equal(dark.step,'#efb0ff');assert.equal(dark.mapFill,'#a3c9e025');assert.equal(light.green,'#386b4e');assert.equal(light.trace,'#14864d');
+ const custom=graphPalette(true,{getPropertyValue:name=>name==='--green'?' #123456 ':name==='--step-color'?' #abcdef ':''});assert.equal(custom.green,'#123456');assert.equal(custom.step,'#abcdef');
 });
