@@ -513,3 +513,16 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .tester.analysis-pending #input{color:#53634b;-webkit-text-fill-color:#53634b}
 [data-theme=dark] .tester.analysis-pending #input{color:#edf1f5;-webkit-text-fill-color:#edf1f5}
 #tokens .token{content-visibility:auto;contain-intrinsic-size:auto 48px}
+
+#tokens.virtual-tokens{display:block;padding:9px;contain:strict}
+#tokens.virtual-tokens .token{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;contain:layout paint}
+/* Keep one full-size graph surface while the panel clips it during resize. */
+.resizing-tester .canvas-wrap{overflow:hidden}
+.resizing-tester #canvas{position:absolute;width:100vw;height:100dvh;left:50%;top:50%;transform:translate(-50%,-50%)}
+
+.resizing-tester #input-highlights,.resizing-tester .input-error-lines{display:none}
+
+.resizing-tester .input-wrap{overflow:hidden}
+.resizing-tester #input{width:var(--resizing-input-width);max-width:none}
+.resizing-tester #input{will-change:transform;transform:translateZ(0);contain:strict}
+.resizing-tester #canvas{will-change:transform}

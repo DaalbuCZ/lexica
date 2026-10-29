@@ -229,13 +229,14 @@ function focusInputToken(){
  if(inputAnalysisPending||stepper.active())return;
  const input=$('input'),start=input.selectionStart,end=input.selectionEnd;
  const matches=tokensAtSelection(visibleTokens,start,end,input.value.length);
+ if(matches.length)tokenOutput.reveal(matches[0].i);
  const next=matches.map(({i})=>$('tokens').querySelector(`[data-token-index="${i}"]`)).filter(Boolean),nextSet=new Set(next),previousSet=new Set(activeTokenCards);for(const card of activeTokenCards)if(!nextSet.has(card)){card.classList.toggle('input-active',false);card.setAttribute('aria-pressed','false')}for(const card of next)if(!previousSet.has(card)){card.classList.toggle('input-active',true);card.setAttribute('aria-pressed','true')}activeTokenCards=next;
  if(matches.length){const token=$('tokens').querySelector(`[data-token-index="${matches[0].i}"]`);if(token!==lastFocusedCard){token?.scrollIntoView({block:'nearest',inline:'nearest'});lastFocusedCard=token}traceToken({traceStates:matches.flatMap(({t})=>t.traceStates??[]),traceEdges:matches.flatMap(({t})=>t.traceEdges??[]),token:matches.some(({t})=>t.token==='ERROR')?'ERROR':''})}else{lastFocusedCard=null;traceToken(null)}
 }
 let inputFocusFrame=null;function scheduleInputFocus(){if(inputAnalysisPending||stepper.active()||inputFocusFrame!==null)return;inputFocusFrame=requestAnimationFrame(()=>{inputFocusFrame=null;focusInputToken()})}
 $('input').onclick=focusInputToken;$('input').onkeyup=scheduleInputFocus;$('input').onselect=scheduleInputFocus;
 document.addEventListener('selectionchange',()=>{if(document.activeElement===$('input'))scheduleInputFocus()});
-function syncInputLayout(refresh=true){if(inputAnalysisPending)return;const input=$('input'),highlights=$('input-highlights');if(!input||!highlights)return;highlights.style.paddingRight=(11+Math.max(0,input.offsetWidth-input.clientWidth))+'px';highlights.scrollTop=input.scrollTop;highlights.scrollLeft=input.scrollLeft;if(refresh)inputHighlights.refresh()}
+function syncInputLayout(refresh=true){if(inputAnalysisPending||document.body.classList.contains('resizing-tester'))return;const input=$('input'),highlights=$('input-highlights');if(!input||!highlights)return;highlights.style.paddingRight=(11+Math.max(0,input.offsetWidth-input.clientWidth))+'px';highlights.scrollTop=input.scrollTop;highlights.scrollLeft=input.scrollLeft;if(refresh)inputHighlights.refresh()}
 function renderInputHighlights(tokens){syncInputLayout(false);inputHighlights.render(tokens)}
 function markFailures(states=[],edges=[]){graphFailures={states,edges};draw()}
 function setInputPending(pending){inputAnalysisPending=pending;document.querySelector('.tester').classList.toggle('analysis-pending',pending);$('step-toggle').disabled=pending;if(pending){$('next-error').disabled=true;$('tokens').setAttribute('aria-busy','true')}}

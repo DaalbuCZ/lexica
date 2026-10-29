@@ -54,7 +54,7 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0,startMemory=null
   let token;
   if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
   else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:pathStates.slice(0,last.statesLength),traceEdges:pathEdges.slice(0,last.edgesLength)};pos=last.end}
-  token.inspectedEnd=end;token.memoryAfter={...memory};
+  token.inspectedEnd=Math.max(token.offset+token.value.length,end+(end<input.length?String.fromCodePoint(input.codePointAt(end)).length:0));token.memoryAfter={...memory};
   yield frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' \u00b7 ':'')+(token.skip?'Skip ':'Emit ')+token.token,{end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}});
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input',memory:{...memory}};

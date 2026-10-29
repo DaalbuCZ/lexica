@@ -874,3 +874,22 @@ test('memory rule editor switches stack rules to counter rules with valid defaul
  const context={machine,stackCell,guardOps,effectOps,needsValue,$:id=>fields[id],updateMachine:change=>{change(machine);validate(machine)}};
  runInNewContext(source,context);context.bindMemoryTransitionControls(0);fields['guard-cell'].onchange();fields['effect-cell'].onchange();assert.deepEqual(machine.edges[0].guard,{cell:'n',op:'==',value:0});assert.deepEqual(machine.edges[0].effect,{cell:'n',op:'add',value:0});
 });
+
+test('long token output mounts only visible rows and reveals tokens beyond the viewport',()=>{
+ const previous=globalThis.ResizeObserver;let resize;globalThis.ResizeObserver=class{constructor(fn){resize=fn}observe(){}};
+ try{
+  const listeners={},surface={style:{},children:[],set innerHTML(html){this.children=[...html.matchAll(/data-token-index="(\d+)"/g)].map(m=>({index:+m[1],style:{}}))}};
+  const element={clientWidth:400,clientHeight:216,scrollTop:0,children:[],classList:{add(){},remove(){}},setAttribute(){},addEventListener:(name,fn)=>listeners[name]=fn,ownerDocument:{createElement:()=>surface},replaceChildren(...nodes){this.children=nodes}};
+  const output=createTokenOutput(element,(t,i)=>`<div data-token-index="${i}">${t.value}</div>`,{schedule(){},cancelFrame(){}});
+  output.render(Array.from({length:50000},(_,i)=>({value:String(i)})));assert.ok(surface.children.length<=18);assert.equal(surface.style.height,'1350000px');
+  output.reveal(49999);assert.ok(surface.children.some(n=>n.index===49999));assert.ok(surface.children.length<=18);
+  element.clientWidth=220;resize();assert.ok(surface.children.length<=9);assert.equal(surface.style.height,'2700000px');
+ }finally{if(previous===undefined)delete globalThis.ResizeObserver;else globalThis.ResizeObserver=previous}
+});
+
+test('incremental analysis reuses converged suffixes and matches full lexing through random edits',()=>{
+ const m=example(),cache=createTokenizationCache(tokenize);let input='hello 42 world '.repeat(80),before=cache.get(m,input);
+ const replacement='j'+input.slice(1),after=cache.get(m,replacement);assert.equal(after.at(-1),before.at(-1));assert.deepEqual(after,tokenize(m,replacement));input=replacement;
+ let seed=12345;const next=()=>seed=(seed*1664525+1013904223)>>>0;
+ for(let i=0;i<150;i++){const at=next()%(input.length+1),remove=next()%5,insert=['a',' ','42','😀','\n',''][next()%6];input=input.slice(0,at)+insert+input.slice(at+remove);assert.deepEqual(cache.get(m,input),tokenize(m,input));}
+});

@@ -20,8 +20,15 @@ export function createTokenizationCache(tokenizer){
     let edit=0;while(edit<previous.input.length&&edit<input.length&&previous.input[edit]===input[edit])edit++;
     let count=0;while(count<previous.tokens.length&&previous.tokens[count].inspectedEnd<edit)count++;
     const prefix=previous.tokens.slice(0,count),last=prefix.at(-1),offset=last?last.offset+last.value.length:0;
+    let suffix=0;while(suffix<previous.input.length-edit&&suffix<input.length-edit&&previous.input[previous.input.length-1-suffix]===input[input.length-1-suffix])suffix++;
+    const delta=input.length-previous.input.length,boundaries=new Map(previous.tokens.map((token,i)=>[token.offset,i]));
     lastTokens=prefix;
-    for(const step of lexerSteps(machine,input,false,offset,last?.memoryAfter))if(step.result)lastTokens.push(step.result);
+    for(const step of lexerSteps(machine,input,false,offset,last?.memoryAfter))if(step.result){
+     const token=step.result;lastTokens.push(token);const end=token.offset+token.value.length,index=boundaries.get(end-delta);
+     if(end>=input.length-suffix&&index!==undefined&&index>0&&JSON.stringify(token.memoryAfter)===JSON.stringify(previous.tokens[index-1].memoryAfter)){
+      for(const t of previous.tokens.slice(index))lastTokens.push(delta?{...t,offset:t.offset+delta,inspectedEnd:t.inspectedEnd+delta}:t);break;
+     }
+    }
    }else lastTokens=tokenizer(machine,input);
    return lastTokens;
   }
