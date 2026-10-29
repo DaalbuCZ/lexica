@@ -229,7 +229,6 @@ function focusInputToken(){
  if(inputAnalysisPending||stepper.active())return;
  const input=$('input'),start=input.selectionStart,end=input.selectionEnd;
  const matches=tokensAtSelection(visibleTokens,start,end,input.value.length);
- if(matches.length)tokenOutput.reveal(matches[0].i);
  const next=matches.map(({i})=>$('tokens').querySelector(`[data-token-index="${i}"]`)).filter(Boolean),nextSet=new Set(next),previousSet=new Set(activeTokenCards);for(const card of activeTokenCards)if(!nextSet.has(card)){card.classList.toggle('input-active',false);card.setAttribute('aria-pressed','false')}for(const card of next)if(!previousSet.has(card)){card.classList.toggle('input-active',true);card.setAttribute('aria-pressed','true')}activeTokenCards=next;
  if(matches.length){const token=$('tokens').querySelector(`[data-token-index="${matches[0].i}"]`);if(token!==lastFocusedCard){token?.scrollIntoView({block:'nearest',inline:'nearest'});lastFocusedCard=token}traceToken({traceStates:matches.flatMap(({t})=>t.traceStates??[]),traceEdges:matches.flatMap(({t})=>t.traceEdges??[]),token:matches.some(({t})=>t.token==='ERROR')?'ERROR':''})}else{lastFocusedCard=null;traceToken(null)}
 }

@@ -826,8 +826,8 @@ test('input debounce runs only the latest work and flushes before debugger start
  });
 
 function tokenTestElement(){
- const element={children:[],setAttribute(){},replaceChildren(){this.children=[]},append(node){this.children.push(node)},get lastElementChild(){return this.children.at(-1)},get innerHTML(){return this.children.map(n=>n.html).join('')},set innerHTML(html){this.children=html?[node(html)]:[]}};
- function node(html){return {html,replaceWith(next){element.children[element.children.indexOf(this)]=next},remove(){element.children.splice(element.children.indexOf(this),1)}}}
+ const element={children:[],setAttribute(){},replaceChildren(){this.children=[]},append(node){node.parentNode=this;this.children.push(node)},get firstElementChild(){return this.children[0]},get lastElementChild(){return this.children.at(-1)},get innerHTML(){return this.children.map(n=>n.html).join('')},set innerHTML(html){this.children=html?[node(html)]:[]}};
+ function node(html){return {html,parentNode:element,replaceWith(next){next.parentNode=element;element.children[element.children.indexOf(this)]=next;this.parentNode=null},remove(){element.children.splice(element.children.indexOf(this),1)}}}
  element.ownerDocument={createElement(){return {set innerHTML(html){this.content={firstElementChild:node(html)}}}}};return element;
 }
 
@@ -875,16 +875,12 @@ test('memory rule editor switches stack rules to counter rules with valid defaul
  runInNewContext(source,context);context.bindMemoryTransitionControls(0);fields['guard-cell'].onchange();fields['effect-cell'].onchange();assert.deepEqual(machine.edges[0].guard,{cell:'n',op:'==',value:0});assert.deepEqual(machine.edges[0].effect,{cell:'n',op:'add',value:0});
 });
 
-test('long token output mounts only visible rows and reveals tokens beyond the viewport',()=>{
- const previous=globalThis.ResizeObserver;let resize;globalThis.ResizeObserver=class{constructor(fn){resize=fn}observe(){}};
- try{
-  const listeners={},surface={style:{},children:[],set innerHTML(html){this.children=[...html.matchAll(/data-token-index="(\d+)"/g)].map(m=>({index:+m[1],style:{}}))}};
-  const element={clientWidth:400,clientHeight:216,scrollTop:0,children:[],classList:{add(){},remove(){}},setAttribute(){},addEventListener:(name,fn)=>listeners[name]=fn,ownerDocument:{createElement:()=>surface},replaceChildren(...nodes){this.children=nodes}};
-  const output=createTokenOutput(element,(t,i)=>`<div data-token-index="${i}">${t.value}</div>`,{schedule(){},cancelFrame(){}});
-  output.render(Array.from({length:50000},(_,i)=>({value:String(i)})));assert.ok(surface.children.length<=18);assert.equal(surface.style.height,'1350000px');
-  output.reveal(49999);assert.ok(surface.children.some(n=>n.index===49999));assert.ok(surface.children.length<=18);
-  element.clientWidth=220;resize();assert.ok(surface.children.length<=9);assert.equal(surface.style.height,'2700000px');
- }finally{if(previous===undefined)delete globalThis.ResizeObserver;else globalThis.ResizeObserver=previous}
+test('unchanged token cards retain their nodes and finish without more animation batches',()=>{
+ const tasks=new Map();let sequence=0,completed=0;const element=tokenTestElement(),output=createTokenOutput(element,(t,i)=>`${i}:${t.value}|`,{schedule:fn=>{tasks.set(++sequence,fn);return sequence},cancelFrame:id=>tasks.delete(id),onComplete:()=>completed++});
+ const tokens=Array.from({length:5000},(_,i)=>({value:'value-'+i}));output.render(tokens);
+ while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}
+ const first=element.children[0],last=element.children.at(-1);output.render(tokens);
+ assert.equal(tasks.size,0);assert.equal(completed,2);assert.equal(element.children[0],first);assert.equal(element.children.at(-1),last);assert.equal(element.children.length,5000);
 });
 
 test('incremental analysis reuses converged suffixes and matches full lexing through random edits',()=>{
