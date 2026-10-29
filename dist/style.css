@@ -496,7 +496,7 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .simple-editor .simple-toggle{display:grid;grid-template-columns:14px minmax(0,1fr);align-items:center;min-height:28px}
 .simple-editor .simple-toggle>input{display:block;width:14px;height:14px;align-self:center;margin:0}
 .simple-editor .simple-toggle>span{display:flex;align-items:center;min-height:18px;line-height:18px}
-.simple-editor .simple-toggle strong{display:block;line-height:18px}
+.simple-editor .simple-toggle strong{display:block;line-height:18px;text-box:trim-both cap alphabetic}
 @media(max-width:650px){.simplified-view .inspector{padding:12px}}
 
 /* Canvas owns the graph pixels; controls remain ordinary HTML. */
@@ -507,3 +507,7 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .toolbar #memory-cells{display:flex;padding:7px 9px}
 .toolbar #memory-cells[hidden]{display:none}
 #settings-dialog #pinch-sensitivity{width:140px;max-width:45%;accent-color:var(--green)}
+
+.tester.analysis-pending #input-highlights,.tester.analysis-pending .input-error-lines{visibility:hidden}
+.tester.analysis-pending #tokens{opacity:.65;pointer-events:none}
+#tokens .token{content-visibility:auto;contain-intrinsic-size:auto 48px}

@@ -31,6 +31,7 @@ export function setAccepting(state,value){state.accepting=value;if(value&&!state
 export function* lexerSteps(m,input,stepping=true,startOffset=0){
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
+ const outgoing=new Map();for(const edge of edges){if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)}
  const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
  const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,c.initial??0]));let memory={...initialMemory};
  const enabled=(edge,mem)=>!extended||!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]);
@@ -39,20 +40,20 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0){
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
  while(pos<input.length){
   const tokenStart=pos,tokenMemory={...memory};let state=m.start,end=pos,last=null,pathStates=[state],pathEdges=[];
-  const frame=(kind,offset,message,extra={})=>({kind,offset,end:offset,tokenStart,state,traceStates:[...pathStates],traceEdges:[...pathEdges],message,memory:{...memory},...extra});
+  const frame=(kind,offset,message,extra={})=>{const statesLength=pathStates.length,edgesLength=pathEdges.length;return {kind,offset,end:offset,tokenStart,state,get traceStates(){return pathStates.slice(0,statesLength)},get traceEdges(){return pathEdges.slice(0,edgesLength)},message,memory:{...memory},...extra}};
   if(stepping)yield frame('start',pos,'Start token at '+pos);
   while(end<input.length){
-   const c=String.fromCodePoint(input.codePointAt(end)),next=edges.filter(e=>e.from===state&&e.test(c)&&enabled(e,memory));
+   const c=String.fromCodePoint(input.codePointAt(end)),next=(outgoing.get(state)??[]).filter(e=>e.test(c)&&enabled(e,memory));
    if(next.length>1)throw Object.assign(Error('Ambiguous transitions from '+states.get(state).name+' on '+JSON.stringify(c)),{stateId:state,edgeIndices:next.map(e=>e.index)});
    const edge=next[0];
    if(!edge){if(stepping)yield frame('blocked',end,'No transition for '+JSON.stringify(c),{end:end+c.length,character:c});break}
    memory=apply(edge,memory);state=edge.to;pathStates.push(state);pathEdges.push(edge.index);const offset=end;end+=c.length;
-   if(isAccepting(states.get(state)))last={end,state:states.get(state),pathStates:[...pathStates],pathEdges:[...pathEdges],memory:{...memory}};
+   if(isAccepting(states.get(state)))last={end,state:states.get(state),statesLength:pathStates.length,edgesLength:pathEdges.length,memory};
    if(stepping)yield frame('character',offset,'Read '+JSON.stringify(c)+' \u2192 '+states.get(state).name,{end,character:c,accepting:isAccepting(states.get(state))});
   }
   let token;
   if(!last){memory=tokenMemory;token={token:'ERROR',value:String.fromCodePoint(input.codePointAt(pos)),offset:pos,traceStates:[...pathStates],traceEdges:[...pathEdges],failureState:state};pos+=token.value.length}
-  else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:last.pathStates,traceEdges:last.pathEdges};pos=last.end}
+  else{memory={...last.memory};token={token:last.state.token,value:input.slice(pos,last.end),offset:pos,skip:!!last.state.skip,traceStates:pathStates.slice(0,last.statesLength),traceEdges:pathEdges.slice(0,last.edgesLength)};pos=last.end}
   yield frame('emit',token.offset,(last&&end>last.end?'Backtrack to '+last.end+' \u00b7 ':'')+(token.skip?'Skip ':'Emit ')+token.token,{end:pos,state:token.traceStates.at(-1),traceStates:token.traceStates,traceEdges:token.traceEdges,result:token,token:token.token,memory:{...memory}});
  }
  if(stepping)yield {kind:'done',offset:pos,end:pos,traceStates:[],traceEdges:[],message:'End of input',memory:{...memory}};

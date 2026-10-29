@@ -370,7 +370,7 @@ test('clicking a token selects its exact UTF-16 input range, including errors an
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusToken('),app.indexOf('function focusInputToken('));
  let focused=0,selected,synced=0;const input={focus:()=>focused++,setSelectionRange:(...range)=>selected=range,getBoundingClientRect:()=>({})},tokens={};
  const visibleTokens=[{token:'WORD',value:'hello',offset:3},{token:'ERROR',value:'😀',offset:10}];
- runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},visibleTokens,inputHighlights:{rect:()=>null},stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
+ runInNewContext(script,{$:id=>id==='input'?input:id==='tokens'?tokens:{querySelector:()=>null},inputAnalysisPending:false,visibleTokens,inputHighlights:{rect:()=>null},stepper:{reset(){}},focusInputToken(){},syncInputLayout:()=>synced++});
  tokens.onclick({target:{closest:()=>({dataset:{tokenIndex:'0'}})}});assert.deepEqual(selected,[3,8]);
  let prevented=false;tokens.onkeydown({key:'Enter',preventDefault:()=>prevented=true,stopPropagation(){},target:{closest:()=>({dataset:{tokenIndex:'1'}})}});assert.deepEqual(selected,[10,12]);assert.equal(prevented,true);assert.equal(focused,2);assert.equal(synced,2);
 });
@@ -396,8 +396,8 @@ test('input caret and selections highlight matching tokens and traces without mo
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function focusInputToken('),app.indexOf("$('input').onclick=focusInputToken"));
  const input={value:'hi 42😀',selectionStart:3,selectionEnd:3},active=new Set();let traced,scrolled;
  const visibleTokens=[{offset:0,value:'hi',traceStates:['start','word'],traceEdges:[0]},{offset:3,value:'42',traceStates:['start','number'],traceEdges:[1]},{offset:5,value:'😀',token:'ERROR',traceStates:['start'],traceEdges:[]}];
- const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){}}));
- const context={stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>({scrollIntoView:()=>scrolled=selector})},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
+ const elements=visibleTokens.map((_,i)=>({dataset:{tokenIndex:String(i)},classList:{toggle:(name,on)=>on?active.add(i):active.delete(i)},setAttribute(){},scrollIntoView:()=>scrolled=`[data-token-index="${i}"]`}));
+ const context={inputAnalysisPending:false,activeTokenCards:[],lastFocusedCard:null,tokensAtSelection,stepper:{active:()=>false},visibleTokens,$:id=>id==='input'?input:{querySelector:selector=>elements[+selector.match(/\d+/)[0]]},document:{querySelectorAll:()=>elements},traceToken:t=>traced=t};
  runInNewContext(script+'focusInputToken();',context);assert.deepEqual([...active],[1]);assert.equal(traced.traceEdges[0],1);assert.match(scrolled,/1/);
  input.selectionStart=2;input.selectionEnd=2;runInNewContext('focusInputToken();',context);assert.equal(active.size,0);assert.equal(traced,null);
  input.selectionStart=0;input.selectionEnd=5;runInNewContext('focusInputToken();',context);assert.deepEqual([...active],[0,1]);assert.equal(traced.traceEdges.length,2);
@@ -418,8 +418,8 @@ test('canvas resizing updates the minimap view while preserving zoom and graph c
 
 test('show skipped tokens restores skipped cards without changing lexer output or offsets',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function test(){'),app.indexOf("$('input').oninput="));
- const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{},'show-skipped':{checked:false},'input-highlights':{}};
- const context={$:id=>elements[id],machine:m,hideInputTokenHover(){},tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
+ const m=example(),all=tokenize(m,'hello 42'),elements={input:{value:'hello 42'},tokens:{setAttribute(){}},'show-skipped':{checked:false},'input-highlights':{}};
+ const context={$:id=>elements[id],machine:m,inputTestVersion:0,inputWork:{cancel(){}},lexerAnalyzer:{get:tokenize},setInputPending(){},tokenOutput:createTokenOutput(elements.tokens,t=>t.token+(t.skip?' · skip':''),{schedule(){},cancelFrame(){}}),inputHighlights:{render(){}},hideInputTokenHover(){},tokenize,errorNav:{update(){}},traceToken(){},markFailures(){},tokenColorClass:()=>'',esc:s=>s,renderInputHighlights(){},visibleTokens:[]};
  runInNewContext(script+'test();',context);assert.equal(context.visibleTokens.length,2);assert.doesNotMatch(elements.tokens.innerHTML,/· skip/);
  elements['show-skipped'].checked=true;runInNewContext('test();',context);assert.equal(context.visibleTokens.length,3);assert.equal(context.visibleTokens[1].value,' ');assert.equal(context.visibleTokens[1].offset,5);assert.match(elements.tokens.innerHTML,/WS · skip/);assert.deepEqual(tokenize(m,'hello 42'),all);
 });
@@ -783,3 +783,42 @@ test('toolbar popovers limit growing contents to the remaining viewport height',
   runInNewContext(script+"setupPopover('toggle','menu',390);",context);handlers.beforetoggle({newState:'open'});const top=parseFloat(menu.style.top),maxHeight=parseFloat(menu.style.maxHeight);assert.ok(top>=12);assert.ok(maxHeight>=0);assert.ok(top+maxHeight<=height-12);
  }
 });
+
+import {createTokenOutput,tokensAtSelection} from './dist/token-output.js';
+import {createLexerAnalyzer} from './dist/lexer-analyzer.js';
+import {createWorkerHandler} from './dist/lexer-worker.js';
+import {createDebouncedTask} from './dist/debounced-task.js';
+
+test('long accepted tokens retain complete paths and earlier debugger snapshots',()=>{
+ const input='a'.repeat(50000),m=example(),tokens=tokenize(m,input);assert.equal(tokens[0].value,input);assert.equal(tokens[0].traceStates.length,input.length+1);assert.equal(tokens[0].traceEdges.length,input.length);
+ const iterator=lexerSteps(m,'a'.repeat(5000));iterator.next();const first=iterator.next().value;for(let i=0;i<4000;i++)iterator.next();assert.deepEqual(first.traceStates,['s0','s1']);assert.deepEqual(first.traceEdges,[0]);
+});
+
+test('background lexer analysis cancels obsolete input and rejects late worker messages',async()=>{
+ const workers=[];const analyzer=createLexerAnalyzer(tokenize,{threshold:1,workerFactory:()=>{const worker={requests:[],postMessage(request){this.requests.push(request)},terminate(){this.terminated=true}};workers.push(worker);return worker}}),m=example();
+ const old=analyzer.get(m,'hello').catch(error=>error.name),first=workers[0],latest=analyzer.get(m,'42');assert.equal(await old,'AbortError');assert.equal(first.terminated,true);const second=workers[1],request=second.requests[0];first.onmessage({data:{id:first.requests[0].id,tokens:[]}});second.onmessage({data:createWorkerHandler()(request)});assert.deepEqual(await latest,tokenize(m,'42'));assert.deepEqual(analyzer.get(m,'42'),tokenize(m,'42'));
+});
+
+test('worker analysis preserves errors, memory guards and full trace order',()=>{
+ const handle=createWorkerHandler(),m=example(),input='hello 😀 42';assert.deepEqual(handle({id:1,machine:m,input}).tokens,tokenize(m,input));m.edges.push({...m.edges[0]});const result=handle({id:2,machine:m,input:'a'});assert.match(result.error.message,/Ambiguous/);assert.deepEqual(result.error.edgeIndices,[0,m.edges.length-1]);
+});
+
+test('blocked workers fall back to the native lexer without disabling the tester',async()=>{
+ const m=example(),missing=createLexerAnalyzer(tokenize,{threshold:1,workerFactory(){throw Error('Worker blocked')}});assert.deepEqual(missing.get(m,'hello'),tokenize(m,'hello'));
+ let worker;const broken=createLexerAnalyzer(tokenize,{threshold:1,workerFactory:()=>worker={postMessage(){},terminate(){}}}),pending=broken.get(m,'42');worker.onerror({message:'Blocked'});assert.deepEqual(await pending,tokenize(m,'42'));assert.deepEqual(broken.get(m,'hello'),tokenize(m,'hello'));
+});
+
+test('token output appends every full value in bounded batches and cancels stale renders',()=>{
+ const tasks=new Map();let sequence=0,complete=0;const element={innerHTML:'',setAttribute(){},insertAdjacentHTML(_,html){this.innerHTML+=html}},output=createTokenOutput(element,(t,i)=>`${i}:${t.value}|`,{schedule:fn=>{tasks.set(++sequence,fn);return sequence},cancelFrame:id=>tasks.delete(id),onComplete:()=>complete++}),tokens=Array.from({length:1300},(_,i)=>({value:'full-'+i}));
+ output.render(tokens);assert.ok(element.innerHTML.includes('full-249|'));assert.ok(!element.innerHTML.includes('full-250|'));while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.ok(element.innerHTML.includes('1299:full-1299|'));assert.equal(complete,1);output.render(tokens);output.render([{value:'latest'}]);while(tasks.size){const [id,fn]=tasks.entries().next().value;tasks.delete(id);fn()}assert.equal(element.innerHTML,'0:latest|');
+});
+
+test('input debounce runs only the latest work and flushes before debugger startup',()=>{
+ const tasks=new Map();let id=0,runs=0;const work=createDebouncedTask(()=>runs++,{setTimer:fn=>{tasks.set(++id,fn);return id},clearTimer:id=>tasks.delete(id)});work.schedule();work.schedule();work.schedule();assert.equal(tasks.size,1);assert.equal(runs,0);work.flush();assert.equal(tasks.size,0);assert.equal(runs,1);work.flush();assert.equal(runs,1);
+});
+
+ test('simplified label boxes include memory guards and effects in routing and hit bounds',()=>{
+ const m=example(),edge=m.edges[0];edge.guard={cell:'long_counter_name',op:'>=',value:123};edge.effect={cell:'long_counter_name',op:'add',value:1};
+ const classic=routeEdges(m),simplified=routeEdges(m,simpleTransitionLabel);
+ assert.equal(simplified[0].label.w,simpleTransitionLabel(edge).length*7+14);assert.ok(simplified[0].label.w>classic[0].label.w);assert.equal(routeEdges(m),classic);assert.equal(routeEdges(m,simpleTransitionLabel),simplified);
+ });
