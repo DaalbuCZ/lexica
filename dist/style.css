@@ -529,3 +529,5 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 #tokens .token-measure>.token{width:max-content;max-width:100%;content-visibility:visible;contain-intrinsic-size:none}
 
 #tokens[aria-busy=true]{pointer-events:none}
+
+dialog #toast{position:sticky;bottom:0;left:auto;transform:none;width:max-content;max-width:100%;margin:12px auto 0;z-index:1}
