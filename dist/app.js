@@ -46,7 +46,7 @@ async function pasteItems(){let text=clipboardText;try{text=await navigator.clip
 setupEditorSettings(currentMachineType,()=>!!machine.labelBoxes,changes=>{render();if(!document.body.classList.contains('properties-hidden')){properties();showProperties(true)}},type=>{checkpoint();machine.machineType=type;save()});
 try{const saved=localStorage.getItem('lexica-machine');if(saved)machine=validate(JSON.parse(saved))}catch{toast('Could not restore saved machine. Example loaded.')}
 restoreTester(machine,$('input'),$('show-skipped'));
-function toast(message){(document.querySelector('dialog[open]')??document.body).append($('toast'));$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500)}
+function toast(message){const notice=$('toast');if(notice.matches(':popover-open'))notice.hidePopover();(document.querySelector('dialog[open]')??document.body).append(notice);notice.textContent=message;notice.showPopover();clearTimeout(toast.timer);toast.timer=setTimeout(()=>{if(notice.matches(':popover-open'))notice.hidePopover()},3500)}
 function checkpoint(){history.push(JSON.stringify(machine));if(history.length>80)history.shift();future=[]}
 function save(){try{localStorage.setItem('lexica-machine',JSON.stringify(machineWithTester(machine,$('input'),$('show-skipped'))))}catch{toast('Storage unavailable — export to save.')}}
 function changed(){save();render()}
