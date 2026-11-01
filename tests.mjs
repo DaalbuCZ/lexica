@@ -926,3 +926,6 @@ test('dragging a self-loop toward its state shrinks it while keeping its endpoin
 
 
 test('dragging a loop around its state rotates it and keeps its size',()=>{const m=example(),edge=m.edges[1],state=m.states.find(s=>s.id===edge.from),before=routeEdges(m)[1],center={x:state.x,y:state.y},apex={x:before.label.x,y:before.label.y+13},initial={x:center.x+100,y:center.y},current={x:center.x,y:center.y+100};edge.bend=loopDragBend(center,apex,initial,current,{x:0,y:0});const after=routeEdges(m)[1],v={x:apex.x-center.x,y:apex.y-center.y};assert.ok(Math.abs(after.label.x-center.x+v.y)<.001);assert.ok(Math.abs(after.label.y+13-center.y-v.x)<.001)});
+
+import {createBendReset} from './dist/reset-bend.js';
+test('double right-click resets only the same nearby connection within the time limit',()=>{const a={},b={};let resets=0;const click=createBendReset(e=>e.edge,()=>resets++),event=(edge,time,x=0)=>({edge,timeStamp:time,clientX:x,clientY:0});click(event(a,0));click(event(b,100));click(event(a,200));assert.equal(resets,0);click(event(a,250,20));assert.equal(resets,0);click(event(a,800,20));assert.equal(resets,0);click(event(a,900,21));assert.equal(resets,1);click(event(a,950,21));assert.equal(resets,1)});
