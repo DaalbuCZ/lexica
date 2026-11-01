@@ -920,3 +920,6 @@ test('virtual cards reuse fitting measurements during resize and mount only near
 });
 
 test('manual bends move the curve and survive serialization and TikZ export',()=>{const m=example(),before=routeEdges(m)[0];m.edges[0].bend={x:30,y:50};const saved=validate(JSON.parse(JSON.stringify(m))),after=routeEdges(saved)[0];assert.notDeepEqual(after.p0,before.p0);assert.notDeepEqual(after.p3,before.p3);for(const [point,state,radius] of [[after.p0,saved.states[0],37],[after.p3,saved.states[1],42]])assert.ok(Math.abs(Math.hypot(point.x-state.x,point.y-state.y)-radius)<.001);assert.notEqual(toTikz(saved),toTikz(example()));saved.edges[0].bend.x='bad';assert.throws(()=>validate(saved),/bend/)});
+
+
+test('dragging a self-loop toward its state shrinks it while keeping its endpoints attached',()=>{const m=example(),edge=m.edges[1],state=m.states.find(s=>s.id===edge.from),before=routeEdges(m)[1],apex={x:before.label.x-state.x,y:before.label.y+13-state.y};edge.bend={x:-apex.x*.45,y:-apex.y*.45};const after=routeEdges(m)[1],distance=p=>Math.hypot(p.x-state.x,p.y-state.y);assert.ok(distance(after.c1)<distance(before.c1));assert.ok(distance(after.c2)<distance(before.c2));assert.ok(Math.abs(distance(after.p0)-distance(before.p0))<.001);assert.ok(Math.abs(distance(after.p3)-distance(before.p3))<.001);});
