@@ -34,7 +34,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     <div class="dialog-heading"><h2 id="settings-heading">Settings</h2><button type="button" id="settings-close" aria-label="Close settings">✕</button></div>
     <section class="setting-section"><h3>Machine</h3>
       <label class="setting-choice"><input type="radio" name="machine-type" value="fsm"><span><strong>Standard FSM</strong><small>Character transitions.</small></span></label>
-      <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Counters, numeric stacks, guards, and side effects.</small></span></label>
+      <label class="setting-choice"><input type="radio" name="machine-type" value="extended"><span><strong>Extended FSM</strong><small>Numeric stacks, guards, and side effects.</small></span></label>
     </section>
     <section class="setting-section"><h3>Editing</h3>
       <label class="setting-choice"><input type="checkbox" id="label-boxes"><span><strong>Label backgrounds</strong><small>Draw boxes around transition labels.</small></span></label>
