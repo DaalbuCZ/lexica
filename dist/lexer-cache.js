@@ -4,7 +4,7 @@ export function lexerConfigurationKey(machine){
  return JSON.stringify([
   machine.machineType??null,machine.start,machine.cells??[],
   machine.states.map(state=>[state.id,state.name,state.token,state.accepting??null,!!state.skip,state.portal??null]),
-  machine.edges.map(edge=>[edge.from,edge.to??null,edge.portal??null,edge.label,!!edge.invert,edge.guard??null,edge.effect??null])
+  machine.edges.map(edge=>[edge.from,edge.to??null,edge.portal??null,edge.label,!!edge.invert,edge.guard??null,edge.guards??null,edge.effect??null])
  ]);
 }
 

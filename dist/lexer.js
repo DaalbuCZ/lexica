@@ -1,4 +1,4 @@
-import {validCell,guardOps,effectOps,needsValue,guardAllows,memoryEffect,stackCell} from './memory.js';
+import {validCell,guardOps,effectOps,needsValue,guardAllows,memoryEffect,stackCell,memoryRuleLabel} from './memory.js';
 import {stateLabel,transitionLabel} from './labels.js';
 import {commentLayout,commentNodeIds,commentLinks} from './comments.js?v=16';
 import {destination,statePortalBox} from './portals.js';
@@ -16,7 +16,7 @@ export function validate(m){
  const ids=new Set();for(const s of m.states){if(typeof s.id!=='string'||ids.has(s.id)||!Number.isFinite(s.x)||!Number.isFinite(s.y)||typeof s.name!=='string'||typeof s.token!=='string'||(s.portal!==undefined&&typeof s.portal!=='string')||(s.accepting!==undefined&&typeof s.accepting!=='boolean'))throw Error('Invalid or duplicate state.');ids.add(s.id)}
  for(const c of m.comments??[])if((c.nodeIds!==undefined&&(!Array.isArray(c.nodeIds)||new Set(c.nodeIds).size!==c.nodeIds.length))||commentNodeIds(c).some(id=>!ids.has(id)))throw Error('Invalid comment attachment.');
  if(m.start!==null&&!ids.has(m.start))throw Error('Choose a start state.');
- for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.bend!==undefined&&(!e.bend||!Number.isFinite(e.bend.x)||!Number.isFinite(e.bend.y)))throw Error('Invalid transition bend.');if(e.label)matcher(e.label,e.invert);if(e.guard!==undefined){const g=e.guard;if(!g||!cells.has(g.cell)||!guardOps(cells.get(g.cell)).includes(g.op)||(needsValue(g.op)&&!Number.isSafeInteger(g.value)))throw Error('Invalid transition guard.')}if(e.effect!==undefined){const a=e.effect;if(!a||!cells.has(a.cell)||!effectOps(cells.get(a.cell)).includes(a.op)||(needsValue(a.op)&&!Number.isSafeInteger(a.value)))throw Error('Invalid transition side effect.')}}return m;
+ for(const e of m.edges){if(!ids.has(e.from)||(e.portal==null&&!ids.has(e.to))||typeof e.label!=='string'||(e.invert!==undefined&&typeof e.invert!=='boolean')||(e.portal!=null&&typeof e.portal!=='string'))throw Error('Invalid transition.');if(e.bend!==undefined&&(!e.bend||!Number.isFinite(e.bend.x)||!Number.isFinite(e.bend.y)))throw Error('Invalid transition bend.');if(e.label)matcher(e.label,e.invert);if(e.guards!==undefined&&!Array.isArray(e.guards))throw Error('Invalid transition guards.');for(const g of [...(e.guard!==undefined?[e.guard]:[]),...(e.guards??[])])if(!g||!cells.has(g.cell)||!guardOps(cells.get(g.cell)).includes(g.op)||(needsValue(g.op)&&!Number.isSafeInteger(g.value)))throw Error('Invalid transition guard.');if(e.effect!==undefined){const a=e.effect;if(!a||!cells.has(a.cell)||!effectOps(cells.get(a.cell)).includes(a.op)||(needsValue(a.op)&&!Number.isSafeInteger(a.value)))throw Error('Invalid transition side effect.')}}return m;
 }
 export function parseMachine(text){
  if(new TextEncoder().encode(text).length>1000000)throw Error('Machine is too large (maximum 1 MB).');
@@ -32,9 +32,9 @@ export function* lexerSteps(m,input,stepping=true,startOffset=0,startMemory=null
  validate(m);if(m.start===null)throw Error('Choose an initial state to test the lexer.');
  const states=new Map(m.states.map(s=>[s.id,s])),edges=m.edges.map((e,index)=>({...e,index,to:destination(m,e).id,test:matcher(e.label,e.invert)}));
  const outgoing=new Map();for(const edge of edges){if(!outgoing.has(edge.from))outgoing.set(edge.from,[]);outgoing.get(edge.from).push(edge)}
- const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.effect)));
+ const extended=m.machineType==='extended'||(m.machineType===undefined&&((m.cells??[]).length||m.edges.some(edge=>edge.guard||edge.guards?.length||edge.effect)));
  const initialMemory=Object.fromEntries((extended?m.cells??[]:[]).map(c=>[c.name,stackCell(c)?[...(c.initial??[])]:c.initial??0]));let memory={...(startMemory??initialMemory)};
- const enabled=(edge,mem)=>!extended||((!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]))&&(edge.effect?.op!=='pop'||mem[edge.effect.cell].length>0));
+ const enabled=(edge,mem)=>!extended||((!edge.guard||guardAllows(edge.guard,mem[edge.guard.cell]))&&(edge.guards??[]).every(g=>guardAllows(g,mem[g.cell]))&&(edge.effect?.op!=='pop'||mem[edge.effect.cell].length>0));
  const apply=(edge,mem)=>{if(!extended||!edge.effect)return mem;const next=memoryEffect(edge.effect,mem[edge.effect.cell]);if(!Array.isArray(next)&&!Number.isSafeInteger(next))throw Object.assign(Error('Memory cell '+edge.effect.cell+' exceeded the safe integer range.'),{stateId:edge.from,edgeIndices:[edge.index]});return {...mem,[edge.effect.cell]:next}};
  let pos=Number.isInteger(startOffset)?Math.max(0,Math.min(input.length,startOffset)):0;
  if(pos>0&&pos<input.length&&input.charCodeAt(pos)>=0xdc00&&input.charCodeAt(pos)<=0xdfff&&input.charCodeAt(pos-1)>=0xd800&&input.charCodeAt(pos-1)<=0xdbff)pos--;
@@ -71,8 +71,9 @@ export function toTikz(m,standalone=true){
 
  const portalTag=(name,box)=>{const left=box.x-box.w/2,right=box.x+box.w/2,top=box.y-box.h/2,bottom=box.y+box.h/2;lines.push('  \\draw[fill=white] '+coord({x:left,y:box.y})+' -- '+coord({x:left+7,y:top})+' -- '+coord({x:right,y:top})+' -- '+coord({x:right,y:bottom})+' -- '+coord({x:left+7,y:bottom})+' -- cycle;');lines.push('  \\node[font=\\scriptsize,inner sep=0pt] at '+coord(box)+' {\\texttt{'+tex(name)+'}};')};
  for(const state of m.states)if(state.portal){const box=statePortalBox(state);portalTag(state.portal,box);lines.push('  \\draw '+coord({x:box.x,y:box.y+box.h/2})+' -- '+coord({x:state.x,y:state.y-36})+';')}
- const routes=routeEdges(m),edgeLabels=[];
- m.edges.forEach((e,i)=>{const r=routes[i];if(r.portalBox)portalTag(e.portal||'?',r.portalBox);lines.push('  \\draw[->] '+coord(r.p0)+' .. controls '+coord(r.c1)+' and '+coord(r.c2)+' .. '+coord(r.p3)+';');edgeLabels.push('  \\node[fill=white,'+(m.labelBoxes&&e.label?'draw=gray,rounded corners=1pt,':'')+'inner sep=2pt,font=\\scriptsize] at '+coord({...r.label,y:r.label.y-4})+' {\\texttt{'+tex(transitionLabel(e))+'}};')});
+ const exportLabel=e=>transitionLabel(e)+[...(e.guard?[e.guard]:[]),...(e.guards??[]),...(e.effect?[e.effect]:[])].map(r=>' · '+memoryRuleLabel(r)).join('');
+ const routes=routeEdges(m,exportLabel),edgeLabels=[];
+ m.edges.forEach((e,i)=>{const r=routes[i];if(r.portalBox)portalTag(e.portal||'?',r.portalBox);lines.push('  \\draw[->] '+coord(r.p0)+' .. controls '+coord(r.c1)+' and '+coord(r.c2)+' .. '+coord(r.p3)+';');edgeLabels.push('  \\node[fill=white,'+(m.labelBoxes&&e.label?'draw=gray,rounded corners=1pt,':'')+'inner sep=2pt,font=\\scriptsize] at '+coord({...r.label,y:r.label.y-4})+' {\\texttt{'+tex(exportLabel(e))+'}};')});
  lines.push(...edgeLabels);
  for(const c of m.comments??[]){const layout=commentLayout(c);lines.push('  \\node[draw=gray,fill=yellow!10,anchor=north west,align=left,font=\\tiny,text width='+((layout.w-24)/60).toFixed(3)+'cm,inner sep=4pt] at '+coord(c)+' {'+layout.lines.map(tex).join('\\\\')+'};')}
  lines.push('\\end{tikzpicture}');const body=lines.join('\n');return standalone?'\\documentclass[tikz,border=10pt]{standalone}\n\\usepackage[T1]{fontenc}\n\\usepackage{graphicx}\n\\usetikzlibrary{automata,positioning,arrows}\n\\begin{document}\n'+body+'\n\\end{document}\n':body;
