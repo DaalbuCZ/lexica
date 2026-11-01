@@ -44,7 +44,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const target of ['s2',null]){
   let pointerup,inserted;const canvas={setPointerCapture(){}};
-  const context={commentSource:null,source:null,space:false,marquee:null,rightStart:null,drag:null,pan:null,connectPoint:null,
+  const context={commentSource:null,source:null,space:false,marquee:null,edgeDrag:null,rightStart:null,drag:null,pan:null,connectPoint:null,
    point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>canvas,graph:{hitClient:()=>target?{type:'state',id:target}:null},
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
@@ -80,7 +80,7 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
  let pointermove;
- const context={commentSource:null,source:'s0',marquee:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ const context={commentSource:null,source:'s0',marquee:null,edgeDrag:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
 
@@ -266,7 +266,7 @@ test('right-drag joins comments and states in either direction and cancels on bl
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
   let release,joined,added,cancelled=0;
-  const context={graph:{hitClient:()=>scenario==='comment-to-state'?{type:'state',id:'s2'}:scenario==='state-to-comment'?{type:'comment',id:'note'}:null},marquee:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  const context={graph:{hitClient:()=>scenario==='comment-to-state'?{type:'state',id:'s2'}:scenario==='state-to-comment'?{type:'comment',id:'note'}:null},marquee:null,edgeDrag:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
   if(scenario==='comment-to-blank'){assert.equal(added,undefined);assert.equal(cancelled,1)}else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
  }
@@ -918,3 +918,5 @@ test('virtual cards reuse fitting measurements during resize and mount only near
   element.scrollTop=20000;element.listeners.scroll();assert.ok(element.children[0].children[0].index>0);assert.ok(element.children[0].children.length<64);
  }finally{if(previous===undefined)delete globalThis.ResizeObserver;else globalThis.ResizeObserver=previous}
 });
+
+test('manual bends move the curve and survive serialization and TikZ export',()=>{const m=example(),before=routeEdges(m)[0];m.edges[0].bend={x:30,y:50};const saved=validate(JSON.parse(JSON.stringify(m))),after=routeEdges(saved)[0];assert.ok(Math.abs(after.label.x-before.label.x-30)<.001);assert.ok(Math.abs(after.label.y-before.label.y-50)<.001);assert.notEqual(toTikz(saved),toTikz(example()));saved.edges[0].bend.x='bad';assert.throws(()=>validate(saved),/bend/)});
