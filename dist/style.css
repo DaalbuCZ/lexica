@@ -531,3 +531,5 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 #tokens[aria-busy=true]{pointer-events:none}
 
 #toast{inset:auto;bottom:calc(var(--tester) + 48px);left:50%;margin:0;border:0}
+
+.memory-rule-section .simple-rule-fields,.memory-rule-section .memory-rule{grid-template-columns:minmax(0,1fr)}.memory-rule-section .simple-field{min-width:0}.memory-rule-section .simple-field select,.memory-rule-section .simple-field input{width:100%;min-width:0}.extra-conditions{display:grid;gap:9px}.extra-conditions .simple-rule-fields{padding-top:10px;border-top:1px solid var(--line)}

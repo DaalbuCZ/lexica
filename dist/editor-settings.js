@@ -93,5 +93,5 @@ export function characterClassExpression(characters) {
 
 export function simpleTransitionLabel(edge){
  const set=simpleCharacterClass(edge.label,edge.invert),match=set?`${set.inverted?'not ':''}${set.characters||'…'}`:edge.label||'…';
- return match+(edge.guard?' · '+memoryRuleLabel(edge.guard):'')+(edge.guards??[]).map(g=>' · '+memoryRuleLabel(g)).join('')+(edge.effect?' · '+memoryRuleLabel(edge.effect):'');
+ const guards=edge.guardDisabled?[]:[...(edge.guard?[edge.guard]:[]),...(edge.guards??[])];return match+(guards.length?' · '+guards.map(memoryRuleLabel).join(edge.guardMode==='any'?' OR ':' AND '):'')+(edge.effect?' · '+memoryRuleLabel(edge.effect):'');
 }
