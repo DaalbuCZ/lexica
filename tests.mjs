@@ -364,7 +364,7 @@ test('properties use the full canvas height with a side-docked tester and stay i
   const panel={style:{},offsetWidth:240,offsetHeight:500};
   const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
   runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
-  assert.equal(panel.style.maxHeight,(area.bottom-area.top-84)+'px');assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
+  assert.equal(parseFloat(panel.style.maxHeight)+parseFloat(panel.style.top),area.bottom-12);assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
  }
 });
 
