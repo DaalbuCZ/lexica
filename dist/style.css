@@ -463,7 +463,6 @@ body:is([data-tester-dock=left],[data-tester-dock=right]) #tester-resize::after{
 .output-label{height:18px}.output-label .lexer-error-actions{margin-left:auto}
 body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step-memory{display:none!important}
 .input-highlights span.step-character,.input-highlights .token-mark.error.step-character{background:var(--step-color);color:transparent;outline:0;box-shadow:none}
-.memory-brain{width:20px;height:20px;stroke-width:1.5}
 ::highlight(lexica-hover-token-color-0){background-color:#3d7fb844;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-0){background-color:#7fb8e844;color:transparent}
 ::highlight(lexica-hover-token-color-1){background-color:#478f6044;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-1){background-color:#72c08d44;color:transparent}
 ::highlight(lexica-hover-token-color-2){background-color:#b88a3344;color:transparent}[data-theme=dark] ::highlight(lexica-hover-token-color-2){background-color:#d9b45f44;color:transparent}
