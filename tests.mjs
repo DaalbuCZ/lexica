@@ -96,7 +96,7 @@ test('radial layout centers the parent and spreads children around it with desce
   const m={start:'q0',states:Array.from({length:count},(_,i)=>({id:'q'+i,name:'q'+i,token:'TOKEN_'+i,x:0,y:0})),edges:Array.from({length:count-1},(_,i)=>({from:'q0',to:'q'+(i+1),label:'x'}))};
   const edges=JSON.stringify(m.edges);autoLayout(m,'circle');const parent=m.states[0];
   const radii=m.states.slice(1).map(s=>Math.hypot(s.x-parent.x,s.y-parent.y));
-  for(const r of radii)assert.ok(Math.abs(r-radii[0])<.00001);
+  for(const r of radii)assert.ok(r>=319.99);
   if(count>2){assert.ok(m.states.some(s=>s.x<parent.x-1));assert.ok(m.states.some(s=>s.x>parent.x+1))}
   for(let i=0;i<count;i++)for(let j=i+1;j<count;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=319.99);
   assert.equal(JSON.stringify(m.edges),edges);validate(m);assert.doesNotThrow(()=>toTikz(m));const first=JSON.stringify(m);autoLayout(m,'circle');assert.equal(JSON.stringify(m),first);
@@ -106,6 +106,14 @@ test('radial layout centers the parent and spreads children around it with desce
  assert.ok(distance('a1')>distance('a'));assert.ok(distance('b1')>distance('b'));
  for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=319.99);
  assert.doesNotThrow(()=>autoLayout({states:[],edges:[],start:null},'circle'));
+});
+
+test('radial layout keeps independent branches close when one branch needs a wide sector',()=>{
+ const leaves=Array.from({length:25},(_,i)=>'leaf'+i),chain=Array.from({length:8},(_,i)=>'chain'+i),ids=['root',...leaves,...chain];
+ const m={start:'root',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:[...leaves.map(id=>({from:'root',to:id,label:'x'})),{from:'root',to:chain[0],label:'x'},...chain.slice(1).map((id,i)=>({from:chain[i],to:id,label:'x'}))]};
+ autoLayout(m,'circle',.5);const root=m.states[0],dist=s=>Math.hypot(s.x-root.x,s.y-root.y);
+ assert.ok(Math.min(...m.states.slice(1,26).map(dist))<200);
+ for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=159.99);
 });
 
 test('layout density adjusts spacing in both modes without changing connections',()=>{

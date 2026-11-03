@@ -45,23 +45,29 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
  if(mode==='circle'){
   let left=160;
   for(const root of roots){
-   const queue=[{id:root,depth:0,start:-Math.PI/2,span:2*Math.PI}],layers=new Map();
+   const queue=[{id:root,depth:0,start:-Math.PI/2,span:2*Math.PI}];
    for(let i=0;i<queue.length;i++){
     const item=queue[i],branches=children.get(item.id);item.angle=item.start+item.span/2;
-    if(!layers.has(item.depth))layers.set(item.depth,[]);layers.get(item.depth).push(item);
     const weight=branches.reduce((sum,id)=>sum+heights.get(id)+gap,0);let angle=item.start;
     for(const id of branches){const span=item.span*(heights.get(id)+gap)/weight;queue.push({id,depth:item.depth+1,start:angle,span});angle+=span}
    }
-   const radii=new Map([[0,0]]);let radius=0;
-   for(const [depth,items] of layers){
-    if(!depth)continue;
-    const angles=items.map(item=>item.angle).sort((a,b)=>a-b);let separation=Infinity;
-    if(angles.length>1)for(let i=0;i<angles.length;i++)separation=Math.min(separation,(angles[(i+1)%angles.length]-angles[i]+2*Math.PI)%(2*Math.PI));
-    radius=Math.max(radius+step,Number.isFinite(separation)?step/(2*Math.sin(separation/2)):0);radii.set(depth,radius);
+   const placed=[],radii=new Map();let extent=0;
+   for(const item of queue){
+    const ux=Math.cos(item.angle),uy=Math.sin(item.angle);let r=item.depth?(radii.get(parents.get(item.id))+step):0;
+    const intervals=[];
+    for(const other of placed){
+     const projection=other.x*ux+other.y*uy,perpendicular=other.x*uy-other.y*ux;
+     if(Math.abs(perpendicular)>=step)continue;
+     const offset=Math.sqrt(step*step-perpendicular*perpendicular);
+     intervals.push([projection-offset,projection+offset]);
+    }
+    intervals.sort((a,b)=>a[0]-b[0]);
+    for(const [start,end] of intervals)if(r>start-1e-8&&r<end)r=end;
+    const point={x:r*ux,y:r*uy};placed.push(point);radii.set(item.id,r);extent=Math.max(extent,r);
    }
-   const center={x:left+radius,y:160+radius};
-   for(const item of queue){const s=states.get(item.id),r=radii.get(item.depth);s.x=center.x+r*Math.cos(item.angle);s.y=center.y+r*Math.sin(item.angle)}
-   left+=radius*2+step;
+   const center={x:left+extent,y:160+extent};
+   queue.forEach((item,i)=>{const s=states.get(item.id);s.x=center.x+placed[i].x;s.y=center.y+placed[i].y});
+   left+=extent*2+step;
   }
   return;
  }
