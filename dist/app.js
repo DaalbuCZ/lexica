@@ -21,7 +21,7 @@ import {commentLayout,makeComment,commentAnchors,commentNodeIds,positionComments
 import {copySelection,pasteSelection} from './selection.js?v=47';
 import {example,validate,parseMachine,tokenize,toTikz,transitionError,matcher,isAccepting,setAccepting,destination,enablePortal,renamePortal,statePortalBox} from './lexer.js';
 import {autoLayout,routeEdges,loopDragBend} from './layout.js';
-import {arrangeGraph} from './basic-layout.js';
+import {smartArrange} from './smart-layout.js';
 import {createGroup,dissolveGroup,graphView,groupFor} from './groups.js';
 import {visualMachine} from './start-views.js';
 import {portalTip} from './portals.js';
@@ -30,8 +30,8 @@ let sourceStartView=null;
 let stepper={reset(){},active(){return false}},errorNav={update(){}},memoryRulesOpen=false,memoryRulesEdgeIndex=null,conditionClipboard='';
 let selectedStates=new Set(['s1']),selectedEdges=new Set(),selectedComments=new Set(),selectedCommentLinks=new Set(),toolMode='pan',marquee=null,clipboardText='',pasteCount=0,lastTransitionRule='';
 let openGroup=null, editingGroup=null;
-const groupBar=document.createElement('div');groupBar.className='group-navigation';groupBar.setAttribute('aria-label','Graph groups');document.querySelector('.canvas-wrap').append(groupBar);
-const groupButton=document.createElement('button');groupButton.id='make-group';groupButton.textContent='Group';groupButton.title='Turn selected states into a reusable section';$('add-comment').after(groupButton);
+const groupBar=document.createElement('div');groupBar.className='group-navigation';groupBar.setAttribute('aria-label','Graph groups');document.querySelector('.toolbar').append(groupBar);
+const groupButton=document.createElement('button');groupButton.id='make-group';groupButton.innerHTML='<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="3 2"/><rect x="7" y="8" width="4" height="8" rx="1"/><rect x="14" y="8" width="3" height="8" rx="1"/></svg>';groupButton.setAttribute('aria-label','Group selected states');groupButton.title='Turn selected states into a reusable section';$('add-comment').after(groupButton);
 const groupDialog=document.createElement('dialog');groupDialog.className='group-dialog';groupDialog.innerHTML='<form method="dialog"><h2>Group states</h2><p>In the overview, these states appear as one box. Open it to edit the states inside.</p><label>Name<input id="group-name" maxlength="60" required></label><div class="dialog-actions"><button value="cancel">Cancel</button><button value="create" class="primary">Create group</button></div></form>';document.body.append(groupDialog);
 function refreshGroupBar(){const current=(machine.groups??[]).find(g=>g.id===openGroup);if(openGroup&&!current)openGroup=null;const boundary=current?machine.edges.filter(edge=>current.stateIds.includes(edge.from)!==current.stateIds.includes(edge.to)).length:0;groupBar.innerHTML=`<button data-overview ${openGroup?'':'aria-current="page"'}>Overview</button>${current?`<span aria-hidden="true">›</span><strong>${esc(current.name)}</strong><small title="Connections to states outside this group">${boundary} outside</small><button data-rename-group title="Rename this group">Rename</button><button data-dissolve-group title="Show these states in the overview">Ungroup</button>`:(machine.groups??[]).map(g=>`<button data-open-group="${esc(g.id)}">${esc(g.name)} <small>${g.stateIds.length}</small></button>`).join('')}`;groupBar.querySelector('[data-overview]').onclick=()=>{openGroup=null;clearSelection();render();fit()};groupBar.querySelectorAll('[data-open-group]').forEach(button=>button.onclick=()=>openGroupById(button.dataset.openGroup));groupBar.querySelector('[data-rename-group]')?.addEventListener('click',()=>{editingGroup=current.id;groupDialog.querySelector('h2').textContent='Rename group';groupDialog.querySelector('p').textContent='This name appears on the overview box.';groupDialog.querySelector('button[value=create]').textContent='Save name';groupDialog.querySelector('input').value=current.name;groupDialog.returnValue="";groupDialog.showModal();groupDialog.querySelector('input').select()});groupBar.querySelector('[data-dissolve-group]')?.addEventListener('click',()=>{checkpoint();dissolveGroup(machine,current.id);openGroup=null;changed();fit()})}
 function openGroupById(id){if(!(machine.groups??[]).some(g=>g.id===id))return;openGroup=id;clearSelection();showProperties(false);render();fit()}
@@ -224,7 +224,7 @@ function setupPopover(toggleId,menuId,height=270){
  $(menuId).addEventListener('beforetoggle',e=>{if(e.newState==='open'){const limit=typeof height==='function'?height():height,box=$(toggleId).getBoundingClientRect(),dock=document.body.dataset.toolbarDock,bar=document.querySelector('.toolbar').getBoundingClientRect(),vertical=dock==='left'||dock==='right';let left=dock==='left'?bar.right+8:dock==='right'?bar.left-248:box.left;const top=vertical?box.top:dock==='bottom'?bar.top-limit-8:box.bottom+8;$(menuId).style.left=Math.max(12,Math.min(left,window.innerWidth-252))+'px';const placedTop=Math.max(12,Math.min(top,window.innerHeight-limit));$(menuId).style.top=placedTop+'px';$(menuId).style.maxHeight=Math.max(0,window.innerHeight-placedTop-12)+'px'}});
  $(menuId).addEventListener('toggle',e=>$(toggleId).setAttribute('aria-expanded',String(e.newState==='open')));
 }
-setupPopover('layout-toggle','layout-menu',180);setupPopover('app-menu-toggle','app-menu',180);
+setupPopover('layout-toggle','layout-menu',()=>$('layout-mode').value==='spring'?620:390);setupPopover('app-menu-toggle','app-menu',180);
 $('memory-menu').addEventListener('beforetoggle',event=>{if(event.newState==='open')machineProperties($('memory-properties'))});
 setupPopover('memory-cells','memory-menu',390);
 
@@ -233,7 +233,7 @@ $('hide-tips').onclick=()=>setTipsVisible(false);const shortcutsDialog=document.
 window.addEventListener('keydown',event=>{if(document.querySelector('dialog[open]')){event.stopImmediatePropagation();return}const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase(),typing=event.target.matches('input,textarea,select');if(event.altKey&&!control&&(key==='arrowright'||key==='arrowleft'||key==='s')){event.preventDefault();event.stopImmediatePropagation();if(key==='arrowright')event.shiftKey?stepper.nextToken():stepper.next();else if(key==='arrowleft')event.shiftKey?stepper.previousToken():stepper.previous();else if(!event.shiftKey)stepper.toggle();return}if(event.key==='?'&&!control&&!event.altKey&&!typing){event.preventDefault();event.stopImmediatePropagation();shortcutsDialog.showModal()}});
 
 try{setTipsVisible(localStorage.getItem('lexica-tips-hidden')!=='true')}catch{}
-$('fit').onclick=fit;$('arrange').onclick=()=>{checkpoint();arrangeGraph(machine,openGroup);changed();fit();$('layout-menu').hidePopover();toast('States arranged. Undo to restore.')};
+$('fit').onclick=fit;$('arrange').onclick=()=>{saveLayoutSettings();checkpoint();const groups=smartArrange(machine,openGroup,{mode:$('layout-mode').value,spacing:Number($('layout-density').value),forces:springControls.read(),smartGroups:$('layout-portals').checked});clearSelection();changed();fit();$('layout-menu').hidePopover();toast(groups?`Arranged graph and created ${groups} connected groups. Undo to restore.`:'States arranged. Undo to restore.')};
 function zoom(factor,p){showProperties(false);const v=view(),center=p??{x:v.x+v.width/2,y:v.y+v.height/2};if(v.width*factor<160||v.width*factor>30000)return;setView({x:center.x+(v.x-center.x)*factor,y:center.y+(v.y-center.y)*factor,width:v.width*factor,height:v.height*factor})}
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);$('canvas').addEventListener('wheel',e=>{e.preventDefault();if(e.ctrlKey||e.metaKey){if(e.deltaY)zoom(wheelZoomFactor(e.deltaY,editorSettings.pinchSensitivity),point(e));return}const v=view(),canvas=$('canvas'),unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1,dx=e.shiftKey&&!e.deltaX?e.deltaY:e.deltaX,dy=e.shiftKey&&!e.deltaX?0:e.deltaY;setView({...v,x:v.x+dx*unit*v.width/canvas.clientWidth,y:v.y+dy*unit*v.height/canvas.clientHeight})},{passive:false});
 $('delete-selection').onclick=remove;$('toggle-properties').onclick=()=>showProperties(document.body.classList.contains('properties-hidden'));$('close-properties').onclick=()=>showProperties(false);function setTesterCollapsed(collapsed){document.body.classList.toggle('tester-collapsed',collapsed);$('toggle-tester').setAttribute('aria-label',collapsed?'Expand tester':'Collapse tester');$('toggle-tester').title=collapsed?'Expand tester':'Collapse tester';$('toggle-tester').setAttribute('aria-expanded',String(!collapsed));requestAnimationFrame(syncInputLayout)}
@@ -304,7 +304,7 @@ restoreLayoutSettings();
 $('label-boxes').onchange=()=>{checkpoint();machine.labelBoxes=$('label-boxes').checked;changed()};
 const springControls=setupSpringControls();
 $('layout-menu').querySelector('strong').textContent='Arrange graph';
-$('layout-menu').querySelector('.layout-note').textContent='Place connected states close together and give nodes room to breathe. The result can be undone.';
+$('layout-menu').querySelector('.layout-note').textContent='When a graph stays crowded, Smart groups folds connected branches into editable boxes. Existing groups stay intact. Undo restores the whole arrangement.';
 $('layout-toggle').title='Arrange graph';
 
 $('copy-selection').onclick=()=>copyItems();$('paste-selection').onclick=pasteItems;$('select-mode').onclick=()=>setTool('select');$('pan-mode').onclick=()=>setTool('pan');$('add-comment').onclick=beginComment;
@@ -324,8 +324,8 @@ new ResizeObserver(resizeCanvas).observe($('canvas'));
 
 $('show-skipped').onchange=()=>{save();test()};
 
-try{$('layout-portals').checked=localStorage.getItem('lexica-layout-portals')!=='false'}catch{}
-$('layout-portals').onchange=()=>{try{localStorage.setItem('lexica-layout-portals',String($('layout-portals').checked))}catch{}};
+try{$('layout-portals').checked=localStorage.getItem('lexica-layout-smart-groups')!=='false'}catch{}
+$('layout-portals').onchange=()=>{try{localStorage.setItem('lexica-layout-smart-groups',String($('layout-portals').checked))}catch{}};
 
 new MutationObserver(()=>{draw();drawMap()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 document.fonts.ready.then(()=>{draw();drawMap()});

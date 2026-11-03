@@ -539,13 +539,12 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 
 .portal-preview{position:fixed;z-index:12;max-width:220px;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:inherit;box-shadow:0 4px 16px #0003;font-size:11px;line-height:1.5;white-space:pre-line;pointer-events:none}
 .portal-preview[hidden]{display:none}
-.group-navigation{position:absolute;z-index:3;top:65px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 2px 12px #0002;overflow-x:auto;white-space:nowrap}
+.group-navigation{position:static;display:flex;align-items:center;gap:4px;max-width:340px;padding:0 0 0 7px;margin-left:4px;border-left:1px solid var(--line);overflow-x:auto;white-space:nowrap;flex-shrink:1;min-width:0}
 .group-navigation button{border:0;background:transparent;color:inherit;border-radius:6px;padding:5px 9px;font:600 11px 'DM Sans',sans-serif;cursor:pointer}
 .group-navigation button:hover,.group-navigation button[aria-current=page]{background:var(--green);color:white}
 .group-navigation strong{font-size:12px}.group-navigation small{opacity:.65;margin-left:3px}
 #make-group{font:600 11px 'DM Sans',sans-serif;white-space:nowrap}
 .group-dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:inherit;padding:22px;max-width:min(420px,calc(100vw - 32px));box-shadow:0 16px 60px #0004}
 .group-dialog::backdrop{background:#17282480}.group-dialog h2{margin:0 0 8px;font-size:18px}.group-dialog p{font-size:12px;line-height:1.5}.group-dialog label{display:grid;gap:6px;font-size:12px;font-weight:600}.group-dialog input{padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;font:inherit}.group-dialog .dialog-actions{margin-top:18px}
-#layout-menu .layout-field,#layout-menu .spring-forces,#layout-menu .check{display:none}
-@media(max-width:1150px){.group-navigation{top:118px}}
+body:is([data-toolbar-dock=left],[data-toolbar-dock=right]) .group-navigation{max-width:180px;max-height:240px;flex-direction:column;border-left:0;border-top:1px solid var(--line);margin:4px 0 0;padding:7px 0 0;overflow:auto}
 #new-portal,.prop-field:has(#state-portal[value=""]),.simple-field:has(#state-portal[value=""]),.check:has(#via-portal:not(:checked)){display:none}

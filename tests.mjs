@@ -1005,7 +1005,25 @@ test('manual connection bends keep their base curve stable during dragging',()=>
  assert.ok(Math.abs(b.c1.x-a.c1.x-4/3)<1e-6);assert.ok(Math.abs(b.c1.y-a.c1.y-4/3)<1e-6);
 });
 import {arrangeGraph} from './dist/basic-layout.js';
+import {smartArrange,layoutQuality} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
+
+test('smart arrangement folds connected crowded branches and preserves lexer behavior in every mode',()=>{
+ const source={start:'root',states:[{id:'root',name:'start',token:'',x:0,y:0}],edges:[]};
+ for(let branch=0;branch<9;branch++)for(let step=0;step<4;step++){
+  const id=`b${branch}-${step}`;source.states.push({id,name:id,token:`TOKEN_${branch}`,x:0,y:0});
+  source.edges.push({from:step?`b${branch}-${step-1}`:'root',to:id,label:step?'x':String.fromCharCode(97+branch)});
+ }
+ const expected=tokenize(source,'axxx bxxx');
+ for(const mode of ['tree','circle','spring']){
+  const plain=structuredClone(source);assert.equal(smartArrange(plain,null,{mode,smartGroups:false}),0);
+  const grouped=structuredClone(source);assert.ok(smartArrange(grouped,null,{mode})>0);validate(grouped);
+  assert.ok(layoutQuality(grouped).score<layoutQuality(plain).score);
+  assert.deepEqual(tokenize(grouped,'axxx bxxx'),expected);
+  assert.ok(grouped.groups.every(g=>g.stateIds.every(id=>id.startsWith(g.stateIds[0].split('-')[0]+'-'))));
+ }
+ const small=example();assert.equal(smartArrange(small),0);assert.equal(small.groups,undefined);
+});
 
 test('groups collapse visually while preserving lexer states and transitions',()=>{
  const m=example(),before=tokenize(m,'hello 42');
