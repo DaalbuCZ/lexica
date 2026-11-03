@@ -3,7 +3,7 @@ import {graphView} from './groups.js';
 
 // Connected branches own separate bands; related branches sit together.
 export function arrangeGraph(machine, focus = null) {
-  const view = graphView(machine, focus);
+  const view = graphView(machine, focus, false);
   if (!view.states.length) return machine;
   const anchors = commentAnchors(machine);
   const states = new Map(view.states.map(state => [state.id, state]));

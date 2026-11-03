@@ -4,7 +4,7 @@ import {destination} from './portals.js';
 import {commentAnchors,positionComments} from './comments.js';
 
 function place(machine,focus,options){
- const shown=graphView(machine,focus),copy=structuredClone(shown),anchors=commentAnchors(machine);
+ const shown=graphView(machine,focus,false),copy=structuredClone(shown),anchors=commentAnchors(machine);
  if(focus&&!copy.start){const members=new Set(copy.states.map(s=>s.id)),inbound=new Map();for(const edge of machine.edges){let to;try{to=destination(machine,edge)?.id}catch{continue}if(!members.has(edge.from)&&members.has(to))inbound.set(to,(inbound.get(to)??0)+1)}copy.start=[...inbound].sort((a,b)=>b[1]-a[1])[0]?.[0]??copy.states[0]?.id}
  for(const edge of copy.edges)delete edge.bend;
  autoLayout(copy,options.mode??'circle',options.spacing??.75,false,options.forces??{},false);

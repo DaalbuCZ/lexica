@@ -1044,7 +1044,10 @@ test('groups collapse visually while preserving lexer states and transitions',()
  const overview=graphView(m),inside=graphView(m,group.id);
  assert.equal(overview.states.length,3);
  assert.equal(overview.states.find(s=>s.id===group.id).count,2);
- assert.deepEqual(new Set(inside.states.map(s=>s.id)),new Set(['s1','s2']));
+ assert.deepEqual(new Set(inside.states.filter(s=>!s.outside).map(s=>s.id)),new Set(['s1','s2']));
+ assert.deepEqual(inside.states.filter(s=>s.outside).map(s=>s.id),['s0']);
+ assert.deepEqual(inside.edges.filter(e=>e.outside).map(e=>e.originalIndex),[0,2]);
+ const outside=structuredClone(m.states[0]);smartArrange(m,group.id);assert.deepEqual(m.states[0],outside);
  assert.deepEqual(tokenize(validate(JSON.parse(JSON.stringify(m))),'hello 42'),before);
  assert.throws(()=>createGroup(m,['s1'],'Duplicate'),/one group/);
  dissolveGroup(m,group.id);assert.equal(graphView(m).states.length,4);
