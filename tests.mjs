@@ -569,7 +569,7 @@ test('repulsion spreads nodes and center attraction controls compactness without
 });
 
 test('spring force controls persist, reset, and are only shown for Spring layout',()=>{
- const script=readFileSync(new URL('./dist/spring-controls.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function'),elements={},events={},saved={};
+ const script=readFileSync(new URL('./dist/spring-controls.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),elements={},events={},saved={};
  for(const key of Object.keys(SPRING_DEFAULTS)){elements['spring-'+key]={};elements['spring-'+key+'-value']={}}
  elements['spring-reset']={};elements['spring-forces']={};elements['layout-mode']={value:'spring',addEventListener:(name,fn)=>events[name]=fn};elements['layout-menu']={matches:()=>false};
  const context={document:{getElementById:id=>elements[id]},SPRING_DEFAULTS,springSettings,localStorage:{getItem:key=>saved[key],setItem:(key,value)=>saved[key]=value}};
@@ -590,7 +590,7 @@ test('lexer stepping starts at the requested cursor with absolute offsets and in
 });
 
 test('range highlights preserve one text flow for tabs, wide glyphs, combining marks and joined emoji',()=>{
- const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
+ const script=readFileSync(new URL('./dist/input-highlights.js',import.meta.url),'utf8').replace(/^import .*\r?\n/,'').replace('export function','function'),input={value:'hi\t漢字 👩‍💻 e\u0301\n42'},mirror={};
  Object.defineProperty(mirror,'textContent',{get(){return this.firstChild?.data},set(value){this.firstChild={data:value}}});
  const registry=new Map(),context={errorSpans,underlineSegments,input,mirror,CSS:{highlights:registry},Highlight:class extends Set{constructor(...ranges){super(ranges)}},document:{createRange:()=>({setStart(node,offset){this.node=node;this.start=offset},setEnd(node,offset){this.end=offset},getClientRects(){return [{start:this.start,end:this.end}]}})}};
  runInNewContext(script+"var highlights=setupInputHighlights(input,mirror,()=> 'token-color-1');",context);
@@ -1003,4 +1003,31 @@ test('grouped radial starts keep one logical start and render each transition on
 test('manual connection bends keep their base curve stable during dragging',()=>{
  const m=example(),edge=m.edges[0];edge.bend={x:40,y:30};const a=routeEdges(m)[0];edge.bend={x:41,y:31};const b=routeEdges(m)[0];
  assert.ok(Math.abs(b.c1.x-a.c1.x-4/3)<1e-6);assert.ok(Math.abs(b.c1.y-a.c1.y-4/3)<1e-6);
+});
+import {arrangeGraph} from './dist/basic-layout.js';
+import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
+
+test('groups collapse visually while preserving lexer states and transitions',()=>{
+ const m=example(),before=tokenize(m,'hello 42');
+ const group=createGroup(m,['s1','s2'],'Words and numbers');
+ validate(m);
+ const overview=graphView(m),inside=graphView(m,group.id);
+ assert.equal(overview.states.length,3);
+ assert.equal(overview.states.find(s=>s.id===group.id).count,2);
+ assert.deepEqual(new Set(inside.states.map(s=>s.id)),new Set(['s1','s2']));
+ assert.deepEqual(tokenize(validate(JSON.parse(JSON.stringify(m))),'hello 42'),before);
+ assert.throws(()=>createGroup(m,['s1'],'Duplicate'),/one group/);
+ dissolveGroup(m,group.id);assert.equal(graphView(m).states.length,4);
+});
+
+test('basic arrangement is deterministic, separates states, and preserves the lexer',()=>{
+ const source=example(),before=tokenize(source,'hello 42'),edges=JSON.stringify(source.edges);
+ const m=arrangeGraph(structuredClone(source));
+ assert.equal(JSON.stringify(m.edges),edges);
+ assert.deepEqual(tokenize(m,'hello 42'),before);
+ for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=180);
+ assert.deepEqual(arrangeGraph(structuredClone(source)).states.map(s=>[s.x,s.y]),m.states.map(s=>[s.x,s.y]));
+ const group=createGroup(m,['s1','s2'],'Tokens');
+ arrangeGraph(m);arrangeGraph(m,group.id);validate(m);
+ assert.deepEqual(tokenize(m,'hello 42'),before);
 });
