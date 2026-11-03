@@ -553,7 +553,7 @@ a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[r
 #new-portal,.prop-field:has(#state-portal[value=""]),.simple-field:has(#state-portal[value=""]),.check:has(#via-portal:not(:checked)){display:none}
 .group-navigation[hidden],.group-overlay[hidden],.group-overview-backdrop[hidden]{display:none}
 .group-overview-backdrop{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;opacity:.55}
-.group-overlay{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004;transition:left 180ms cubic-bezier(.2,.8,.2,1),top 180ms cubic-bezier(.2,.8,.2,1),width 180ms cubic-bezier(.2,.8,.2,1),height 180ms cubic-bezier(.2,.8,.2,1),opacity 160ms ease}
+.group-overlay{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004;transition:left 180ms cubic-bezier(.2,.8,.2,1),top 180ms cubic-bezier(.2,.8,.2,1),opacity 160ms ease,scale 160ms ease}
 .group-overlay-heading{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;background:var(--panel);border-bottom:1px solid var(--line)}
 .group-overlay #canvas{flex:1;min-height:0}
 #canvas:focus{outline:none}
