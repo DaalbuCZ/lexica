@@ -216,12 +216,13 @@ function computeRoutes(machine,labels){
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
  const obstacles=[...reserved];
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {edge:e,from,to,dx,dy,length:dx*dx+dy*dy}});
+ const radialHub=machine.edges.filter(edge=>edge.from===machine.start&&edge.to!==edge.from).length>=8;
  const ordered=machine.edges.map((e,i)=>({e,i})).sort((a,b)=>(a.e.from!==a.e.to)-(b.e.from!==b.e.to));
  for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){let best,bestScore=Infinity;for(const [dx,dy] of e.portalOffset?[[e.portalOffset.x,e.portalOffset.y]]:[140,220,300,420,560,720].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy)||1,p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox=portalBoxAtTip(e.portal,p3,dx<0?'right':'left');applyBend(c,e,a,null);let score=len*.01+(overlaps(c.label,c.portalBox)?1000:0);for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}for(const segment of segments)if(segment.edge!==e){if(segmentHitsBox(segment.from,segment.to,c.label))score+=100;if(segmentHitsBox(segment.from,segment.to,c.portalBox))score+=100}if(score<bestScore){best=c;bestScore=score}}best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
  let best,bestScore=Infinity;
  const loop=a===b,rotation=loop?[...a.id].reduce((n,ch)=>n+ch.codePointAt(0),0)%4:0;
  for(let attempt=0;attempt<(loop?64:61);attempt++){
- let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*65*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*37,y:b.y+Math.sin(endAngle)*37};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
+ let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*42*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*37,y:b.y+Math.sin(endAngle)*37};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
  const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};
 
  let labelScore=Infinity,bestLabel=c.label;
@@ -241,7 +242,7 @@ function computeRoutes(machine,labels){
  let previous=c.p0;
  for(let k=1;k<=24&&score<bestScore&&nearbyCaptions.length;k++){
   const point=sample(c,k/24);
-  if(nearbyCaptions.some(box=>segmentHitsBox(previous,point,box))){score+=12000;break}
+  if(nearbyCaptions.some(box=>segmentHitsBox(previous,point,box))){score+=radialHub&&e.from===machine.start?1800:12000;break}
   previous=point;
  }
  if(loop)for(let t=.1;t<.95&&score<bestScore;t+=.05){const p=sample(c,t);if((p.x-a.x)**2+(p.y-a.y)**2<48**2)continue;for(const {from,dx,dy,length} of nearbySegments){if(!length)continue;const u=Math.max(0,Math.min(1,((p.x-from.x)*dx+(p.y-from.y)*dy)/length));if((p.x-from.x-u*dx)**2+(p.y-from.y-u*dy)**2<14**2)score+=200}}

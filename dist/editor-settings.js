@@ -5,9 +5,9 @@ export function readEditorSettings(storage) {
   try {
     const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(STORAGE_KEY) || '{}');
     const sensitivity=Number(saved.pinchSensitivity);
-    return {simplified:saved.simplified===true,pinchSensitivity:Number.isFinite(sensitivity)?Math.max(.2,Math.min(2,sensitivity)):1};
+    return {groupPresentation:saved.groupPresentation==="overlay"?"overlay":"canvas",simplified:saved.simplified===true,pinchSensitivity:Number.isFinite(sensitivity)?Math.max(.2,Math.min(2,sensitivity)):1};
   } catch {
-    return {simplified:false,pinchSensitivity:1};
+    return {groupPresentation:"canvas",simplified:false,pinchSensitivity:1};
   }
 }
 
@@ -41,6 +41,11 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
       <label class="setting-choice"><input type="checkbox" id="simplified-setting"><span><strong>Simplified view</strong><small>Use character sets and compact properties.</small></span></label>
     </section>
 <section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
+    <section class="setting-section"><h3>Groups</h3>
+      <label class="setting-row" for="group-presentation">Open groups in
+        <select id="group-presentation"><option value="canvas">Full canvas with breadcrumbs</option><option value="overlay">Canvas overlay</option></select>
+      </label>
+    </section>
     <section class="setting-section"><h3>Pinch zoom</h3>
       <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
     </section>
@@ -52,6 +57,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
   document.body.append(dialog);
 
   const sync = () => {
+    dialog.querySelector("#group-presentation").value=editorSettings.groupPresentation;
     dialog.querySelector(`[name="machine-type"][value="${getMachineType()}"]`).checked = true;
     dialog.querySelector('#simplified-setting').checked = editorSettings.simplified;
     dialog.querySelector('#label-boxes').checked=getLabelBoxes();
@@ -67,6 +73,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
   });
   dialog.querySelectorAll('[name="machine-type"]').forEach(input => input.onchange = () => { onMachineTypeChange(input.value); sync(); onChange(); });
+  dialog.querySelector('#group-presentation').onchange = e => changed({groupPresentation:e.target.value});
   dialog.querySelector('#simplified-setting').onchange = e => changed({simplified: e.target.checked});
   dialog.querySelector('#pinch-sensitivity').oninput=e=>{updateEditorSettings({pinchSensitivity:Number(e.target.value)});sync()};
   document.body.classList.toggle('simplified-view', editorSettings.simplified);

@@ -31,12 +31,15 @@ function place(machine,focus,options){
  const preferFlow=focus&&copy.states.length>=11;
  const directions=new Set(copy.edges.map(e=>JSON.stringify([e.from,e.to])));
  const forwardEdges=copy.edges.filter(e=>e.from!==e.to&&!directions.has(JSON.stringify([e.to,e.from])));
- const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges),xs=candidate.states.map(s=>s.x),ys=candidate.states.map(s=>s.y),width=xs.length?Math.max(...xs)-Math.min(...xs):0,height=ys.length?Math.max(...ys)-Math.min(...ys):0,nodes=new Map(candidate.states.map(s=>[s.id,s]));let wire=0;for(const e of candidate.edges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)wire+=Math.hypot(a.x-b.x,a.y-b.y)}let flow=0;if(preferFlow)for(const e of forwardEdges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)flow+=Math.max(0,170-b.x+a.x)+Math.abs(b.y-a.y)*.22}let routedCrossings=0;
- if(preferFlow){
+ const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges),xs=candidate.states.map(s=>s.x),ys=candidate.states.map(s=>s.y),width=xs.length?Math.max(...xs)-Math.min(...xs):0,height=ys.length?Math.max(...ys)-Math.min(...ys):0,nodes=new Map(candidate.states.map(s=>[s.id,s]));let wire=0,longest=0;for(const e of candidate.edges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b){const length=Math.hypot(a.x-b.x,a.y-b.y);wire+=length;longest=Math.max(longest,length)}}let flow=0;if(preferFlow)for(const e of forwardEdges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)flow+=Math.max(0,170-b.x+a.x)+Math.abs(b.y-a.y)*.22}let routedCrossings=0;
+ if(focus){
   const positioned={...machine,states:machine.states.map(state=>nodes.get(state.id)??state)};
-  routedCrossings=crossingPairs(graphView(positioned,focus),true,simpleTransitionLabel).length;
+  const projected=graphView(positioned,focus);
+  for(const [a,b] of crossingPairs(projected,true,simpleTransitionLabel)){
+   routedCrossings+=projected.edges[a].outside||projected.edges[b].outside?35:250;
+  }
  }
- return flow/45+routedCrossings*2000+c.crossings*2000+(c.wire<65?2000:0)+Math.sqrt(width*height)/35+extent(candidate.states)/70+wire/800};
+ return (focus?longest/5+wire/60:0)+flow/70+routedCrossings+c.crossings*2000+(c.wire<65?2000:0)+Math.sqrt(width*height)/35+extent(candidate.states)/70+wire/800};
  arrange(copy);let best=cost(copy),chosen=copy.states,limit=Math.max(2200,extent(copy.states)*(focus?2.5:1.5));
  if(analytical.positions){
   // Use the planar embedding to order branches, then assign coordinates in the

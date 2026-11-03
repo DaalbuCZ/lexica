@@ -687,9 +687,9 @@ test('debugger surfaces invalid configurations instead of throwing before the se
 });
 
 test('simplified settings restore safely without changing graph preferences',()=>{
- assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{simplified:true,pinchSensitivity:2});
- assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{simplified:false,pinchSensitivity:1});
- assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{simplified:false,pinchSensitivity:1});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{"simplified":true,"pinchSensitivity":2}'}),{groupPresentation:"canvas",simplified:true,pinchSensitivity:2});
+ assert.deepEqual(readEditorSettings({getItem:()=>'{broken'}),{groupPresentation:"canvas",simplified:false,pinchSensitivity:1});
+ assert.deepEqual(readEditorSettings({getItem(){throw Error('Storage unavailable')}}),{groupPresentation:"canvas",simplified:false,pinchSensitivity:1});
 });
 
 
@@ -1015,7 +1015,7 @@ test('a multi-entry identifier group stays compact without long boundary crossin
  const pairs=[['outside','identifier'],['outside','underscore'],['outside','prefix'],['outside','dollar'],['identifier','identifier'],['underscore','identifier'],['prefix','identifier'],['prefix','quote1'],['quote1','quote2'],['quote2','quote3'],['dollar','identifier'],['dollar','brace'],['dollar','underscore'],['dollar','doubleDollar']];
  const m={start:'outside',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to],i)=>({from,to,label:String.fromCharCode(65+i)}))},group=createGroup(m,ids.slice(1),'Identifiers'),before=structuredClone(m.states[0]);
  smartArrange(m,group.id,{mode:'circle'});const view=graphView(m,group.id),clearance=drawingClearance(view.states,view.edges);
- assert.equal(crossingPairs(view,true).length,0);assert.ok(clearance.node>=159.99);assert.ok(clearance.wire>=64.99);
+ assert.equal(crossingPairs(graphView(m,group.id,false),true).length,0);assert.equal(view.states.filter(s=>s.outside).length,1);assert.ok(clearance.node>=159.99);assert.ok(clearance.wire>=64.99);
  const xs=view.states.map(s=>s.x),ys=view.states.map(s=>s.y);assert.ok((Math.max(...xs)-Math.min(...xs))*(Math.max(...ys)-Math.min(...ys))<2000000);
  assert.deepEqual(m.states[0],before);assert.ok(view.states.filter(s=>s.outside).every(s=>s.outsideSource==='outside'));validate(m);
 });

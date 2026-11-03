@@ -3,10 +3,9 @@ import {simpleTransitionLabel} from './editor-settings.js';
 const turn=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
 const crosses=(a,b,c,d)=>turn(a,b,c)*turn(a,b,d)<-1e-6&&turn(c,d,a)*turn(c,d,b)<-1e-6;
 export function boundaryContext(machine,states,edges){
- const nodes=new Map(states.map(s=>[s.id,s])),ghosts=[],placedEdges=edges.filter(e=>!e.outside),sources=[...new Set(edges.filter(e=>e.outside).map(e=>e.from))],mapped=new Map();
- const used=new Set(machine.states.map(s=>s.id));
+ const nodes=new Map(states.map(s=>[s.id,s])),ghosts=[],placedEdges=edges.filter(e=>!e.outside),sources=[...new Set(edges.filter(e=>e.outside).map(e=>e.from))];
  for(const source of sources){
-  const incoming=edges.filter(e=>e.outside&&e.from===source),targets=[...new Set(incoming.map(e=>e.to))];
+  const incoming=edges.filter(e=>e.outside&&e.from===source);
   function find(links){
    const targets=[...new Set(links.map(e=>e.to))].map(id=>nodes.get(id)),clearance=Math.max(260,...links.map(e=>simpleTransitionLabel(e).length*7+130));
    const xs=states.map(s=>s.x),ys=states.map(s=>s.y),left=Math.min(...xs),right=Math.max(...xs),top=Math.min(...ys),bottom=Math.max(...ys),cx=targets.reduce((sum,s)=>sum+s.x,0)/targets.length,cy=targets.reduce((sum,s)=>sum+s.y,0)/targets.length;
@@ -14,6 +13,7 @@ export function boundaryContext(machine,states,edges){
    for(const x of new Set([cx,...targets.map(s=>s.x)]))candidates.push({x,y:top-clearance},{x,y:bottom+clearance});
    for(const target of targets)for(let i=0;i<16;i++)candidates.push({x:target.x+Math.cos(i*Math.PI/8)*clearance,y:target.y+Math.sin(i*Math.PI/8)*clearance});
    let best;
+   candidates.push({x:Math.min(...[...nodes.values()].map(state=>state.x))-clearance,y:cy});
    for(const point of candidates){let bad=0,length=0;
     if([...nodes.values()].some(s=>Math.hypot(s.x-point.x,s.y-point.y)<160))continue;
     for(const target of targets){const dx=target.x-point.x,dy=target.y-point.y,d2=dx*dx+dy*dy;length+=Math.sqrt(d2);
@@ -26,11 +26,9 @@ export function boundaryContext(machine,states,edges){
    }
    return best;
   }
-  const shared=find(incoming),batches=shared.bad&&targets.length>1?targets.map(target=>incoming.filter(e=>e.to===target)):[incoming];
-  for(const batch of batches){const point=batches.length===1?shared:find(batch);let id=source;if(batches.length>1){id=`outside:${JSON.stringify([source,batch[0].to])}`;while(used.has(id))id+=':'}used.add(id);
-   const ghost={...machine.states.find(s=>s.id===source),id,x:point.x,y:point.y,outside:true,outsideSource:source,portal:undefined,portalOffset:undefined};ghosts.push(ghost);nodes.set(id,ghost);
-   for(const edge of batch){const shown={...edge,from:id};mapped.set(edge.originalIndex,shown);placedEdges.push(shown)}
-  }
+  const point=find(incoming);
+  const ghost={...machine.states.find(s=>s.id===source),x:point.x,y:point.y,outside:true,outsideSource:source,portal:undefined,portalOffset:undefined};
+  ghosts.push(ghost);nodes.set(source,ghost);placedEdges.push(...incoming);
  }
- return {states:[...states,...ghosts],edges:edges.map(e=>mapped.get(e.originalIndex)??e)};
+ return {states:[...states,...ghosts],edges};
 }
