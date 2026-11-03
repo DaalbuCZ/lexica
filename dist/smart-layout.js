@@ -73,7 +73,7 @@ function place(machine,focus,options){
  }
  const selected=new Map(chosen.map(s=>[s.id,s]));for(const state of copy.states){state.x=selected.get(state.id).x;state.y=selected.get(state.id).y}
 
- for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
+ for(const edge of shown.edges)if(!edge.groupEdge)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
  const positions=new Map(copy.states.map(s=>[s.id,s]));
  for(const state of shown.states){const next=positions.get(state.id);if(!next)continue;
   if(state.group){const group=machine.groups.find(g=>g.id===state.id),dx=next.x-state.x,dy=next.y-state.y;for(const member of machine.states)if(group.stateIds.includes(member.id)){member.x+=dx;member.y+=dy}}

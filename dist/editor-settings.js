@@ -42,7 +42,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
     </section>
 <section class="setting-section"><h3>Lexer tester</h3><label class="setting-choice"><input type="checkbox" id="show-skipped"><span><strong>Show skipped tokens</strong><small>Include whitespace and other skipped tokens in the output.</small></span></label></section>
     <section class="setting-section"><h3>Groups</h3>
-      <label class="setting-row" for="group-presentation">Open groups in
+      <label class="setting-row" for="group-presentation"><strong>Open groups in</strong>
         <select id="group-presentation"><option value="canvas">Full canvas with breadcrumbs</option><option value="overlay">Canvas overlay</option></select>
       </label>
     </section>
@@ -50,7 +50,7 @@ export function setupEditorSettings(getMachineType, getLabelBoxes, onChange, onM
       <label class="setting-row" for="pinch-sensitivity"><span><strong>Sensitivity</strong><output id="pinch-sensitivity-value"></output></span><input id="pinch-sensitivity" type="range" min="0.2" max="2" step="0.1"></label>
     </section>
     <section class="setting-section"><h3>Appearance</h3>
-      <div class="setting-row"><span><strong>Theme</strong><small>Switch between light and dark.</small></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
+      <div class="setting-row"><span><strong>Theme</strong></span><button id="theme-toggle" type="button" aria-pressed="false" title="Switch theme"><svg class="tool-icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg><svg class="tool-icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><span>Switch theme</span></button></div>
     </section>
 
 `;

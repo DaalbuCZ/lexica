@@ -1098,9 +1098,13 @@ test('untangling removes avoidable wire crossings without changing occupied posi
  const positions=m.states.map(s=>`${s.x},${s.y}`).sort(),edges=JSON.stringify(m.edges);assert.equal(crossingPairs(m).length,1);untangle(m);assert.equal(crossingPairs(m).length,0);assert.deepEqual(m.states.map(s=>`${s.x},${s.y}`).sort(),positions);assert.equal(JSON.stringify(m.edges),edges);
 });
 
-test('overview connections retain every underlying transition for inspection',()=>{
- const m=example(),g=createGroup(m,['s1','s2'],'Tokens'),bundle=graphView(m).edges.find(e=>e.to===g.id);
- assert.deepEqual(bundle.edgeIndices,[0,2]);assert.equal(bundle.count,2);
+test('overview renders distinct parallel wires for each group transition',()=>{
+ const m=example(),g=createGroup(m,['s1','s2'],'Tokens'),overview=graphView(m);
+ const incoming=overview.edges.filter(edge=>edge.to===g.id);
+ assert.deepEqual(incoming.map(edge=>edge.originalIndex),[0,2]);
+ const routes=routeEdges(overview),[first,second]=incoming.map(edge=>routes[overview.edges.indexOf(edge)]);
+ assert.notEqual(first.d,second.d);
+ assert.ok(Math.hypot(first.p3.x-second.p3.x,first.p3.y-second.p3.y)<24);
  m.edges[1].bend={x:900,y:900};m.edges[0].bend={x:12,y:13};smartArrange(m,g.id,{mode:'circle'});
  assert.equal(m.edges[1].bend,undefined);assert.deepEqual(m.edges[0].bend,{x:12,y:13});
 });

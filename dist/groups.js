@@ -48,15 +48,13 @@ export function graphView(machine, focus = null, includeOutside = true) {
     states.push({id: group.id, name: group.name, token: '', x: members.reduce((sum, s) => sum + s.x, 0) / members.length,
       y: members.reduce((sum, s) => sum + s.y, 0) / members.length, group: true, count: members.length});
   }
-  const edges = [], seen = new Map();
+  const edges = [];
   for (const [originalIndex, edge] of machine.edges.entries()) {
     let target;try{target=destination(machine,edge)?.id}catch{continue}
     const from = membership.get(edge.from) ?? edge.from, to = membership.get(target) ?? target;
     if ((from === to && membership.has(edge.from)) || !states.some(s => s.id === from) || !states.some(s => s.id === to)) continue;
     if (!membership.has(edge.from) && !membership.has(target)) {edges.push({...edge, originalIndex}); continue;}
-    const key = JSON.stringify([from, to]);
-    if (!seen.has(key)) {seen.set(key, edges.length); edges.push({from, to, label: '', summary: true, count: 0, edgeIndices: []});}
-    edges[seen.get(key)].count++;edges[seen.get(key)].edgeIndices.push(originalIndex);
+    edges.push({...edge, from, to, originalIndex, groupEdge:true, portal:undefined, portalOffset:undefined, bend:undefined});
   }
   return {start: membership.get(machine.start) ?? machine.start, states, edges,
     comments: (machine.comments ?? []).filter(comment => !(comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some(id => membership.has(id))),

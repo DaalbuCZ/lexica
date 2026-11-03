@@ -553,7 +553,17 @@ body[data-toolbar-dock=left] .group-navigation{left:80px}
 a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[role=button],label:has(input[type=checkbox]),label:has(input[type=radio]),#minimap{cursor:pointer}
 #new-portal,.prop-field:has(#state-portal[value=""]),.simple-field:has(#state-portal[value=""]),.check:has(#via-portal:not(:checked)){display:none}
 .group-navigation[hidden],.group-overlay[hidden],.group-overview-backdrop[hidden]{display:none}
-.group-overview-backdrop{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.55}
-.group-overlay{position:absolute;z-index:2;inset:14% 9% 9%;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004}
+.group-overview-backdrop{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;opacity:.55}
+.group-overlay{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004}
 .group-overlay-heading{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;background:var(--panel);border-bottom:1px solid var(--line)}
 .group-overlay #canvas{flex:1;min-height:0}
+
+#group-presentation{max-width:66%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:inherit;cursor:pointer}
+#pinch-sensitivity-value{font-size:10px;font-weight:400;opacity:.65}
+#group-overlay-title{padding:4px 6px;border:0;background:transparent;color:inherit;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#group-overlay-title:hover{text-decoration:underline}
+.group-overlay-actions{display:flex;gap:6px;flex:none}
+.group-overlay-actions [data-delete-group]{background:#b32838;color:white;border-color:transparent}
+.group-overlay-actions [data-delete-group]:hover{background:#931d2c;color:white}
+.group-target-list{display:grid;gap:5px;max-height:55vh;overflow:auto}
+.group-target-list small{display:block;opacity:.72}

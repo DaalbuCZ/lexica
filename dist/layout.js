@@ -216,9 +216,22 @@ function computeRoutes(machine,labels){
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
  const obstacles=[...reserved];
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {edge:e,from,to,dx,dy,length:dx*dx+dy*dy}});
- const radialHub=machine.edges.filter(edge=>edge.from===machine.start&&edge.to!==edge.from).length>=8;
+ const wires=new Map();
+ for(const [i,edge] of machine.edges.entries())if(edge.groupEdge){
+  const key=JSON.stringify([edge.from,edge.to]);
+  if(!wires.has(key))wires.set(key,[]);
+  wires.get(key).push(i);
+ }
+ const parallel=new Map();
+ for(const indices of wires.values())if(indices.length>1){
+  const spacing=Math.min(11,54/(indices.length-1));
+  indices.forEach((i,lane)=>parallel.set(i,{first:indices[0],offset:(lane-(indices.length-1)/2)*spacing}));
+ }
+ const radialHub=new Set(machine.edges.filter(edge=>edge.from===machine.start&&edge.to!==edge.from).map(edge=>edge.to)).size>=8;
  const ordered=machine.edges.map((e,i)=>({e,i})).sort((a,b)=>(a.e.from!==a.e.to)-(b.e.from!==b.e.to));
  for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){let best,bestScore=Infinity;for(const [dx,dy] of e.portalOffset?[[e.portalOffset.x,e.portalOffset.y]]:[140,220,300,420,560,720].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy)||1,p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox=portalBoxAtTip(e.portal,p3,dx<0?'right':'left');applyBend(c,e,a,null);let score=len*.01+(overlaps(c.label,c.portalBox)?1000:0);for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}for(const segment of segments)if(segment.edge!==e){if(segmentHitsBox(segment.from,segment.to,c.label))score+=100;if(segmentHitsBox(segment.from,segment.to,c.portalBox))score+=100}if(score<bestScore){best=c;bestScore=score}}best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
+ const lane=parallel.get(i);
+ if(lane&&lane.first!==i)continue;
  let best,bestScore=Infinity;
  const loop=a===b,rotation=loop?[...a.id].reduce((n,ch)=>n+ch.codePointAt(0),0)%4:0;
  for(let attempt=0;attempt<(loop?64:61);attempt++){
@@ -250,6 +263,21 @@ function computeRoutes(machine,labels){
  }
  applyBend(best,e,a,b);
  best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
+ }
+ for(const [i,{first,offset}] of [...parallel].reverse()){
+  const edge=machine.edges[i],base=routes[first];
+  const a=machine.states.find(state=>state.id===edge.from),b=machine.states.find(state=>state.id===edge.to);
+  const length=Math.hypot(b.x-a.x,b.y-a.y)||1;
+  const shift=p=>({x:p.x-(b.y-a.y)/length*offset,y:p.y+(b.x-a.x)/length*offset});
+  const attach=(point,state)=>{
+   const p=shift(point),radius=Math.hypot(point.x-state.x,point.y-state.y),distance=Math.hypot(p.x-state.x,p.y-state.y)||1;
+   return {x:state.x+(p.x-state.x)*radius/distance,y:state.y+(p.y-state.y)*radius/distance};
+  };
+  const p0=attach(base.p0,a),p3=attach(base.p3,b),c1=shift(base.c1),c2=shift(base.c2);
+  const route={p0,p3,c1,c2,d:`M ${p0.x} ${p0.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p3.x} ${p3.y}`};
+  const center=sample(route,.5);
+  route.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};
+  routes[i]=route;
  }
  const paths=routes.map(route=>{const points=Array.from({length:25},(_,i)=>sample(route,i/24)),xs=points.map(p=>p.x),ys=points.map(p=>p.y);return {points,left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}});
  for(let pass=0;pass<2;pass++)for(let i=0;i<routes.length;i++){
