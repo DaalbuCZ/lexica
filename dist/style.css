@@ -554,7 +554,7 @@ a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[r
 #new-portal,.prop-field:has(#state-portal[value=""]),.simple-field:has(#state-portal[value=""]),.check:has(#via-portal:not(:checked)){display:none}
 .group-navigation[hidden],.group-overlay[hidden],.group-overview-backdrop[hidden]{display:none}
 .group-overview-backdrop{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;opacity:.55}
-.group-overlay{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004}
+.group-overlay{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:inherit;box-shadow:0 16px 44px #0004;transition:left 180ms cubic-bezier(.2,.8,.2,1),top 180ms cubic-bezier(.2,.8,.2,1),width 180ms cubic-bezier(.2,.8,.2,1),height 180ms cubic-bezier(.2,.8,.2,1),opacity 160ms ease}
 .group-overlay-heading{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;background:var(--panel);border-bottom:1px solid var(--line)}
 .group-overlay #canvas{flex:1;min-height:0}
 #canvas:focus{outline:none}
@@ -569,8 +569,16 @@ a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[r
 .group-overlay-actions button:hover{background:color-mix(in srgb,var(--panel) 75%,var(--green))}
 .group-overlay-actions [data-delete-group]{color:var(--error)}
 .group-overlay-actions .tool-icon{width:17px;height:17px}
+@media(prefers-reduced-motion:reduce){.group-overlay{transition:none}}
 .group-target-list{display:grid;gap:5px;max-height:55vh;overflow:auto}
 .group-target-list small{display:block;opacity:.72}
+.group-overlay{transition:opacity 160ms ease,scale 160ms ease,display 160ms allow-discrete;scale:1;transition-behavior:allow-discrete}
+.group-overlay:not([hidden]){opacity:1}
+@starting-style{.group-overlay:not([hidden]){opacity:0;scale:.98}}
+.group-target-graph{display:block;width:min(80vw,640px);max-height:55vh;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.target-edge{fill:none;stroke:#82918a;stroke-width:2;opacity:.72}
+.target-edge-label{font:10px 'IBM Plex Mono',monospace;text-anchor:middle;fill:var(--text,#52634f);paint-order:stroke;stroke:var(--panel);stroke-width:5px}
+.target-state{cursor:pointer}.target-state circle{fill:var(--panel);stroke:var(--green);stroke-width:2}.target-state:hover circle,.target-state:focus circle{fill:color-mix(in srgb,var(--green) 20%,var(--panel));stroke-width:3}.target-state text{font:11px 'DM Sans',sans-serif;text-anchor:middle;fill:var(--text,#52634f);pointer-events:none}.target-state .target-token{font:8px 'IBM Plex Mono',monospace;fill:var(--green)}
 
 :root{--token-accent-0:#3d7fb8;--token-accent-1:#478f60;--token-accent-2:#b88a33;--token-accent-3:#c25a6c;--token-accent-4:#8567bf;--token-accent-5:#3f968c;--token-accent-6:#c47a43;--token-accent-7:#6f79bf;--token-accent-8:#bf5d92;--token-accent-9:#8aa13c}
 [data-theme=dark]{--token-accent-0:#7fb8e8;--token-accent-1:#72c08d;--token-accent-2:#d9b45f;--token-accent-3:#e58b9b;--token-accent-4:#b39ae6;--token-accent-5:#6fc6bb;--token-accent-6:#e19b65;--token-accent-7:#9aa5ea;--token-accent-8:#e28bb9;--token-accent-9:#b5c86b}

@@ -6,7 +6,6 @@ import {createTokenOutput,tokensAtSelection} from './token-output.js';
 import {wheelZoomFactor,setupCanvasGestures} from './canvas-gestures.js';
 import {placementPreview} from './placement.js';
 import {canvasTransform,createGraphCanvas,graphBounds} from './canvas-graph.js';
-import {placeFloatingRect} from './floating-placement.js';
 import {singleCharacterError} from './regex-analysis.js';
 import {editorSettings,setupEditorSettings,updateEditorSettings,simpleCharacterClass,characterClassExpression,simpleTransitionLabel} from './editor-settings.js';
 import {machineWithTester,restoreTester} from './tester-state.js?v=47';
@@ -52,10 +51,9 @@ function floatingObstacles(exclude){return [document.querySelector('.brand'),doc
 function positionGroupPanel(group,bounds){
  const area=canvasWrap.getBoundingClientRect();if(!group||!area.width||!area.height||!bounds)return;
  const {scale,x,y}=canvasTransform(overviewView,area.width,area.height),padding=38,heading=groupPanel.querySelector('.group-overlay-heading').offsetHeight||42;
- const panelWidth=Math.min(area.width-24,Math.max(180,bounds.width*scale+padding*2)),panelHeight=Math.min(area.height-24,Math.max(140,bounds.height*scale+padding*2+heading));
+ const panelWidth=Math.max(180,bounds.width*scale+padding*2),panelHeight=panelWidth*.68;
  const center={x:area.left+x+group.x*scale,y:area.top+y+group.y*scale};
- const placed=placeFloatingRect({x:center.x-panelWidth/2,y:center.y-panelHeight/2},{width:panelWidth,height:panelHeight},area,floatingObstacles(groupPanel),12);
- groupPanel.style.width=panelWidth+'px';groupPanel.style.height=panelHeight+'px';groupPanel.style.left=placed.x-area.left+panelWidth/2+'px';groupPanel.style.top=placed.y-area.top+panelHeight/2+'px';
+ groupPanel.style.width=panelWidth+'px';groupPanel.style.height=panelHeight+'px';groupPanel.style.left=center.x-area.left+'px';groupPanel.style.top=center.y-area.top+'px';
  const innerHeight=panelHeight-heading,innerScale=Math.min(scale,(panelWidth-padding*2)/Math.max(1,bounds.width),(innerHeight-padding*2)/Math.max(1,bounds.height));
  graph.setView({x:bounds.x+bounds.width/2-panelWidth/(2*innerScale),y:bounds.y+bounds.height/2-innerHeight/(2*innerScale),width:panelWidth/innerScale,height:innerHeight/innerScale});
 }
@@ -119,14 +117,17 @@ function connectToGroup(id){
  const group=machine.groups.find(group=>group.id===id);
  if(!source||!group)return;
  const from=source;
- const members=machine.states.filter(state=>group.stateIds.includes(state.id));
+ const members=machine.states.filter(state=>group.stateIds.includes(state.id)),subgraph=graphView(machine,id,false),bounds=graphBounds(subgraph,routeEdges(subgraph,transitionLabel)),width=640,height=360,pad=52,scale=Math.min((width-pad*2)/Math.max(1,bounds.width),(height-pad*2)/Math.max(1,bounds.height)),pos=state=>({x:pad+(state.x-bounds.x)*scale,y:pad+(state.y-bounds.y)*scale}),statesById=new Map(subgraph.states.map(state=>[state.id,state]));
+ const edges=subgraph.edges.map(edge=>{const a=statesById.get(edge.from),b=statesById.get(edge.to);if(!a||!b)return '';const p=pos(a),q=pos(b),mx=(p.x+q.x)/2,my=(p.y+q.y)/2;return `<path class="target-edge" d="M${p.x} ${p.y} Q${mx} ${my-18} ${q.x} ${q.y}"/><text class="target-edge-label" x="${mx}" y="${my-12}">${esc(simpleTransitionLabel(edge))}</text>`}).join('');
+ const nodes=members.map(state=>{const p=pos(state);return `<g class="target-state" role="button" tabindex="0" data-member-id="${esc(state.id)}" aria-label="Connect to ${esc(state.name)}"><circle cx="${p.x}" cy="${p.y}" r="29"/><text x="${p.x}" y="${p.y-2}">${esc(state.name)}</text>${state.token?`<text class="target-token" x="${p.x}" y="${p.y+12}">${esc(state.token)}</text>`:''}</g>`}).join('');
  cancelConnect();
- groupTargetDialog.innerHTML=`<form method="dialog"><div class="dialog-heading"><h2 id="group-target-heading">Connect to ${esc(group.name)}</h2><button aria-label="Cancel">✕</button></div></form><div class="group-target-list">${members.map((state,i)=>`<button class="transition-item" data-member="${i}">${esc(state.name)}${state.token?`<small>${esc(state.token)}</small>`:''}</button>`).join('')}</div>`;
- groupTargetDialog.querySelectorAll('[data-member]').forEach(button=>button.onclick=()=>{
+ groupTargetDialog.innerHTML=`<form method="dialog"><div class="dialog-heading"><h2 id="group-target-heading">Choose a state in ${esc(group.name)}</h2><button aria-label="Cancel">✕</button></div><svg class="group-target-graph" viewBox="0 0 ${width} ${height}" role="group" aria-label="Subgraph states and transitions">${edges}${nodes}</svg></form>`;
+ const chooseMember=button=>{
   groupTargetDialog.close();
   source=from;
-  connectTo(members[Number(button.dataset.member)].id);
- });
+  connectTo(button.dataset.memberId);
+ };
+ groupTargetDialog.querySelectorAll('[data-member-id]').forEach(button=>{button.onclick=()=>chooseMember(button);button.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chooseMember(button)}}});
  groupTargetDialog.showModal();
 }
 function openGroupById(id){if(!(machine.groups??[]).some(g=>g.id===id))return;for(const popover of document.querySelectorAll(':popover-open'))popover.hidePopover();openGroup=id;clearSelection();showProperties(false);render();if(!overviewView)fit();requestAnimationFrame(()=>{for(const popover of document.querySelectorAll(':popover-open'))popover.hidePopover()})}
@@ -348,7 +349,7 @@ window.addEventListener('keydown',event=>{if(document.querySelector('dialog[open
 try{setTipsVisible(localStorage.getItem('lexica-tips-hidden')!=='true')}catch{}
 $('fit').onclick=fit;$('arrange').onclick=()=>{saveLayoutSettings();checkpoint();if($('layout-disregard-groups').checked){machine.groups=[];openGroup=null}const groups=smartArrange(machine,openGroup,{mode:$('layout-mode').value,spacing:Number($('layout-density').value),forces:springControls.read(),smartGroups:$('layout-portals').checked});clearSelection();changed();if(overviewView)fitGroupContents();else fit();$('layout-menu').hidePopover();toast(groups?`Arranged graph and created ${groups} connected groups. Undo to restore.`:'States arranged. Undo to restore.')};
 function zoom(factor,p){const v=overviewView??view(),center=p??{x:v.x+v.width/2,y:v.y+v.height/2};if(v.width*factor<160||v.width*factor>30000)return;setView({x:center.x+(v.x-center.x)*factor,y:center.y+(v.y-center.y)*factor,width:v.width*factor,height:v.height*factor})}
-function wheelGraph(e){e.preventDefault();const canvas=overviewView?overviewCanvas:$('canvas');if(e.ctrlKey||e.metaKey){if(e.deltaY)zoom(wheelZoomFactor(e.deltaY,editorSettings.pinchSensitivity),overviewView?overviewGraph.point(e):point(e));return}const v=overviewView??view(),unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1;setView({...v,x:v.x+e.deltaX*unit*v.width/canvas.clientWidth,y:v.y+e.deltaY*unit*v.height/canvas.clientHeight})}
+function wheelGraph(e){e.preventDefault();const canvas=overviewView?overviewCanvas:$('canvas');if(e.ctrlKey||e.metaKey){if(e.deltaY)zoom(wheelZoomFactor(e.deltaY,editorSettings.pinchSensitivity),overviewView?overviewGraph.point(e):point(e));return}const v=overviewView??view(),unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1,shifted=e.deltaMode!==0&&e.shiftKey&&!e.deltaX,dx=shifted?e.deltaY:e.deltaX,dy=shifted?0:e.deltaY;setView({...v,x:v.x+dx*unit*v.width/canvas.clientWidth,y:v.y+dy*unit*v.height/canvas.clientHeight})}
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);canvasWrap.addEventListener('wheel',wheelGraph,{passive:false,capture:true});
 $('delete-selection').onclick=remove;$('toggle-properties').onclick=()=>showProperties(document.body.classList.contains('properties-hidden'));$('close-properties').onclick=()=>showProperties(false);function setTesterCollapsed(collapsed){document.body.classList.toggle('tester-collapsed',collapsed);$('toggle-tester').setAttribute('aria-label',collapsed?'Expand tester':'Collapse tester');$('toggle-tester').title=collapsed?'Expand tester':'Collapse tester';$('toggle-tester').setAttribute('aria-expanded',String(!collapsed));requestAnimationFrame(syncInputLayout)}
 try{setTesterCollapsed(localStorage.getItem('lexica-tester-collapsed')==='true')}catch{}
