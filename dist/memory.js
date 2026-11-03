@@ -10,3 +10,6 @@ export function guardAllows(guard,value){
 }
 export function memoryEffect(effect,value){switch(effect.op){case'push':return [...value,effect.value];case'pop':return value.slice(0,-1);case'clear':return [];case'set':return effect.value;case'add':return value+effect.value}}
 export function memoryRuleLabel(rule){return rule.cell+' '+({add:'+=',set:':=',empty:'is empty',notEmpty:'is not empty'}[rule.op]??rule.op)+(needsValue(rule.op)?' '+rule.value:'')}
+
+export function copyConditions(edge){return JSON.stringify({kind:'lexica-conditions',...Object.fromEntries(['guard','guards','guardMode','guardDisabled'].filter(key=>edge[key]!==undefined).map(key=>[key,edge[key]]))})}
+export function pasteConditions(edge,text){if(text.length>1000000)throw Error('Clipboard is too large.');let data;try{data=JSON.parse(text)}catch{throw Error('Copy conditions from a transition first.')}if(!data||data.kind!=='lexica-conditions'||(!data.guard&&!data.guards?.length))throw Error('Copy conditions from a transition first.');for(const key of ['guard','guards','guardMode','guardDisabled']){delete edge[key];if(data[key]!==undefined)edge[key]=data[key]}}

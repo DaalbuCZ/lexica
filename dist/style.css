@@ -535,3 +535,5 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .memory-rule-section .simple-rule-fields,.memory-rule-section .memory-rule{grid-template-columns:minmax(0,1fr)}.memory-rule-section .simple-field{min-width:0}.memory-rule-section .simple-field select,.memory-rule-section .simple-field input{width:100%;min-width:0}.extra-conditions{display:grid;gap:9px}.extra-conditions .simple-rule-fields{padding-top:10px;border-top:1px solid var(--line)}
 
 .inspector{overflow-y:auto;overscroll-behavior:contain}
+
+.condition-clipboard{display:flex;flex-wrap:wrap;gap:6px}.condition-clipboard button{flex:1 1 auto}
