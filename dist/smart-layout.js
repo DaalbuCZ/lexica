@@ -3,11 +3,23 @@ import {graphView,createGroup,groupFor} from './groups.js';
 import {destination} from './portals.js';
 import {commentAnchors,positionComments} from './comments.js';
 
+export function simpleBranch(machine){
+ if(!machine.start||machine.states.length>12)return false;
+ const children=new Map(machine.states.map(s=>[s.id,new Set()])),parents=new Map();
+ for(const edge of machine.edges){if(edge.from===edge.to)continue;if(!children.has(edge.from)||!children.has(edge.to))return false;children.get(edge.from).add(edge.to);if(parents.has(edge.to)&&parents.get(edge.to)!==edge.from)return false;parents.set(edge.to,edge.from)}
+ if(parents.has(machine.start))return false;
+ const seen=new Set(),queue=[machine.start];
+ for(let i=0;i<queue.length;i++){const id=queue[i];if(seen.has(id))return false;seen.add(id);queue.push(...children.get(id))}
+ return seen.size===machine.states.length;
+}
+
 function place(machine,focus,options){
  const shown=graphView(machine,focus,false),copy=structuredClone(shown),anchors=commentAnchors(machine);
  if(focus&&!copy.start){const members=new Set(copy.states.map(s=>s.id)),inbound=new Map();for(const edge of machine.edges){let to;try{to=destination(machine,edge)?.id}catch{continue}if(!members.has(edge.from)&&members.has(to))inbound.set(to,(inbound.get(to)??0)+1)}copy.start=[...inbound].sort((a,b)=>b[1]-a[1])[0]?.[0]??copy.states[0]?.id}
  for(const edge of copy.edges)delete edge.bend;
- autoLayout(copy,options.mode??'circle',options.spacing??.75,false,options.forces??{},false);
+ // Small directed branches read as a flow even when the surrounding graph uses a radial layout.
+ const compactBranch=focus&&simpleBranch(copy);
+ autoLayout(copy,compactBranch?'tree':options.mode??'circle',options.spacing??.75,false,options.forces??{},false);
  untangle(copy);
  for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
  const positions=new Map(copy.states.map(s=>[s.id,s]));

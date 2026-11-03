@@ -1,5 +1,6 @@
 // Groups are a view of the same states and transitions, never a second lexer model.
 import {destination} from './portals.js';
+import {simpleTransitionLabel} from './editor-settings.js';
 export function groupFor(machine, stateId) {
   return (machine.groups ?? []).find(group => group.stateIds.includes(stateId));
 }
@@ -36,7 +37,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
       incoming.get(edge.from).push(machine.states.find(s=>s.id===to).y);
       return [{...edge,to,portal:undefined,portalOffset:undefined,bend:undefined,originalIndex,outside:true}];
     });
-    const left=Math.min(...states.map(s=>s.x))-280;
+    const clearance=Math.max(280,...edges.filter(e=>e.outside).map(e=>simpleTransitionLabel(e).length*7+140));
+    const left=Math.min(...states.map(s=>s.x))-clearance;
     let previous=-Infinity;
     for(const [id,targets] of [...incoming].sort((a,b)=>a[1].reduce((s,n)=>s+n,0)/a[1].length-b[1].reduce((s,n)=>s+n,0)/b[1].length)){
       const y=Math.max(previous+180,targets.reduce((s,n)=>s+n,0)/targets.length);previous=y;

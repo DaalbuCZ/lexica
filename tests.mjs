@@ -1008,6 +1008,17 @@ import {arrangeGraph} from './dist/basic-layout.js';
 import {smartArrange,layoutQuality,untangle} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
 
+test('a small subgraph fork flows from the outside start through its entry to both destinations',()=>{
+ for(const mode of ['tree','circle','spring']){
+  const m={start:'start',states:['start','entry','first','second'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[{from:'start',to:'entry',label:'<'},{from:'entry',to:'first',label:'-'},{from:'entry',to:'second',label:'='}]};
+  const group=createGroup(m,['first','entry','second'],'Operators');smartArrange(m,group.id,{mode});
+  const view=graphView(m,group.id),get=id=>view.states.find(s=>s.id===id),entry=get('entry');
+  assert.ok(get('start').x<entry.x);assert.equal(get('start').y,entry.y);
+  assert.ok(entry.x<get('first').x);assert.equal(get('first').x,get('second').x);
+  assert.equal(entry.y,(get('first').y+get('second').y)/2);assert.notEqual(get('first').y,get('second').y);
+ }
+});
+
 test('untangling removes avoidable wire crossings without changing occupied positions or topology',()=>{
  const m={start:null,states:[['a',0,0],['b',200,200],['c',0,200],['d',200,0]].map(([id,x,y])=>({id,name:id,token:'',x,y})),edges:[{from:'a',to:'b',label:'a'},{from:'c',to:'d',label:'b'}]};
  const positions=m.states.map(s=>`${s.x},${s.y}`).sort(),edges=JSON.stringify(m.edges);assert.equal(crossingPairs(m).length,1);untangle(m);assert.equal(crossingPairs(m).length,0);assert.deepEqual(m.states.map(s=>`${s.x},${s.y}`).sort(),positions);assert.equal(JSON.stringify(m.edges),edges);
