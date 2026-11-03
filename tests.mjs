@@ -314,12 +314,14 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
  m.edges.push({...m.edges[0]});assert.throws(()=>tokenize(m,'x'),error=>error.stateId==='a'&&error.edgeIndices.join(',')==='0,1');
 });
 
-test('wheel pans both axes at canvas scale, shift pans horizontally, and pinch zooms',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf("$('zoom-in').onclick="),app.indexOf('\n',app.indexOf("$('zoom-in').onclick=")));
+test('wheel pans both axes without shift snapping and pinch zooms the shared viewport',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf('function wheelGraph('),app.indexOf("$('delete-selection').onclick="));
  let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
- runInNewContext(script,{$:id=>elements[id],view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),wheelZoomFactor,editorSettings:{pinchSensitivity:1},Math});
+ const overviewCanvas={clientWidth:800,clientHeight:400,addEventListener(){}};
+ runInNewContext(script,{$:id=>elements[id],overviewCanvas,overviewView:null,view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),wheelZoomFactor,editorSettings:{pinchSensitivity:1},Math});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,10);assert.equal(next.y,116);
+ wheel({...event,deltaX:4,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,138);assert.equal(next.y,116);
  wheel({...event,ctrlKey:true});assert.equal(zoomed[0],wheelZoomFactor(10));
  wheel({...event,deltaY:-120,ctrlKey:true});assert.equal(zoomed[0],wheelZoomFactor(-120));
  elements['zoom-in'].onclick();assert.equal(zoomed[0],.8);elements['zoom-out'].onclick();assert.equal(zoomed[0],1.25);
@@ -367,13 +369,13 @@ test('toolbar popovers open beside vertical docks and stay within the viewport',
  }
 });
 
-test('properties use the full canvas height with a side-docked tester and stay inside the canvas',()=>{
- const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('function showProperties('),app.indexOf('\n',app.indexOf('function showProperties(')));
+test('properties stay in the canvas and avoid visible controls',()=>{
+ const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let propertiesFrame='),app.indexOf('function markSelection('));
  for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
   const panel={style:{},offsetWidth:240,offsetHeight:500};
-  const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},document:{body:{classList:{toggle(){}}},querySelector:s=>s==='.inspector'?panel:null},$:id=>id==='canvas'?{getBoundingClientRect:()=>area}:{setAttribute(){}},window:{innerWidth:745}};
+  const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},canvasWrap:{getBoundingClientRect:()=>area},overviewView:null,groupPanel:null,document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:s=>s==='.inspector'?panel:null},$:()=>({setAttribute(){}}),requestAnimationFrame:fn=>{fn();return 1},cancelAnimationFrame(){}};
   runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
-  assert.equal(parseFloat(panel.style.maxHeight)+parseFloat(panel.style.top),area.bottom-12);assert.ok(parseFloat(panel.style.left)>=area.left);assert.ok(parseFloat(panel.style.left)+240<=area.right);assert.ok(parseFloat(panel.style.top)>=area.top+72);
+  assert.ok(parseFloat(panel.style.left)>=area.left+10);assert.ok(parseFloat(panel.style.left)+240<=area.right-10);assert.ok(parseFloat(panel.style.top)>=area.top+10);assert.ok(parseFloat(panel.style.top)+500<=area.bottom-10);
  }
 });
 
@@ -418,7 +420,7 @@ test('input caret and selections highlight matching tokens and traces without mo
 test('canvas resizing updates the minimap view while preserving zoom and graph center',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let canvasSize='),app.indexOf('new ResizeObserver(resizeCanvas)'));
  const canvas={clientWidth:800,clientHeight:600};let current={x:100,y:200,width:1600,height:1200},maps=0;
- const context={$:()=>canvas,view:()=>current,setView:v=>{current=v;maps++},syncInputLayout(){},document:{body:{classList:{contains:()=>true}}}};
+ const context={$:()=>canvas,overviewView:null,view:()=>current,setView:v=>{current=v;maps++},syncInputLayout(){},document:{body:{classList:{contains:()=>true}}}};
  runInNewContext(script,context);
  for(const [width,height] of [[500,600],[500,850],[900,850],[900,500],[800,600]]){
   canvas.clientWidth=width;canvas.clientHeight=height;runInNewContext('resizeCanvas();',context);
