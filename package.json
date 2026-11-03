@@ -13,6 +13,7 @@
   },
   "packageManager": "pnpm@12.14.0",
   "dependencies": {
+    "@khalidsaidi/topoloom": "0.4.0",
     "d3-force": "^3.0.0"
   }
 }

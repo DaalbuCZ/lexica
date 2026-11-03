@@ -229,7 +229,7 @@ function computeRoutes(machine,labels){
   for(const segment of segments)if(segment.edge!==e&&segmentHitsBox(segment.from,segment.to,label))collisions++;
   if(collisions<labelScore){labelScore=collisions;bestLabel=label}if(!collisions)break;
  }
- c.label=bestLabel;let score=(loop?Math.floor(attempt/4):attempt)*.1+labelScore*10;
+ c.label=bestLabel;let score=(loop?Math.floor(attempt/4)*.1:attempt===0?0:2500+attempt*15)+labelScore*10;
  // A Bezier curve stays inside its control-point bounds; outside obstacles cannot collide.
  const left=Math.min(c.p0.x,c.c1.x,c.c2.x,c.p3.x),right=Math.max(c.p0.x,c.c1.x,c.c2.x,c.p3.x),top=Math.min(c.p0.y,c.c1.y,c.c2.y,c.p3.y),bottom=Math.max(c.p0.y,c.c1.y,c.c2.y,c.p3.y);
  const nearby=score<bestScore?machine.states.filter(s=>s!==a&&s!==b&&s.x>=left-65&&s.x<=right+65&&s.y>=top-65&&s.y<=bottom+65):[];

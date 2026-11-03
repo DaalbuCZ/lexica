@@ -2,6 +2,7 @@ import {autoLayout,crossingPairs} from './layout.js';
 import {graphView,createGroup,groupFor} from './groups.js';
 import {destination} from './portals.js';
 import {commentAnchors,positionComments} from './comments.js';
+import {planarCoordinates,drawingClearance} from './planar-layout.js';
 
 export function simpleBranch(machine){
  if(!machine.start||machine.states.length>12)return false;
@@ -17,10 +18,18 @@ function place(machine,focus,options){
  const shown=graphView(machine,focus,false),copy=structuredClone(shown),anchors=commentAnchors(machine);
  if(focus&&!copy.start){const members=new Set(copy.states.map(s=>s.id)),inbound=new Map();for(const edge of machine.edges){let to;try{to=destination(machine,edge)?.id}catch{continue}if(!members.has(edge.from)&&members.has(to))inbound.set(to,(inbound.get(to)??0)+1)}copy.start=[...inbound].sort((a,b)=>b[1]-a[1])[0]?.[0]??copy.states[0]?.id}
  for(const edge of copy.edges)delete edge.bend;
+ const analytical=planarCoordinates(copy);
  // Small directed branches read as a flow even when the surrounding graph uses a radial layout.
  const compactBranch=focus&&simpleBranch(copy);
  autoLayout(copy,compactBranch?'tree':options.mode??'circle',options.spacing??.75,false,options.forces??{},false);
- untangle(copy);
+ const clearance=drawingClearance(copy.states,copy.edges);
+ if(analytical.positions&&(clearance.crossings||clearance.wire<65||clearance.node<160)){
+  // Uniform transforms retain the embedding; don't snap or repel vertices afterwards.
+  const root=analytical.positions.get(copy.start),points=[...analytical.positions.values()];
+  const center={x:points.reduce((sum,p)=>sum+p.x,0)/points.length,y:points.reduce((sum,p)=>sum+p.y,0)/points.length};
+  const angle=root?Math.atan2(center.y-root.y,center.x-root.x):0,cos=Math.cos(angle),sin=Math.sin(angle);
+  for(const state of copy.states){const p=analytical.positions.get(state.id),x=p.x-(root?.x??0),y=p.y-(root?.y??0);state.x=160+x*cos+y*sin;state.y=160-x*sin+y*cos}
+ }else if(!analytical.positions)untangle(copy);
  for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
  const positions=new Map(copy.states.map(s=>[s.id,s]));
  for(const state of shown.states){const next=positions.get(state.id);if(!next)continue;

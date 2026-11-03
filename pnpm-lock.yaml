@@ -166,6 +166,9 @@ importers:
 
   .:
     dependencies:
+      '@khalidsaidi/topoloom':
+        specifier: 0.4.0
+        version: 0.4.0
       d3-force:
         specifier: ^3.0.0
         version: 3.0.0
@@ -175,6 +178,9 @@ importers:
         version: 8.3.5
 
 packages:
+
+  '@khalidsaidi/topoloom@0.4.0':
+    resolution: {integrity: sha512-+JomHh5jpV/kbNlvdPWsyS+mj+L1pNDjF9FLpeBoHTVJu55gw5Vu7gj/zWzt5JiHVBY9qrxhq3aVFNOSVYLwRQ==}
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
@@ -459,6 +465,8 @@ packages:
         optional: true
 
 snapshots:
+
+  '@khalidsaidi/topoloom@0.4.0': {}
 
   '@oxc-project/types@0.154.0': {}
 

@@ -1007,6 +1007,33 @@ test('manual connection bends keep their base curve stable during dragging',()=>
 import {arrangeGraph} from './dist/basic-layout.js';
 import {smartArrange,layoutQuality,untangle} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
+import {planarCoordinates,drawingClearance} from './dist/planar-layout.js';
+
+test('topological grid embedding handles planar cycles, nested faces, cut vertices and disconnected components',()=>{
+ const fixtures=[
+  [4,[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]]],
+  [8,[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]],
+  [8,[[0,1],[1,2],[2,0],[2,3],[3,4],[4,2],[4,5],[6,7]]],
+  [9,Array.from({length:9},(_,v)=>[...(v%3<2?[[v,v+1]]:[]),...(v<6?[[v,v+3]]:[])]).flat()]
+ ];
+ for(const [n,pairs] of fixtures){const m={start:'0',states:Array.from({length:n},(_,id)=>({id:String(id),name:String(id),token:'',x:0,y:0})),edges:pairs.map(([a,b])=>({from:String(a),to:String(b),label:'a'}))},before=JSON.stringify(m);
+  const result=planarCoordinates(m);assert.equal(result.planar,true);assert.ok(result.positions);assert.equal(JSON.stringify(m),before);
+  const nodes=m.states.map(s=>({...s,...result.positions.get(s.id)})),clearance=drawingClearance(nodes,m.edges);
+  assert.equal(clearance.crossings,0);assert.ok(clearance.node>=219.999);assert.ok(clearance.wire>=84.999);
+  assert.deepEqual(planarCoordinates(m).positions,result.positions);
+ }
+});
+
+test('planarity test rejects K3,3 even though it passes the Euler edge-count bound',()=>{
+ const m={states:Array.from({length:6},(_,id)=>({id:String(id)})),edges:Array.from({length:3},(_,a)=>Array.from({length:3},(_,b)=>({from:String(a),to:String(b+3)}))).flat()};
+ assert.ok(m.edges.length<=3*m.states.length-6);const result=planarCoordinates(m);assert.equal(result.planar,false);assert.equal(result.positions,null);
+});
+
+test('ordinary unblocked transitions route straight while loops and manual bends retain their geometry',()=>{
+ const m={states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'',x:400,y:0}],edges:[{from:'a',to:'b',label:'a'}]},route=routeEdges(m)[0];
+ assert.ok(Math.abs(route.c1.y-route.p0.y)<1e-8);assert.ok(Math.abs(route.c2.y-route.p3.y)<1e-8);
+ m.edges[0].bend={x:0,y:90};assert.notEqual(routeEdges(m)[0].c1.y,route.c1.y);
+});
 
 test('a small subgraph fork flows from the outside start through its entry to both destinations',()=>{
  for(const mode of ['tree','circle','spring']){
