@@ -31,7 +31,7 @@ let stepper={reset(){},active(){return false}},errorNav={update(){}},memoryRules
 let selectedStates=new Set(['s1']),selectedEdges=new Set(),selectedComments=new Set(),selectedCommentLinks=new Set(),toolMode='pan',marquee=null,clipboardText='',pasteCount=0,lastTransitionRule='';
 let openGroup=null, editingGroup=null;
 const groupBar=document.createElement('div');groupBar.className='group-navigation';groupBar.setAttribute('aria-label','Graph groups');document.querySelector('.canvas-wrap').append(groupBar);
-const moveGroupButton=document.createElement('button');moveGroupButton.id='move-state-group';moveGroupButton.className='icon-button';moveGroupButton.innerHTML='<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>';moveGroupButton.setAttribute('aria-label','Move selected state to group');moveGroupButton.title='Move selected state to a group';moveGroupButton.disabled=true;document.querySelector('.inspector-actions').prepend(moveGroupButton);
+const moveGroupButton=document.createElement('button');moveGroupButton.id='move-state-group';moveGroupButton.className='icon-button';moveGroupButton.innerHTML='<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="12" height="16" rx="2" stroke-dasharray="3 2"/><path d="M9 12h11m-4-4 4 4-4 4"/></svg>';moveGroupButton.setAttribute('aria-label','Move selected state to group');moveGroupButton.title='Move selected state to a group';moveGroupButton.disabled=true;document.querySelector('.inspector-actions').prepend(moveGroupButton);
 const groupDialog=document.createElement('dialog');groupDialog.className='group-dialog';groupDialog.innerHTML='<form method="dialog"><h2>Group states</h2><label>Name<input id="group-name" maxlength="60" required></label><div class="dialog-actions"><button value="cancel">Cancel</button><button value="create" class="primary">Create group</button></div></form>';document.body.append(groupDialog);
 const canvasWrap=groupBar.parentElement;
 const overviewCanvas=document.createElement('canvas');
@@ -39,7 +39,7 @@ overviewCanvas.className='group-overview-backdrop';
 overviewCanvas.hidden=true;
 overviewCanvas.setAttribute('aria-hidden','true');
 canvasWrap.prepend(overviewCanvas);
-const overviewGraph=createGraphCanvas(overviewCanvas,document.createElement('canvas'));
+const overviewGraph=createGraphCanvas(overviewCanvas,$('minimap'));
 const groupPanel=document.createElement('section');
 groupPanel.className='group-overlay';
 groupPanel.hidden=true;
@@ -51,7 +51,7 @@ function floatingObstacles(exclude){return [document.querySelector('.brand'),doc
 function positionGroupPanel(group,bounds){
  const area=canvasWrap.getBoundingClientRect();if(!group||!area.width||!area.height||!bounds)return;
  const {scale,x,y}=canvasTransform(overviewView,area.width,area.height),padding=38,heading=groupPanel.querySelector('.group-overlay-heading').offsetHeight||42;
- const panelWidth=Math.max(180,bounds.width*scale+padding*2),panelHeight=Math.max(140,bounds.height*scale+padding*2+heading);
+ const panelWidth=Math.max(180,Math.min(bounds.width*scale+padding*2,area.width-20)),panelHeight=Math.max(140,Math.min(bounds.height*scale+padding*2+heading,area.height-20));
  const center={x:area.left+x+group.x*scale,y:area.top+y+group.y*scale};
  groupPanel.style.width=panelWidth+'px';groupPanel.style.height=panelHeight+'px';groupPanel.style.left=center.x-area.left+'px';groupPanel.style.top=center.y-area.top+'px';
  const innerHeight=panelHeight-heading,innerScale=scale;
@@ -292,10 +292,10 @@ let propertiesFrame=null,propertiesEvent=null;
 function showProperties(show,event){document.body.classList.toggle('properties-hidden',!show);$('toggle-properties').setAttribute('aria-expanded',String(show));if(!show){if(propertiesFrame!==null)cancelAnimationFrame(propertiesFrame);propertiesFrame=null;return}if(event)propertiesEvent={clientX:event.clientX,clientY:event.clientY};if(propertiesFrame!==null)return;propertiesFrame=requestAnimationFrame(()=>{propertiesFrame=null;positionProperties()})}
 function positionProperties(){
  if(document.body.classList.contains('properties-hidden'))return;
- const panel=document.querySelector('.inspector'),area=canvasWrap.getBoundingClientRect(),box=graph.selectionBox(selection),anchor=propertiesEvent??{clientX:box?.right??area.left+area.width/2,clientY:box?.top??area.top+90};propertiesEvent=null;
+ const panel=document.querySelector('.inspector'),area=canvasWrap.getBoundingClientRect(),box=graph.selectionBox(selection);propertiesEvent=null;
  panel.style.width=Math.max(40,Math.min(224,area.width-24))+'px';panel.style.maxWidth=Math.max(40,area.width-24)+'px';panel.style.maxHeight=Math.max(40,area.height-24)+'px';
  const size={width:panel.offsetWidth,height:panel.offsetHeight},obstacles=floatingObstacles(panel);
- const preferLeft=anchor.clientX>area.left+area.width/2,candidate={x:preferLeft?anchor.clientX-size.width-18:anchor.clientX+18,y:anchor.clientY-15},placed=placeFloatingRect(candidate,size,area,obstacles,12);
+ const anchor=box?{x:(box.left+box.right)/2,y:(box.top+box.bottom)/2}:{x:area.left+area.width/2,y:area.top+area.height/2},preferLeft=anchor.x>area.left+area.width/2,candidate={x:preferLeft?(box?.left??anchor.x)-size.width-14:(box?.right??anchor.x)+14,y:anchor.y-size.height/2},placed=placeFloatingRect(candidate,size,area,obstacles,12);
  panel.style.left=placed.x+'px';panel.style.top=placed.y+'px';
 }
 function markSelection(){draw();$('copy-selection').disabled=selection.type==='none';$('toggle-properties').disabled=false;moveGroupButton.disabled=selectedStates.size!==1}
@@ -347,17 +347,17 @@ $('hide-tips').onclick=()=>setTipsVisible(false);const shortcutsDialog=document.
 window.addEventListener('keydown',event=>{if(document.querySelector('dialog[open]')){event.stopImmediatePropagation();return}const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase(),typing=event.target.matches('input,textarea,select');if(event.altKey&&!control&&(key==='arrowright'||key==='arrowleft'||key==='s')){event.preventDefault();event.stopImmediatePropagation();if(key==='arrowright')event.shiftKey?stepper.nextToken():stepper.next();else if(key==='arrowleft')event.shiftKey?stepper.previousToken():stepper.previous();else if(!event.shiftKey)stepper.toggle();return}if(event.key==='?'&&!control&&!event.altKey&&!typing){event.preventDefault();event.stopImmediatePropagation();shortcutsDialog.showModal()}});
 
 try{setTipsVisible(localStorage.getItem('lexica-tips-hidden')!=='true')}catch{}
-$('fit').onclick=fit;$('arrange').onclick=()=>{saveLayoutSettings();checkpoint();if($('layout-disregard-groups').checked){machine.groups=[];openGroup=null}const groups=smartArrange(machine,openGroup,{mode:$('layout-mode').value,spacing:Number($('layout-density').value),forces:springControls.read(),smartGroups:$('layout-portals').checked});clearSelection();changed();if(overviewView)fitGroupContents();else fit();$('layout-menu').hidePopover();toast(groups?`Arranged graph and created ${groups} connected groups. Undo to restore.`:'States arranged. Undo to restore.')};
+$('fit').onclick=fit;$('arrange').onclick=()=>{const button=$('arrange');if(button.disabled)return;saveLayoutSettings();button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='Arranging…';button.classList.add('arranging');requestAnimationFrame(()=>setTimeout(()=>{try{checkpoint();if($('layout-disregard-groups').checked){machine.groups=[];openGroup=null}const groups=smartArrange(machine,openGroup,{mode:$('layout-mode').value,spacing:Number($('layout-density').value),forces:springControls.read(),smartGroups:$('layout-portals').checked});clearSelection();changed();if(overviewView)fitGroupContents();else fit();$('layout-menu').hidePopover();toast(groups?`Arranged graph and created ${groups} connected groups. Undo to restore.`:'States arranged. Undo to restore.')}catch(error){history.pop();toast(error.message)}finally{button.disabled=false;button.removeAttribute('aria-busy');button.classList.remove('arranging');button.textContent='Apply layout'}},30))};
 function zoom(factor,p){const v=overviewView??view(),center=p??{x:v.x+v.width/2,y:v.y+v.height/2};if(v.width*factor<160||v.width*factor>30000)return;setView({x:center.x+(v.x-center.x)*factor,y:center.y+(v.y-center.y)*factor,width:v.width*factor,height:v.height*factor})}
 function wheelGraph(e){e.preventDefault();const canvas=overviewView?overviewCanvas:$('canvas');if(e.ctrlKey||e.metaKey){if(e.deltaY)zoom(wheelZoomFactor(e.deltaY,editorSettings.pinchSensitivity),overviewView?overviewGraph.point(e):point(e));return}const v=overviewView??view(),unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1,shifted=e.deltaMode!==0&&e.shiftKey&&!e.deltaX,dx=shifted?e.deltaY:e.deltaX,dy=shifted?0:e.deltaY;setView({...v,x:v.x+dx*unit*v.width/canvas.clientWidth,y:v.y+dy*unit*v.height/canvas.clientHeight})}
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);canvasWrap.addEventListener('wheel',wheelGraph,{passive:false,capture:true});
 $('delete-selection').onclick=remove;$('toggle-properties').onclick=()=>showProperties(document.body.classList.contains('properties-hidden'));$('close-properties').onclick=()=>showProperties(false);function setTesterCollapsed(collapsed){document.body.classList.toggle('tester-collapsed',collapsed);$('toggle-tester').setAttribute('aria-label',collapsed?'Expand tester':'Collapse tester');$('toggle-tester').title=collapsed?'Expand tester':'Collapse tester';$('toggle-tester').setAttribute('aria-expanded',String(!collapsed));requestAnimationFrame(syncInputLayout)}
 try{setTesterCollapsed(localStorage.getItem('lexica-tester-collapsed')==='true')}catch{}
 $('toggle-tester').onclick=()=>{const collapsed=!document.body.classList.contains('tester-collapsed');setTesterCollapsed(collapsed);try{localStorage.setItem('lexica-tester-collapsed',String(collapsed))}catch{}};
-function drawMap(){graph.drawMap()}
+function drawMap(){(overviewView?overviewGraph:graph).drawMap()}
 let mapDragging=false,mapTransform=null;
-function navigateMap(e){const p=graph.mapPoint(e,mapTransform??graph.mapTransform()),v=view();setView({...v,x:p.x-v.width/2,y:p.y-v.height/2})}
-$('minimap').onpointerdown=e=>{e.preventDefault();mapDragging=true;mapTransform=graph.mapTransform();$('minimap').setPointerCapture(e.pointerId);navigateMap(e)};$('minimap').onpointermove=e=>{if(mapDragging)navigateMap(e)};$('minimap').onpointerup=()=>{mapDragging=false;mapTransform=null};$('minimap').onpointercancel=()=>{mapDragging=false;mapTransform=null};
+function navigateMap(e){const activeMap=overviewView?overviewGraph:graph,p=activeMap.mapPoint(e,mapTransform??activeMap.mapTransform()),v=overviewView??view();setView({...v,x:p.x-v.width/2,y:p.y-v.height/2})}
+$('minimap').onpointerdown=e=>{e.preventDefault();mapDragging=true;mapTransform=(overviewView?overviewGraph:graph).mapTransform();$('minimap').setPointerCapture(e.pointerId);navigateMap(e)};$('minimap').onpointermove=e=>{if(mapDragging)navigateMap(e)};$('minimap').onpointerup=()=>{mapDragging=false;mapTransform=null};$('minimap').onpointercancel=()=>{mapDragging=false;mapTransform=null};
 const lexerAnalyzer=createLexerAnalyzer(tokenize,{workerFactory:typeof Worker==='undefined'?null:()=>new Worker(new URL('./lexer-worker.js',import.meta.url),{type:'module'})});
 const inputWork=createDebouncedTask(()=>{save();test();focusInputToken()},{delay:120});
 let inputAnalysisPending=false,inputTestVersion=0,allInputTokens=[],activeTokenCards=[],lastFocusedCard=null;
@@ -439,20 +439,11 @@ new ResizeObserver(()=>{if(overviewView)draw()}).observe(canvasWrap);
 function setOverviewView(next){setView(next)}
 setupCanvasGestures(overviewCanvas,{getView:()=>overviewView,setView:setOverviewView,toWorld:overviewGraph.point,sensitivity:()=>editorSettings.pinchSensitivity,onInterrupt:()=>{overviewCanvas.onpointermove=null}});
 
-overviewCanvas.onpointerdown=event=>{
- if(!event.isPrimary||event.button!==0)return;
- closeGroup();
- return;
- const initial=overviewView, start=overviewGraph.point(event);
- overviewCanvas.setPointerCapture(event.pointerId);
- overviewCanvas.onpointermove=move=>{
-  if(move.pointerId!==event.pointerId)return;
-  const rect=overviewCanvas.getBoundingClientRect();
-  const {scale,x,y}=canvasTransform(initial,rect.width,rect.height);
-  setOverviewView({...initial,x:initial.x+start.x-(move.clientX-rect.left-x)/scale,y:initial.y+start.y-(move.clientY-rect.top-y)/scale});
- };
- overviewCanvas.onlostpointercapture=()=>{overviewCanvas.onpointermove=null};
-};
+let outsideGroupPress=null;
+overviewCanvas.addEventListener('pointerdown',event=>{if(!event.isPrimary||event.button!==0)return;outsideGroupPress={id:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,moved:false,view:{...overviewView},type:event.pointerType}});
+window.addEventListener('pointermove',event=>{if(outsideGroupPress?.id!==event.pointerId)return;const press=outsideGroupPress;if(Math.hypot(event.clientX-press.x,event.clientY-press.y)>8)press.moved=true;if(press.moved&&press.type!=='touch'){const rect=overviewCanvas.getBoundingClientRect(),scale=canvasTransform(press.view,rect.width,rect.height).scale;setOverviewView({...press.view,x:press.view.x-(event.clientX-press.x)/scale,y:press.view.y-(event.clientY-press.y)/scale})}},true);
+window.addEventListener('pointerup',event=>{if(outsideGroupPress?.id!==event.pointerId)return;const shouldClose=!outsideGroupPress.moved;outsideGroupPress=null;if(shouldClose&&overviewView)closeGroup()},true);
+window.addEventListener('pointercancel',event=>{if(outsideGroupPress?.id===event.pointerId)outsideGroupPress=null},true);
 
 
 $('show-skipped').onchange=()=>{save();test()};
