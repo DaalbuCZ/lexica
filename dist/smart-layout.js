@@ -5,6 +5,7 @@ import {commentAnchors,positionComments} from './comments.js';
 import {planarCoordinates,drawingClearance} from './planar-layout.js';
 import {tidyTree,radialTree} from './tidy-tree.js';
 import {blockLayout} from './block-layout.js';
+import {compactPlanar} from './compact-planar.js';
 
 export function simpleBranch(machine){
  if(!machine.start||machine.states.length>12)return false;
@@ -27,7 +28,7 @@ function place(machine,focus,options){
  const arrange=candidate=>{if(mode==='tree')tidyTree(candidate,spacing);else if(mode==='circle')radialTree(candidate,spacing);else autoLayout(candidate,mode,spacing,false,options.forces??{},false)};
  const extent=states=>states.length?Math.max(Math.max(...states.map(s=>s.x))-Math.min(...states.map(s=>s.x)),Math.max(...states.map(s=>s.y))-Math.min(...states.map(s=>s.y))):0;
  const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges),xs=candidate.states.map(s=>s.x),ys=candidate.states.map(s=>s.y),width=xs.length?Math.max(...xs)-Math.min(...xs):0,height=ys.length?Math.max(...ys)-Math.min(...ys):0,nodes=new Map(candidate.states.map(s=>[s.id,s]));let wire=0;for(const e of candidate.edges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)wire+=Math.hypot(a.x-b.x,a.y-b.y)}return c.crossings*2000+(c.wire<65?2000:0)+Math.sqrt(width*height)/35+extent(candidate.states)/70+wire/800};
- arrange(copy);let best=cost(copy),chosen=copy.states,limit=Math.max(2200,extent(copy.states)*1.5);
+ arrange(copy);let best=cost(copy),chosen=copy.states,limit=Math.max(2200,extent(copy.states)*(focus?2.5:1.5));
  if(analytical.positions){
   // Use the planar embedding to order branches, then assign coordinates in the
   // requested style. A grid drawing must not silently replace Radial or Tree.
@@ -42,6 +43,7 @@ function place(machine,focus,options){
   }
  }
  if(focus&&!compactBranch){const candidate=structuredClone(shown);candidate.start=copy.start;if(blockLayout(candidate,spacing)){const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best){best=next;chosen=candidate.states}}}
+ if(focus&&!compactBranch&&analytical.positions&&(()=>{const c=drawingClearance(chosen,copy.edges);return c.crossings||c.wire<65||c.node<170})()){const candidate=structuredClone(shown);candidate.start=copy.start;candidate.states=compactPlanar(candidate,analytical.positions);const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best){best=next;chosen=candidate.states}}
  const selected=new Map(chosen.map(s=>[s.id,s]));for(const state of copy.states){state.x=selected.get(state.id).x;state.y=selected.get(state.id).y}
 
  for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;

@@ -1,6 +1,6 @@
 // Groups are a view of the same states and transitions, never a second lexer model.
 import {destination} from './portals.js';
-import {simpleTransitionLabel} from './editor-settings.js';
+import {boundaryContext} from './boundary-layout.js';
 export function groupFor(machine, stateId) {
   return (machine.groups ?? []).find(group => group.stateIds.includes(stateId));
 }
@@ -27,25 +27,17 @@ export function graphView(machine, focus = null, includeOutside = true) {
   if (focus && !groups.some(group => group.id === focus)) focus = null;
   if (focus) {
     const ids = new Set(groups.find(group => group.id === focus).stateIds);
-    const states=machine.states.filter(state=>ids.has(state.id)),incoming=new Map();
+    const states=machine.states.filter(state=>ids.has(state.id));
     const edges=machine.edges.flatMap((edge,originalIndex)=>{
       let to;try{to=destination(machine,edge)?.id}catch{return []}
       if(!ids.has(to))return [];
       if(ids.has(edge.from))return [{...edge,to,originalIndex}];
       if(!includeOutside)return [];
-      if(!incoming.has(edge.from))incoming.set(edge.from,[]);
-      incoming.get(edge.from).push(machine.states.find(s=>s.id===to).y);
       return [{...edge,to,portal:undefined,portalOffset:undefined,bend:undefined,originalIndex,outside:true}];
     });
-    const clearance=Math.max(280,...edges.filter(e=>e.outside).map(e=>simpleTransitionLabel(e).length*7+140));
-    const left=Math.min(...states.map(s=>s.x))-clearance;
-    let previous=-Infinity;
-    for(const [id,targets] of [...incoming].sort((a,b)=>a[1].reduce((s,n)=>s+n,0)/a[1].length-b[1].reduce((s,n)=>s+n,0)/b[1].length)){
-      const y=Math.max(previous+180,targets.reduce((s,n)=>s+n,0)/targets.length);previous=y;
-      states.push({...machine.states.find(s=>s.id===id),x:left,y,outside:true,portal:undefined,portalOffset:undefined});
-    }
+    const context=includeOutside?boundaryContext(machine,states,edges):{states,edges};
     return {start: ids.has(machine.start) ? machine.start : null,
-      states,edges,
+      ...context,
       comments: (machine.comments ?? []).filter(comment => (comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some(id => ids.has(id))),
       labelBoxes: machine.labelBoxes};
   }

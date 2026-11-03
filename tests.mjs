@@ -1010,6 +1010,23 @@ import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
 import {planarCoordinates,drawingClearance} from './dist/planar-layout.js';
 import {radialTree} from './dist/tidy-tree.js';
 
+test('a multi-entry identifier group stays compact without long boundary crossings',()=>{
+ const ids=['outside','identifier','underscore','prefix','quote1','quote2','quote3','dollar','brace','doubleDollar'];
+ const pairs=[['outside','identifier'],['outside','underscore'],['outside','prefix'],['outside','dollar'],['identifier','identifier'],['underscore','identifier'],['prefix','identifier'],['prefix','quote1'],['quote1','quote2'],['quote2','quote3'],['dollar','identifier'],['dollar','brace'],['dollar','underscore'],['dollar','doubleDollar']];
+ const m={start:'outside',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to],i)=>({from,to,label:String.fromCharCode(65+i)}))},group=createGroup(m,ids.slice(1),'Identifiers'),before=structuredClone(m.states[0]);
+ smartArrange(m,group.id,{mode:'circle'});const view=graphView(m,group.id),clearance=drawingClearance(view.states,view.edges);
+ assert.equal(crossingPairs(view,true).length,0);assert.ok(clearance.node>=159.99);assert.ok(clearance.wire>=64.99);
+ const xs=view.states.map(s=>s.x),ys=view.states.map(s=>s.y);assert.ok((Math.max(...xs)-Math.min(...xs))*(Math.max(...ys)-Math.min(...ys))<2000000);
+ assert.deepEqual(m.states[0],before);assert.ok(view.states.filter(s=>s.outside).every(s=>s.outsideSource==='outside'));validate(m);
+});
+
+test('outside references choose an unobstructed side of a triangle with two entry targets',()=>{
+ const ids=['outside','entry','left','right','end'],pairs=[['outside','entry'],['outside','right'],['entry','left'],['entry','right'],['left','right'],['left','end'],['right','right']];
+ const m={start:'outside',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to],i)=>({from,to,label:String.fromCharCode(65+i)}))},group=createGroup(m,ids.slice(1),'Triangle');
+ smartArrange(m,group.id,{mode:'circle'});const view=graphView(m,group.id);assert.equal(crossingPairs(view,true).length,0);assert.ok(drawingClearance(view.states,view.edges).node>=159.99);
+ const nodes=new Map(view.states.map(s=>[s.id,s]));for(const edge of view.edges.filter(e=>e.outside)){const a=nodes.get(edge.from),b=nodes.get(edge.to);assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<750)}
+});
+
 test('a string-like subgraph keeps cyclic blocks compact and terminal continuations aligned',()=>{
  const names=['outside','open','content','accepted','empty','tripleEntry','quote1','body','quote2','tripleAccepted','escape'];
  const pairs=[['outside','open'],['open','content'],['content','accepted'],['content','content'],['open','empty'],['empty','tripleEntry'],['tripleEntry','quote1'],['tripleEntry','body'],['body','quote1'],['quote1','quote2'],['quote2','tripleAccepted'],['body','body'],['content','escape'],['escape','content'],['open','escape'],['quote1','body'],['quote2','body']];

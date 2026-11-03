@@ -32,7 +32,8 @@ export function blockLayout(machine,spacing=.75){
  function place(id,parentBlock,direction){
   const branches=incident.get(id).filter(b=>b!==parentBlock).sort((a,b)=>blocks[b].filter(n=>n!==id).reduce((sum,n)=>sum+1+weight(n,b),0)-blocks[a].filter(n=>n!==id).reduce((sum,n)=>sum+1+weight(n,a),0));
   for(let i=0;i<branches.length;i++){
-   const b=branches[i],angle=direction+(i===0?0:i===1?Math.PI:(i%2?1:-1)*Math.PI/2),positions=local(blocks[b],id,angle);if(!positions)return false;const origin=placed.get(id);
+   const spread=parentBlock!==null&&branches.length>1?(i-(branches.length-1)/2)*Math.PI/2:(i===0?0:i===1?Math.PI:(i%2?1:-1)*Math.PI/2);
+   const b=branches[i],angle=direction+spread,positions=local(blocks[b],id,angle);if(!positions)return false;const origin=placed.get(id);
    for(const [next,p] of positions)if(next!==id)placed.set(next,{x:origin.x+p.x,y:origin.y+p.y});
    for(const next of blocks[b])if(next!==id&&!place(next,b,angle))return false;
   }
