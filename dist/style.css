@@ -536,4 +536,4 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 
 .inspector{overflow-y:auto;overscroll-behavior:contain}
 
-.condition-clipboard{display:flex;flex-wrap:wrap;gap:6px}.condition-clipboard button{flex:1 1 auto}
+.condition-toggle-row{display:flex;align-items:center;gap:4px}.condition-toggle-row>label{flex:1;min-width:0}.condition-clipboard{display:flex;gap:2px}.condition-clipboard button{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:4px;border:0;background:transparent;color:inherit}.condition-clipboard button:hover{background:#0001}.condition-clipboard .tool-icon{width:16px;height:16px}[data-theme=dark] .condition-clipboard button:hover{background:#fff1}
