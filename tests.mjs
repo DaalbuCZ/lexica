@@ -1,4 +1,11 @@
 import {stackCell,guardOps,effectOps,needsValue} from './dist/memory.js';
+import {placeFloatingRect} from './dist/floating-placement.js';
+test('floating panels stop at canvas edges and leave a gap around controls',()=>{
+ const area={left:0,top:0,right:600,bottom:400},obstacle={left:270,top:0,right:340,bottom:180},size={width:120,height:100};
+ const placed=placeFloatingRect({x:275,y:35},size,area,[obstacle],12);
+ assert.ok(placed.x>=12&&placed.y>=12&&placed.x+size.width<=588&&placed.y+size.height<=388);
+ assert.ok(placed.x+size.width+12<=obstacle.left||placed.x-12>=obstacle.right||placed.y-12>=obstacle.bottom);
+});
 import {createTokenizationCache} from './dist/lexer-cache.js';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {example,tokenize,toTikz,validate,isAccepting,setAccepting} from './dist/lexer.js';
 test('lexer emits longest matches and marks whitespace skipped',()=>{assert.deepEqual(tokenize(example(),'hello_2 42+').map(t=>[t.token,t.value,!!t.skip]),[['IDENT','hello_2',false],['WS',' ',true],['NUMBER','42',false],['ERROR','+',false]])});
@@ -7,7 +14,12 @@ test('TikZ exports positions, loops, accepting and initial states; escapes label
 test('import rejects broken references and malformed regex',()=>{const m=example();m.edges[0].to='missing';assert.throws(()=>validate(m));m.edges[0].to='s1';m.edges[0].label='[';assert.throws(()=>validate(m))});
 test('longest match backtracks to last accepting state',()=>{const m={start:'a',states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:1,y:1},{id:'c',name:'c',token:'',x:2,y:2}],edges:[{from:'a',to:'b',label:'a'},{from:'b',to:'c',label:'b'}]};assert.deepEqual(tokenize(m,'ab').map(t=>t.token),['B','ERROR'])});
 
-import {autoLayout,routeEdges,loopDragBend} from './dist/layout.js';
+import {autoLayout,routeEdges,loopDragBend,loopAngles} from './dist/layout.js';
+test('reciprocal connections take distinct sides with separate labels',()=>{
+ const machine={states:[{id:'a',x:0,y:0},{id:'b',x:200,y:0}],edges:[{from:'a',to:'b',label:'forward'},{from:'b',to:'a',label:'back'}]};
+ const [forward,back]=routeEdges(machine);assert.ok(forward.label.y>35&&back.label.y< -35);
+ assert.ok(Math.abs(forward.label.y-back.label.y)>70);
+});
 import {statePortalBox} from './dist/portals.js';
 test('auto layout separates all states and retains topology',()=>{const m=example();for(const s of m.states){s.x=0;s.y=0}const edges=JSON.stringify(m.edges);autoLayout(m);assert.equal(JSON.stringify(m.edges),edges);for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=160);assert.ok(m.states.find(s=>s.id===m.start).x<m.states[1].x)});
 test('routed labels avoid nodes and one another after layout',()=>{const m=autoLayout(example()),routes=routeEdges(m);for(const r of routes){for(const s of m.states)assert.ok(Math.abs(r.label.x-s.x)>(r.label.w+90)/2||Math.abs(r.label.y-s.y)>(r.label.h+90)/2);assert.ok(!r.d.includes('NaN'))}for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++){const a=routes[i].label,b=routes[j].label;assert.ok(Math.abs(a.x-b.x)>(a.w+b.w)/2||Math.abs(a.y-b.y)>(a.h+b.h)/2)}});
@@ -64,7 +76,7 @@ test('tree layout reserves separate bands for uneven subtrees and centers each p
  assert.ok(Math.max(...['a','a1','a2','a3'].map(id=>get(id).y))+150<Math.min(...['b','b1','b2'].map(id=>get(id).y)));
  assert.equal(get('root').y,(get('a').y+get('b').y)/2);
  assert.ok(get('a').x>get('root').x);assert.ok(get('a3').x>get('a2').x);
- assert.deepEqual(m.comments[0].nodeIds,['root']);assert.equal(m.comments[0].x,get('root').x);assert.equal(m.comments[0].y,get('root').y);
+ assert.deepEqual(m.comments[0].nodeIds,['root']);assert.ok(Math.hypot(m.comments[0].x-get('root').x,m.comments[0].y-get('root').y)>40);
  const first=JSON.stringify(m);autoLayout(m);assert.equal(JSON.stringify(m),first);validate(m);
 });
 
@@ -183,7 +195,12 @@ test('copying states carries attached notes and remaps attachments, while notes 
  m.comments[0].nodeIds=['missing'];assert.throws(()=>validate(m),/attachment/);
 });
 
-import {commentAnchors,positionComments,commentLinks,toggleCommentNode} from './dist/comments.js';
+import {commentAnchors,positionComments,commentLinks,toggleCommentNode,placeCommentsAfterLayout} from './dist/comments.js';
+test('layout moves an attached comment away from a state and crossing wire',()=>{
+ const m={start:'a',states:[{id:'a',x:0,y:0},{id:'b',x:200,y:0}],edges:[{from:'a',to:'b',label:'x'}],comments:[{id:'note',text:'Explanation',x:0,y:0,nodeIds:['a']}]};
+ placeCommentsAfterLayout(m);assert.ok(Math.hypot(m.comments[0].x,m.comments[0].y)>40);
+ const placed={x:m.comments[0].x,y:m.comments[0].y};placeCommentsAfterLayout(m);assert.deepEqual({x:m.comments[0].x,y:m.comments[0].y},placed);
+});
 test('several states share one comment with toggleable dashed attachments and centroid movement',()=>{
  const m=example();m.comments=[makeComment(m,{x:600,y:100},'note')];m.comments[0].nodeIds=['s0'];
  toggleCommentNode(m,'note','s1');assert.deepEqual(m.comments[0].nodeIds,['s0','s1']);
@@ -316,9 +333,9 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
 
 test('wheel pans both axes without shift snapping and pinch zooms the shared viewport',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');const script=app.slice(app.indexOf('function wheelGraph('),app.indexOf("$('delete-selection').onclick="));
- let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400,addEventListener:(name,fn)=>wheel=fn}};
+ let wheel,next,zoomed;const elements={'zoom-in':{},'zoom-out':{},canvas:{clientWidth:800,clientHeight:400}};
  const overviewCanvas={clientWidth:800,clientHeight:400,addEventListener(){}};
- runInNewContext(script,{$:id=>elements[id],overviewCanvas,overviewView:null,view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),wheelZoomFactor,editorSettings:{pinchSensitivity:1},Math});
+ runInNewContext(script,{$:id=>elements[id],canvasWrap:{addEventListener:(name,fn)=>wheel=fn},overviewCanvas,overviewView:null,view:()=>({x:10,y:20,width:1600,height:800}),setView:v=>next=v,zoom:(...args)=>zoomed=args,point:()=>({x:0,y:0}),wheelZoomFactor,editorSettings:{pinchSensitivity:1},Math});
  const event={preventDefault(){},deltaX:30,deltaY:10,deltaMode:0};wheel(event);assert.equal(next.x,70);assert.equal(next.y,40);assert.equal(next.width,1600);
  wheel({...event,deltaX:0,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,10);assert.equal(next.y,116);
  wheel({...event,deltaX:4,deltaY:3,deltaMode:1,shiftKey:true});assert.equal(next.x,138);assert.equal(next.y,116);
@@ -373,7 +390,7 @@ test('properties stay in the canvas and avoid visible controls',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf('let propertiesFrame='),app.indexOf('function markSelection('));
  for(const area of [{left:0,right:425,top:0,bottom:919,width:425},{left:320,right:745,top:0,bottom:919,width:425},{left:0,right:745,top:190,bottom:919,width:745}]){
   const panel={style:{},offsetWidth:240,offsetHeight:500};
-  const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},canvasWrap:{getBoundingClientRect:()=>area},overviewView:null,groupPanel:null,document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:s=>s==='.inspector'?panel:null},$:()=>({setAttribute(){}}),requestAnimationFrame:fn=>{fn();return 1},cancelAnimationFrame(){}};
+  const context={graph:{selectionBox:()=>null},selection:{type:'edge',index:0},canvasWrap:{getBoundingClientRect:()=>area},floatingObstacles:()=>[],placeFloatingRect,document:{body:{classList:{toggle(){},contains:()=>false}},querySelector:s=>s==='.inspector'?panel:null},$:()=>({setAttribute(){}}),requestAnimationFrame:fn=>{fn();return 1},cancelAnimationFrame(){}};
   runInNewContext(script+"showProperties(true,{clientX:700,clientY:100});",context);
   assert.ok(parseFloat(panel.style.left)>=area.left+10);assert.ok(parseFloat(panel.style.left)+240<=area.right-10);assert.ok(parseFloat(panel.style.top)>=area.top+10);assert.ok(parseFloat(panel.style.top)+500<=area.bottom-10);
  }
@@ -448,7 +465,7 @@ test('grid pans and scales with world coordinates, including centered SVG viewpo
  v={x:0,y:0,width:30000,height:22500};runInNewContext('syncGrid();',context);assert.ok(Math.abs(parseFloat(grid.style.backgroundSize)-100*800/30000)<.001);
 });
 
-test('self loops evaluate all four orientations and choose the unobstructed side',()=>{
+test('self loops choose an unobstructed side and can use diagonal angle bisectors',()=>{
  const directions=[[0,-1],[1,0],[0,1],[-1,0]];
  for(let open=0;open<4;open++){
   const states=[{id:'root',name:'root',token:'',x:0,y:0},...directions.filter((_,i)=>i!==open).map(([x,y],i)=>({id:'block'+i,name:'block',token:'',x:x*105,y:y*105}))];
@@ -456,7 +473,8 @@ test('self loops evaluate all four orientations and choose the unobstructed side
   assert.ok(x*directions[open][0]+y*directions[open][1]>0);assert.equal(Math.round(Math.abs(directions[open][0]?y:x)),0);
   assert.deepEqual(routeEdges(m),routeEdges(m));
  }
- const orientations=new Set();for(const id of ['a','b','c','d']){const r=routeEdges({start:id,states:[{id,name:id,token:'',x:0,y:0}],edges:[{from:id,to:id,label:'x'}]})[0];orientations.add(Math.round(Math.atan2(r.c1.y+r.c2.y,r.c1.x+r.c2.x)*180/Math.PI))}assert.equal(orientations.size,4);
+ const m={start:'root',states:[{id:'root',x:0,y:0},{id:'east',x:200,y:0},{id:'north',x:0,y:200}],edges:[{from:'root',to:'east',label:'a'},{from:'root',to:'north',label:'b'},{from:'root',to:'root',label:'c'}]};
+ const bisector=loopAngles(m,m.states[0])[0];assert.ok(Math.abs(Math.cos(bisector)+Math.SQRT1_2)<.01);assert.ok(Math.abs(Math.sin(bisector)+Math.SQRT1_2)<.01);
 });
 
 test('connection preview stays a routed self loop inside its source and becomes an arrow outside',()=>{

@@ -32,6 +32,24 @@ export function commentAnchors(machine){
 export function positionComments(anchors){
  for(const {comment,nodes,dx,dy} of anchors){comment.x=nodes.reduce((sum,s)=>sum+s.x,0)/nodes.length+dx;comment.y=nodes.reduce((sum,s)=>sum+s.y,0)/nodes.length+dy}
 }
+export function placeCommentsAfterLayout(machine){
+ const states=new Map(machine.states.map(state=>[state.id,state])),placed=[];
+ const segments=(machine.edges??[]).flatMap(edge=>{const from=states.get(edge.from),to=states.get(edge.to);return from&&to&&from!==to&&edge.portal==null?[[from,to]]:[]});
+ const hits=(a,b,box)=>{let lo=0,hi=1;for(const [start,delta,min,max] of [[a.x,b.x-a.x,box.x,box.x+box.w],[a.y,b.y-a.y,box.y,box.y+box.h]]){if(Math.abs(delta)<1e-9){if(start<min||start>max)return false;continue}const first=(min-start)/delta,last=(max-start)/delta;lo=Math.max(lo,Math.min(first,last));hi=Math.min(hi,Math.max(first,last));if(lo>hi)return false}return true};
+ for(const comment of machine.comments??[]){
+  const attached=commentNodeIds(comment).map(id=>states.get(id)).filter(Boolean);if(!attached.length)continue;
+  const {w,h}=commentLayout(comment),center={x:attached.reduce((sum,s)=>sum+s.x,0)/attached.length,y:attached.reduce((sum,s)=>sum+s.y,0)/attached.length};
+  const candidates=[{x:comment.x,y:comment.y},...Array.from({length:3*24},(_,i)=>{const radius=85+Math.floor(i/24)*70,angle=i%24*Math.PI/12;return {x:center.x+Math.cos(angle)*radius-w/2,y:center.y+Math.sin(angle)*radius-h/2}})];
+  let best=null;for(const candidate of candidates){const box={...candidate,w,h},mid={x:box.x+w/2,y:box.y+h/2};let score=Math.hypot(mid.x-center.x,mid.y-center.y)*.15+Math.hypot(candidate.x-comment.x,candidate.y-comment.y)*2;
+   for(const state of machine.states){const dx=Math.max(box.x-state.x,0,state.x-box.x-w),dy=Math.max(box.y-state.y,0,state.y-box.y-h);if(Math.hypot(dx,dy)<52)score+=5000}
+   for(const [a,b] of segments)if(hits(a,b,{x:box.x-8,y:box.y-8,w:w+16,h:h+16}))score+=1200;
+   for(const other of placed)if(box.x<other.x+other.w+12&&box.x+w+12>other.x&&box.y<other.y+other.h+12&&box.y+h+12>other.y)score+=5000;
+   for(const state of attached)for(const [a,b] of segments)if(a!==state&&b!==state&&hits(state,mid,{x:Math.min(a.x,b.x)-6,y:Math.min(a.y,b.y)-6,w:Math.abs(a.x-b.x)+12,h:Math.abs(a.y-b.y)+12}))score+=250;
+   if(!best||score<best.score)best={...box,score};
+  }
+  comment.x=best.x;comment.y=best.y;placed.push(best);
+ }
+}
 export function commentLinks(machine){
  return (machine.comments??[]).flatMap(comment=>{
   const {w,h}=commentLayout(comment),center={x:comment.x+w/2,y:comment.y+h/2};

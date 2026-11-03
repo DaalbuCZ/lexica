@@ -2,7 +2,7 @@ import {simpleTransitionLabel} from './editor-settings.js';
 import {autoLayout,crossingPairs} from './layout.js';
 import {graphView,createGroup,groupFor} from './groups.js';
 import {destination} from './portals.js';
-import {commentAnchors,positionComments} from './comments.js';
+import {commentAnchors,positionComments,placeCommentsAfterLayout} from './comments.js';
 import {planarCoordinates,drawingClearance} from './planar-layout.js';
 import {tidyTree,radialTree} from './tidy-tree.js';
 import {blockLayout} from './block-layout.js';
@@ -79,7 +79,7 @@ function place(machine,focus,options){
   if(state.group){const group=machine.groups.find(g=>g.id===state.id),dx=next.x-state.x,dy=next.y-state.y;for(const member of machine.states)if(group.stateIds.includes(member.id)){member.x+=dx;member.y+=dy}}
   else {state.x=next.x;state.y=next.y}
  }
- delete machine.startViews;positionComments(anchors);
+ delete machine.startViews;positionComments(anchors);placeCommentsAfterLayout(machine);
 }
 
 // Swapping occupied positions preserves node clearance while reducing wire crossings and detours.
@@ -122,6 +122,7 @@ export function groupingCandidates(machine){
 export function smartArrange(machine,focus=null,options={}){
  if(!focus)for(const group of machine.groups??[])place(machine,group.id,options);
  place(machine,focus,options);
+ if(!focus&&options.smartGroups===false&&!machine.groups?.length&&machine.states.length>12&&machine.states.length<=120&&crossingPairs(machine).length){const anchors=commentAnchors(machine);untangle(machine);positionComments(anchors);placeCommentsAfterLayout(machine)}
  if(focus||options.smartGroups===false)return 0;
  const quality=layoutQuality(machine);
  if(quality.nodes<=32&&quality.crossings<=Math.max(4,machine.edges.length*.12)&&quality.extent<=6500)return 0;
