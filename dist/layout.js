@@ -42,6 +42,9 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
   heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
  }
  const step=Math.max(120,Math.max(320,...machine.edges.map(e=>Math.max(transitionLabel(e).length,simpleTransitionLabel(e).length)*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
+ const sizes=new Map();for(const id of [...order].reverse())sizes.set(id,1+children.get(id).reduce((sum,child)=>sum+sizes.get(child),0));
+ const distantBranches=new Set();
+ if(mode==='circle'&&portals&&states.has(machine.start))for(const id of children.get(machine.start))if(sizes.get(id)>=4)distantBranches.add(id);
  function place(){
  if(mode==='circle'){
   let left=160;
@@ -54,7 +57,7 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
    }
    const placed=[],radii=new Map(),rootRadius=Math.max(step,children.get(root).length*step/6);let extent=0;
    for(const item of queue){
-    const ux=Math.cos(item.angle),uy=Math.sin(item.angle);let r=item.depth?(item.depth===1?rootRadius:radii.get(parents.get(item.id))+step):0;
+    const ux=Math.cos(item.angle),uy=Math.sin(item.angle);let r=item.depth?(item.depth===1?rootRadius+(distantBranches.has(item.id)?step*3:0):radii.get(parents.get(item.id))+step):0;
     const intervals=[];
     for(const other of placed){
      const projection=other.x*ux+other.y*uy,perpendicular=other.x*uy-other.y*ux;
@@ -88,7 +91,6 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
  place();
  if(portals){
   if(mode==='circle'&&states.has(machine.start)){
-   const sizes=new Map();for(const id of [...order].reverse())sizes.set(id,1+children.get(id).reduce((sum,child)=>sum+sizes.get(child),0));
    for(const id of children.get(machine.start))if(sizes.get(id)>=4){
     const edge=machine.edges.find(e=>e.from===machine.start&&e.portal==null&&e.to===id);if(edge)enablePortal(machine,edge);
    }

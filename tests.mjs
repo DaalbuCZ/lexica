@@ -738,6 +738,8 @@ test('radial layout uses a portal for a long start branch without duplicating tr
  const ids=['root','a','b','c','d','other'],links=[['root','a'],['a','b'],['b','c'],['c','d'],['root','other']];
  const m={start:'root',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:links.map(([from,to])=>({from,to,label:'x'}))};
  autoLayout(m,'circle',.5,true);const edge=m.edges.find(e=>e.from==='root'&&e.to==='a');assert.ok(edge.portal);assert.equal(destination(m,edge).id,'a');assert.equal(m.edges.length,links.length);assert.equal(m.states.length,ids.length);
+ const get=id=>m.states.find(s=>s.id===id),distance=id=>Math.hypot(get(id).x-get('root').x,get(id).y-get('root').y);
+ assert.ok(distance('a')>distance('other')+300);
 });
 
 test('Canvas paints current routes and hit-tests states, labels, portals and comments without SVG nodes',()=>{
