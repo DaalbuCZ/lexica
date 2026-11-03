@@ -38,7 +38,7 @@ export function Dialogs() {
     case 'memory':
       return (
         <Modal title="Memory cells" onClose={close} anchorId={dialog.anchorId}>
-          <MemoryCells />
+          <MemoryCells heading={false} />
         </Modal>
       );
     case 'shortcuts':

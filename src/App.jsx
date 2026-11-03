@@ -56,7 +56,20 @@ export default function App() {
     <>
       <header>
         <a className="brand" href="./">
-          <span className="logo">λ</span> lexica
+          <svg className="brand-icon" viewBox="0 0 26 28" aria-hidden="true">
+            <rect width="26" height="28" rx="6" />
+            <text
+              x="13"
+              y="23"
+              textAnchor="middle"
+              fontFamily="Georgia,serif"
+              fontSize="25"
+              fontWeight="700"
+            >
+              λ
+            </text>
+          </svg>{' '}
+          lexica
         </a>
         <div className="top-actions" />
       </header>

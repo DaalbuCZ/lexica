@@ -1,15 +1,32 @@
 import { createPortal } from 'react-dom';
-import { Theme, Badge } from '@radix-ui/themes';
+import { useLayoutEffect, useRef } from 'react';
+import { Theme } from '@radix-ui/themes';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { IconButton } from './ui.jsx';
 
 export function DebuggerWindow({ frame, canPrevious, canNext, onMove, onStop }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    document.body.dataset.debugging = 'true';
+    const place = () =>
+      document.body.style.setProperty(
+        '--debugger-bottom',
+        ref.current.getBoundingClientRect().bottom + 12 + 'px',
+      );
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(ref.current);
+    return () => {
+      observer.disconnect();
+      delete document.body.dataset.debugging;
+      document.body.style.removeProperty('--debugger-bottom');
+    };
+  }, []);
   return createPortal(
     <Theme asChild>
-      <section className="debugger-window" role="dialog" aria-label="Lexer debugger">
+      <section ref={ref} className="debugger-window" role="dialog" aria-label="Lexer debugger">
         <div className="window-heading">
           <h2>Lexer debugger</h2>
-          <Badge variant="soft">Step {frame.position}</Badge>
           <IconButton icon={X} label="Stop debugging" onClick={onStop} />
         </div>
         <div className="debugger-controls">

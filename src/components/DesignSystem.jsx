@@ -18,8 +18,8 @@ export function DesignSystem({ children }) {
   return (
     <Theme
       appearance={appearance}
-      accentColor="green"
-      grayColor="sage"
+      accentColor={appearance === 'dark' ? 'blue' : 'green'}
+      grayColor={appearance === 'dark' ? 'slate' : 'sage'}
       radius="medium"
       scaling="90%"
     >

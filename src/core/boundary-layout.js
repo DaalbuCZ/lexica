@@ -2,15 +2,24 @@ import { simpleTransitionLabel } from './editor-settings.js';
 const turn = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 const crosses = (a, b, c, d) =>
   turn(a, b, c) * turn(a, b, d) < -1e-6 && turn(c, d, a) * turn(c, d, b) < -1e-6;
-export function boundaryContext(machine, states, edges) {
+export function boundaryContext(machine, states, edges, positions = {}) {
   const nodes = new Map(states.map((s) => [s.id, s])),
     ghosts = [],
     placedEdges = edges.filter((e) => !e.outside),
-    sources = [...new Set(edges.filter((e) => e.outside).map((e) => e.from))];
+    sources = [
+      ...new Set(
+        edges
+          .filter((e) => e.outside)
+          .flatMap((e) => [e.from, e.to])
+          .filter((id) => !nodes.has(id)),
+      ),
+    ];
   for (const source of sources) {
-    const incoming = edges.filter((e) => e.outside && e.from === source);
+    const incoming = edges.filter((e) => e.outside && (e.from === source || e.to === source));
     function find(links) {
-      const targets = [...new Set(links.map((e) => e.to))].map((id) => nodes.get(id)),
+      const targets = [...new Set(links.map((e) => (e.from === source ? e.to : e.from)))].map(
+          (id) => nodes.get(id),
+        ),
         clearance = Math.max(260, ...links.map((e) => simpleTransitionLabel(e).length * 7 + 130));
       const xs = states.map((s) => s.x),
         ys = states.map((s) => s.y),
@@ -48,6 +57,7 @@ export function boundaryContext(machine, states, edges) {
             y: target.y + Math.sin((i * Math.PI) / 8) * clearance,
           });
       let best;
+      const evaluated = [];
       candidates.push({
         x: Math.min(...[...nodes.values()].map((state) => state.x)) - clearance,
         y: cy,
@@ -57,6 +67,17 @@ export function boundaryContext(machine, states, edges) {
           length = 0;
         if ([...nodes.values()].some((s) => Math.hypot(s.x - point.x, s.y - point.y) < 160))
           continue;
+        for (const edge of placedEdges) {
+          const a = nodes.get(edge.from),
+            b = nodes.get(edge.to);
+          if (!a || !b || a === b) continue;
+          const dx = b.x - a.x,
+            dy = b.y - a.y,
+            d2 = dx * dx + dy * dy,
+            t = d2 ? ((point.x - a.x) * dx + (point.y - a.y) * dy) / d2 : 0;
+          if (t > 0 && t < 1 && Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy) < 75)
+            bad++;
+        }
         for (const target of targets) {
           const dx = target.x - point.x,
             dy = target.y - point.y,
@@ -84,16 +105,25 @@ export function boundaryContext(machine, states, edges) {
             length +
             alignment +
             (width * height - (right - left) * (bottom - top)) / 1500;
-        if (!best || score < best.score)
+        const input = links.some((edge) => edge.from === source);
+        const preference = input
+          ? Math.max(0, point.x - left) + Math.max(0, point.y - top) * 0.5
+          : Math.max(0, right - point.x);
+        evaluated.push({ ...point, bad, score, preference });
+        if (!best || bad < best.bad || (bad === best.bad && score < best.score))
           best = {
             ...point,
             bad,
             score,
           };
       }
-      return best;
+      return (
+        evaluated
+          .filter((point) => point.bad === best.bad && point.score <= best.score * 1.03 + 1)
+          .sort((a, b) => a.preference - b.preference || a.score - b.score)[0] ?? best
+      );
     }
-    const point = find(incoming);
+    const point = Object.hasOwn(positions ?? {}, source) ? positions[source] : find(incoming);
     const ghost = {
       ...machine.states.find((s) => s.id === source),
       x: point.x,

@@ -692,7 +692,7 @@ export function createEditorController(
       if (update((next) => createGroup(next, context.selectedStates, name.trim()))) {
         clearSelection();
         changed();
-        fit();
+        if (!context.openGroup) fit();
         return true;
       }
       return false;
@@ -734,7 +734,7 @@ export function createEditorController(
         if (options.disregardGroups) context.openGroup = null;
         clearSelection();
         changed();
-        fit();
+        if (!context.openGroup) fit();
         toast(
           groups
             ? 'Arranged graph and created ' + groups + ' connected groups. Undo to restore.'

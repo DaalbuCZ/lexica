@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 import { example } from '../src/core/lexer.js';
 import { createGroup, graphView } from '../src/core/groups.js';
 import { routeEdges } from '../src/core/layout.js';
-import { graphBounds, canvasTransform } from '../src/core/canvas-graph.js';
 import { simpleTransitionLabel } from '../src/core/editor-settings.js';
 
 test('overlay groups, memory rules, docking and large inputs remain interactive', async ({
@@ -28,20 +27,13 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
       edge.originalIndices?.length > 1
         ? `${edge.originalIndices.length} transitions`
         : simpleTransitionLabel(edge),
-    ),
-    bounds = graphBounds(diagram, routes);
-  const rect = await page.locator('#canvas').boundingBox(),
-    scale = Math.max(
-      (bounds.width + 100) / Math.max(220, rect.width - 70),
-      (bounds.height + 70) / Math.max(180, rect.height - 180),
     );
-  const view = {
-      x: bounds.x + bounds.width / 2 - (rect.width / 2) * scale,
-      y: bounds.y + bounds.height / 2 - (rect.height / 2 + 20) * scale,
-      width: rect.width * scale,
-      height: rect.height * scale,
-    },
-    transform = canvasTransform(view, rect.width, rect.height);
+  const camera = () =>
+    page.locator('#canvas').evaluate((canvas) => {
+      const t = canvas.getContext('2d').getTransform();
+      return { x: t.e, y: t.f, scale: t.a };
+    });
+  let transform = await camera();
   const point = (p) => ({
     x: transform.x + p.x * transform.scale,
     y: transform.y + p.y * transform.scale,
@@ -57,6 +49,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.screenshot({ path: testInfo.outputPath('group-overlay.png') });
   await page.getByRole('button', { name: 'Close group', exact: true }).click();
   await expect(page.locator('.canvas-surface #canvas')).toHaveCount(1);
+  transform = await camera();
   await page.locator('#canvas').click({ position: point(routes[0].label) });
   await page
     .getByRole('dialog', { name: 'Choose a transition to edit', exact: true })

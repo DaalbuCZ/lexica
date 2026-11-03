@@ -32,7 +32,7 @@ export function useAnchoredPanel(panel, anchorId) {
     const dockObserver = new MutationObserver(place);
     dockObserver.observe(document.body, {
       attributes: true,
-      attributeFilter: ['data-toolbar-dock'],
+      attributeFilter: ['data-toolbar-dock', 'data-debugging'],
     });
     window.addEventListener('resize', place);
     return () => {

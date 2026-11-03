@@ -640,20 +640,22 @@ export function createGraphCanvas(canvas, minimap) {
             })
           : Math.hypot(p.x - s.x, p.y - s.y) <= 36
       )
-        return s.group
-          ? {
-              type: 'group',
-              id: s.id,
-            }
-          : s.startView !== undefined
+        return s.outside
+          ? { type: 'outside-state', id: s.id }
+          : s.group
             ? {
-                type: 'start-view',
-                index: s.startView,
-              }
-            : {
-                type: 'state',
+                type: 'group',
                 id: s.id,
-              };
+              }
+            : s.startView !== undefined
+              ? {
+                  type: 'start-view',
+                  index: s.startView,
+                }
+              : {
+                  type: 'state',
+                  id: s.id,
+                };
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.lineWidth = Math.max(14, 8 / transform().scale);

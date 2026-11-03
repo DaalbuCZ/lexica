@@ -35,8 +35,9 @@ export function Toolbar() {
           ? null
           : {
               type,
-              anchorId:
-                type === 'layout'
+              anchorId: ['settings', 'import', 'export'].includes(type)
+                ? undefined
+                : type === 'layout'
                   ? 'layout-toggle'
                   : type === 'memory'
                     ? 'memory-cells'

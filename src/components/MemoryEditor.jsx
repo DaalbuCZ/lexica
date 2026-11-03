@@ -28,7 +28,7 @@ const labels = {
   clear: 'Clear stack',
 };
 let conditionClipboard = '';
-export function MemoryCells() {
+export function MemoryCells({ heading = true }) {
   const machine = useStudio((s) => s.scene.machine),
     controller = useStudio((s) => s.controller);
   const cells = machine.cells ?? [];
@@ -78,7 +78,7 @@ export function MemoryCells() {
     });
   return (
     <>
-      <h2 className="property-name">Memory cells</h2>
+      {heading && <h2 className="property-name">Memory cells</h2>}
       <p className="prop-note">
         Stack values are ordered bottom to top. Existing counters are retained for compatibility.
       </p>

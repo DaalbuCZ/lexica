@@ -1,6 +1,6 @@
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef } from 'react';
-import { Trash2, X, GripHorizontal, MoveDiagonal2 } from 'lucide-react';
+import { Trash2, X, GripHorizontal } from 'lucide-react';
 import { createEditorController } from '../editor/editor-controller.js';
 import { useStudio } from '../state/studio.js';
 import { IconButton, Field } from './ui.jsx';
@@ -104,12 +104,6 @@ export function GraphEditor({ children }) {
             <IconButton icon={X} label="Close group" onClick={() => controller.closeGroup()} />
           </div>
         </div>
-        <IconButton
-          icon={MoveDiagonal2}
-          data-group-resize
-          className="group-window-resize"
-          label="Resize group window"
-        />
       </section>
       <nav className="group-navigation" ref={breadcrumbs} aria-label="Graph groups">
         <Button

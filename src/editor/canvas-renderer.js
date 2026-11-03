@@ -85,6 +85,20 @@ export function createCanvasRenderer(context) {
           ? `${edge.originalIndices.length} transitions`
           : baseLabel(edge),
       shownRoutes = routeEdges(shown, label);
+    if (context.openGroup) {
+      const group = context.machine.groups.find((group) => group.id === context.openGroup);
+      if (group) {
+        group.contextPositions ??= Object.create(null);
+        for (const state of shown.states)
+          if (state.outside && !Object.hasOwn(group.contextPositions, state.id))
+            Object.defineProperty(group.contextPositions, state.id, {
+              value: { x: state.x, y: state.y },
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+      }
+    }
     if (context.overviewView) {
       const overview = graphView(context.machine);
       context.overviewGraph.setView(context.overviewView);

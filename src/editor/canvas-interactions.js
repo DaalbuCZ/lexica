@@ -223,9 +223,10 @@ export function createCanvasInteractions(context) {
     setupCanvasGestures(context.$('canvas'), {
       getView: () => context.view(),
       setView: context.setView,
-      toWorld: (event) => context.point(event),
+      toWorld: (event) =>
+        context.overviewView ? context.overviewGraph.point(event) : context.point(event),
       signal: context.scope.signal,
-      viewport: () => context.$('canvas'),
+      viewport: () => (context.overviewView ? context.overviewCanvas : context.$('canvas')),
       sensitivity: () => editorSettings.pinchSensitivity,
       onInterrupt: () => {
         if (context.drag?.moved) {
@@ -288,7 +289,25 @@ export function createCanvasInteractions(context) {
         startPan(e);
         return;
       }
-      if (hit?.type === 'outside-state') return;
+      if (hit?.type === 'outside-state') {
+        if (e.button === 0 && !e.ctrlKey) {
+          const group = context.machine.groups.find((group) => group.id === context.openGroup),
+            point = group?.contextPositions?.[hit.id];
+          if (point) {
+            e.preventDefault();
+            context.clearSelection();
+            context.showProperties(false);
+            context.markSelection();
+            context.drag = {
+              start: context.point(e),
+              moved: false,
+              anchors: [],
+              items: [{ item: point, x: point.x, y: point.y }],
+            };
+          }
+        }
+        return;
+      }
       if (hit?.type === 'group') {
         e.preventDefault();
         e.stopPropagation();
@@ -515,7 +534,7 @@ export function createCanvasInteractions(context) {
         return;
       }
       if (context.pan) {
-        const surface = context.$('canvas'),
+        const surface = context.overviewView ? context.overviewCanvas : context.$('canvas'),
           scale = Math.min(
             surface.clientWidth / context.pan.v.width,
             surface.clientHeight / context.pan.v.height,

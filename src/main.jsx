@@ -6,6 +6,7 @@ import './style.css';
 import '@radix-ui/themes/styles.css';
 import './react.css';
 import './design-system.css';
+import './palette.css';
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <DesignSystem>

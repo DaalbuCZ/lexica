@@ -15,6 +15,8 @@ export function createViewport(context) {
       document.querySelector('.canvas-status'),
       document.querySelector('.inspector'),
       context.groupPanel,
+      document.querySelector('.tester'),
+      document.querySelector('.debugger-window'),
     ]
       .filter((el) => el && el !== exclude && !el.hidden && getComputedStyle(el).display !== 'none')
       .map((el) => el.getBoundingClientRect());
@@ -64,7 +66,7 @@ export function createViewport(context) {
     panel.style.position = 'absolute';
     panel.style.right = 'auto';
     panel.style.bottom = 'auto';
-    panel.style.width = Math.max(40, Math.min(224, area.width - 24)) + 'px';
+    panel.style.width = Math.max(40, Math.min(320, area.width - 24)) + 'px';
     panel.style.maxWidth = Math.max(40, area.width - 24) + 'px';
     panel.style.maxHeight = Math.max(40, area.height - 24) + 'px';
     const size = {
@@ -91,11 +93,11 @@ export function createViewport(context) {
     panel.style.top = placed.y - area.top + 'px';
   }
   function view() {
-    return context.graph.view();
+    return context.overviewView ?? context.graph.view();
   }
   function syncGrid() {
     const canvas = context.$('canvas'),
-      v = view(),
+      v = context.graph.view(),
       scale = Math.min(canvas.clientWidth / v.width, canvas.clientHeight / v.height);
     if (!(scale > 0)) return;
     const size = 100 * scale;
@@ -108,7 +110,10 @@ export function createViewport(context) {
     grid.style.backgroundPosition = `${x}px ${y}px`;
   }
   function setView(v) {
-    context.graph.setView(v);
+    if (context.overviewView) {
+      context.overviewView = v;
+      context.overviewGraph.setView(v);
+    } else context.graph.setView(v);
     if ((context.placingState || context.placingComment) && context.commentCursor)
       context.placementPoint = context.point(context.commentCursor);
     syncGrid();
@@ -116,13 +121,26 @@ export function createViewport(context) {
     if (!document.body.classList.contains('properties-hidden')) showProperties(true);
   }
   function fittedView(bounds, canvas) {
+    const area = canvas.getBoundingClientRect(),
+      tester = document.querySelector('.tester')?.getBoundingClientRect(),
+      dock = document.body.dataset.testerDock;
+    let left = 35,
+      right = canvas.clientWidth - 35,
+      top = 80,
+      bottom = canvas.clientHeight - 35;
+    if (tester) {
+      if (dock === 'left') left = Math.max(left, tester.right - area.left + 24);
+      else if (dock === 'right') right = Math.min(right, tester.left - area.left - 24);
+      else if (dock === 'top') top = Math.max(top, tester.bottom - area.top + 24);
+      else bottom = Math.min(bottom, tester.top - area.top - 24);
+    }
     const scale = Math.max(
-      (bounds.width + 100) / Math.max(220, canvas.clientWidth - 70),
-      (bounds.height + 70) / Math.max(180, canvas.clientHeight - 180),
+      (bounds.width + 80) / Math.max(120, right - left),
+      (bounds.height + 80) / Math.max(120, bottom - top),
     );
     return {
-      x: bounds.x + bounds.width / 2 - (canvas.clientWidth / 2) * scale,
-      y: bounds.y + bounds.height / 2 - (canvas.clientHeight / 2 + 20) * scale,
+      x: bounds.x + bounds.width / 2 - ((left + right) / 2) * scale,
+      y: bounds.y + bounds.height / 2 - ((top + bottom) / 2) * scale,
       width: canvas.clientWidth * scale,
       height: canvas.clientHeight * scale,
     };
@@ -132,7 +150,34 @@ export function createViewport(context) {
     showProperties(true);
   }
   function fit() {
-    setView(fittedView(context.graph.bounds(), context.elements.canvas));
+    if (context.overviewView && context.groupWindowWorldBounds) {
+      const bounds = context.groupWindowWorldBounds,
+        group = context.machine.groups?.find((g) => g.id === context.openGroup),
+        members = context.machine.states.filter((s) => group?.stateIds.includes(s.id));
+      if (members.length) {
+        const x = members.reduce((sum, s) => sum + s.x, 0) / members.length,
+          y = members.reduce((sum, s) => sum + s.y, 0) / members.length;
+        const left = Math.min(bounds.x, x - 60),
+          top = Math.min(bounds.y, y - 60),
+          right = Math.max(bounds.x + bounds.width, x + 60),
+          bottom = Math.max(bounds.y + bounds.height, y + 60);
+        setView(
+          fittedView(
+            { x: left, y: top, width: right - left, height: bottom - top },
+            context.overviewCanvas,
+          ),
+        );
+        return;
+      }
+    }
+    setView(
+      fittedView(
+        context.overviewView
+          ? (context.groupWindowWorldBounds ?? context.overviewGraph.bounds())
+          : context.graph.bounds(),
+        context.overviewView ? context.overviewCanvas : context.elements.canvas,
+      ),
+    );
   }
   function zoom(factor, p) {
     const v = view(),
@@ -151,11 +196,11 @@ export function createViewport(context) {
   function wheelGraph(e) {
     if (e.target !== context.elements.canvas && e.target !== context.overviewCanvas) return;
     e.preventDefault();
-    const outside = e.target === context.overviewCanvas;
+    const outside = !!context.overviewView;
     const canvas = outside ? context.overviewCanvas : context.elements.canvas;
-    const current = outside ? context.overviewView : view();
+    const current = view();
     if (!current) return;
-    const apply = outside ? setOverviewView : setView;
+    const apply = setView;
     if (e.ctrlKey || e.metaKey) {
       if (e.deltaY) {
         const factor = wheelZoomFactor(e.deltaY, editorSettings.pinchSensitivity),
@@ -196,6 +241,22 @@ export function createViewport(context) {
       context.queueDraw();
       return;
     }
+    if (context.overviewView) {
+      context.canvasSize = { width, height };
+      const next = {
+          width: context.overviewCanvas.clientWidth,
+          height: context.overviewCanvas.clientHeight,
+        },
+        old = context.overviewCanvasSize ?? next;
+      context.overviewCanvasSize = next;
+      if (old.width && old.height && (old.width !== next.width || old.height !== next.height))
+        setView({
+          ...view(),
+          width: (view().width * next.width) / old.width,
+          height: (view().height * next.height) / old.height,
+        });
+      return;
+    }
     const v = view(),
       nextWidth = (v.width * width) / context.canvasSize.width,
       nextHeight = (v.height * height) / context.canvasSize.height;
@@ -214,13 +275,15 @@ export function createViewport(context) {
   }
   function setOverviewView(next) {
     if (!context.overviewView) return;
-    context.overviewView = next;
-    context.overviewGraph.setView(next);
-    context.queueDraw();
+    setView(next);
   }
   function navigateMap(e) {
     const p = context.graph.mapPoint(e, context.mapTransform ?? context.graph.mapTransform()),
       v = view();
+    if (context.overviewView && context.groupWindowOffset) {
+      p.x += context.groupWindowOffset.x;
+      p.y += context.groupWindowOffset.y;
+    }
     setView({
       ...v,
       x: p.x - v.width / 2,

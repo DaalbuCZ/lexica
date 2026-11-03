@@ -18,6 +18,10 @@ export function createGroupNavigation(context) {
       context.groupPanel.hidden = false;
       context.groupPanel.append(context.elements.canvas);
       context.groupPanelViewInitialized = false;
+      context.overviewCanvasSize = {
+        width: context.overviewCanvas.clientWidth,
+        height: context.overviewCanvas.clientHeight,
+      };
       context.canvasSize = {
         width: context.elements.canvas.clientWidth,
         height: context.elements.canvas.clientHeight,
@@ -47,6 +51,7 @@ export function createGroupNavigation(context) {
     context.groupPanelBounds = null;
     context.groupPanelBoundsId = null;
     context.groupPanelViewInitialized = false;
+    context.groupWindowBounds = null;
     context.clearSelection();
     context.showProperties(false);
     context.render();
@@ -76,10 +81,11 @@ export function createGroupNavigation(context) {
     context.openGroup = id;
     context.groupPanelBoundsId = null;
     context.groupPanelViewInitialized = false;
+    context.groupWindowBounds = null;
     context.clearSelection();
     context.showProperties(false);
     context.render();
-    if (!context.overviewView) context.fit();
+    context.fit();
   }
   function renameGroup(group) {
     context.onDialog({

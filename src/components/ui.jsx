@@ -11,10 +11,25 @@ import {
 } from '@radix-ui/themes';
 import { X } from 'lucide-react';
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js';
-export function IconButton({ icon: Icon, label, title = label, children, ...props }) {
+export function IconButton({
+  icon: Icon,
+  label,
+  title = label,
+  children,
+  className = '',
+  ...props
+}) {
   const Component = children ? ThemeButton : ThemeIconButton;
   return (
-    <Component size="2" variant="ghost" type="button" aria-label={label} title={title} {...props}>
+    <Component
+      size="2"
+      variant="soft"
+      type="button"
+      className={`${children ? 'app-icon-label' : 'app-icon-button'} ${className}`}
+      aria-label={label}
+      title={title}
+      {...props}
+    >
       {Icon && <Icon className="tool-icon" aria-hidden="true" />}
       {children}
     </Component>
@@ -27,7 +42,7 @@ export function Button({ className = '', type = 'button', ...props }) {
       type={type}
       variant={className.includes('primary') ? 'solid' : 'soft'}
       color={className.includes('danger') ? 'red' : undefined}
-      className={className}
+      className={`app-button ${className}`}
       {...props}
     />
   );

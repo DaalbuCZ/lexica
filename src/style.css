@@ -4238,10 +4238,6 @@
   #canvas:focus {
     outline: none;
   }
-  #tips-panel,
-  #show-tips {
-    display: none !important;
-  }
 
   #group-presentation {
     max-width: 66%;

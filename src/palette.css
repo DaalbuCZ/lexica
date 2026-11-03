@@ -1,0 +1,180 @@
+/* Pre-React Lexica colors, mapped onto Radix's component tokens. */
+.radix-themes {
+  --accent-1: #f9fbf7;
+  --accent-2: #f0f5ed;
+  --accent-3: #eaf1e2;
+  --accent-4: #e2ecda;
+  --accent-5: #d5dfcb;
+  --accent-6: #bdceb3;
+  --accent-7: #9ab58e;
+  --accent-8: #718664;
+  --accent-9: #386b4e;
+  --accent-10: #2d593f;
+  --accent-11: #386b4e;
+  --accent-12: #304d37;
+  --accent-a1: #386b4e03;
+  --accent-a2: #386b4e08;
+  --accent-a3: #386b4e12;
+  --accent-a4: #386b4e20;
+  --accent-a5: #386b4e30;
+  --accent-a6: #386b4e40;
+  --accent-a7: #386b4e60;
+  --accent-a8: #386b4e90;
+  --accent-a9: #386b4e;
+  --accent-a10: #2d593f;
+  --accent-a11: #386b4e;
+  --accent-a12: #304d37;
+  --accent-contrast: #fff;
+  --accent-surface: #edf5e9;
+  --accent-indicator: #386b4e;
+  --accent-track: #386b4e;
+  --gray-1: #f9fbf7;
+  --gray-2: #f0f4ec;
+  --gray-3: #edf3e8;
+  --gray-4: #e7eee1;
+  --gray-5: #e1e7dc;
+  --gray-6: #dde5d9;
+  --gray-7: #cbd7c5;
+  --gray-8: #a4b397;
+  --gray-9: #80916d;
+  --gray-10: #627459;
+  --gray-11: #718268;
+  --gray-12: #29382f;
+  --gray-a3: #3040220a;
+  --gray-a4: #30402215;
+  --gray-a5: #30402220;
+  --gray-a6: #30402230;
+  --gray-a7: #30402240;
+  --gray-a8: #30402260;
+  --gray-a9: #30402280;
+  --gray-a10: #304022a0;
+  --gray-a11: #627459;
+  --gray-a12: #29382f;
+  --color-background: #f9fbf7;
+  --color-panel-solid: #fff;
+  --color-panel: #fffffff5;
+  --color-surface: #fff;
+}
+.radix-themes.dark {
+  --accent-1: #343b3f;
+  --accent-2: #354452;
+  --accent-3: #3d566b;
+  --accent-4: #425d73;
+  --accent-5: #4a6c86;
+  --accent-6: #5f819c;
+  --accent-7: #7a9bb4;
+  --accent-8: #8eb7d6;
+  --accent-9: #a9d5ff;
+  --accent-10: #c7e5ff;
+  --accent-11: #a9d5ff;
+  --accent-12: #e7f5ff;
+  --accent-a1: #a9d5ff03;
+  --accent-a2: #a9d5ff08;
+  --accent-a3: #a9d5ff16;
+  --accent-a4: #a9d5ff25;
+  --accent-a5: #a9d5ff35;
+  --accent-a6: #a9d5ff50;
+  --accent-a7: #a9d5ff70;
+  --accent-a8: #a9d5ff90;
+  --accent-a9: #a9d5ff;
+  --accent-a10: #c7e5ff;
+  --accent-a11: #a9d5ff;
+  --accent-a12: #e7f5ff;
+  --accent-contrast: #183047;
+  --accent-surface: #3d566b;
+  --accent-indicator: #a9d5ff;
+  --accent-track: #a9d5ff;
+  --gray-1: #303639;
+  --gray-2: #343a3e;
+  --gray-3: #3e4549;
+  --gray-4: #444d52;
+  --gray-5: #465157;
+  --gray-6: #5b666c;
+  --gray-7: #687783;
+  --gray-8: #818d93;
+  --gray-9: #96a5b0;
+  --gray-10: #aebcc6;
+  --gray-11: #bdcbd7;
+  --gray-12: #edf1f5;
+  --gray-a3: #edf1f50a;
+  --gray-a4: #edf1f515;
+  --gray-a5: #edf1f520;
+  --gray-a6: #edf1f530;
+  --gray-a7: #edf1f540;
+  --gray-a8: #edf1f560;
+  --gray-a9: #edf1f580;
+  --gray-a10: #edf1f5a0;
+  --gray-a11: #bdcbd7;
+  --gray-a12: #edf1f5;
+  --color-background: #303639;
+  --color-panel-solid: #3e4549;
+  --color-panel: #3e4549f5;
+  --color-surface: #2d3337;
+}
+:root[data-theme='dark'] {
+  background: #303639;
+  color: #edf1f5;
+  --green: #a9d5ff;
+  --line: #5b666c;
+  --panel: #3e4549f5;
+}
+:root[data-theme='dark'] .canvas-wrap {
+  background-color: #343a3e;
+}
+.canvas-wrap {
+  background-color: #fafcf8;
+}
+.brand-icon rect {
+  fill: #426c4d;
+}
+.brand-icon text {
+  fill: #fff;
+}
+[data-theme='dark'] .brand-icon rect {
+  fill: #b8ddff;
+}
+[data-theme='dark'] .brand-icon text {
+  fill: #183047;
+}
+.rt-BaseButton.app-icon-button,
+.rt-BaseButton.app-icon-label {
+  background: transparent;
+  box-shadow: none;
+}
+.rt-BaseButton.app-icon-button:hover,
+.rt-BaseButton.app-icon-label:hover {
+  background: #edf3e8;
+}
+.rt-BaseButton.app-icon-button[aria-pressed='true'] {
+  background: #eaf1e2;
+  color: #386b4e;
+}
+[data-theme='dark'] .rt-BaseButton.app-icon-button:hover,
+[data-theme='dark'] .rt-BaseButton.app-icon-label:hover {
+  background: #39434c;
+}
+[data-theme='dark'] .rt-BaseButton.app-icon-button[aria-pressed='true'] {
+  background: #3c566c;
+  color: #e5f3ff;
+}
+[data-theme='dark'] .react-dialog,
+[data-theme='dark'] .inspector,
+[data-theme='dark'] .minimap,
+[data-theme='dark'] .tester,
+[data-theme='dark'] .debugger-window {
+  background: #3e4549;
+  color: #edf1f5;
+}
+[data-theme='dark'] #tokens {
+  background: #2d3337;
+}
+.rt-BaseButton.app-button:not(.primary):not(.danger) {
+  background: #fff;
+  color: #48564b;
+  box-shadow: inset 0 0 0 1px #dde5d9;
+}
+[data-theme='dark'] .rt-BaseButton.app-button:not(.primary):not(.danger) {
+  background: #292f35;
+  color: #e9eff5;
+  box-shadow: inset 0 0 0 1px #5b666c;
+}

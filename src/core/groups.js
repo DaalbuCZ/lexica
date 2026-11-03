@@ -28,7 +28,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
   if (!groups.length && !focus) return machine;
   if (focus && !groups.some((group) => group.id === focus)) focus = null;
   if (focus) {
-    const ids = new Set(groups.find((group) => group.id === focus).stateIds);
+    const focusedGroup = groups.find((group) => group.id === focus);
+    const ids = new Set(focusedGroup.stateIds);
     const states = machine.states.filter((state) => ids.has(state.id));
     const edges = machine.edges.flatMap((edge, originalIndex) => {
       let to;
@@ -37,8 +38,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
       } catch {
         return [];
       }
-      if (!ids.has(to)) return [];
-      if (ids.has(edge.from))
+      if (!ids.has(to) && !ids.has(edge.from)) return [];
+      if (ids.has(edge.from) && ids.has(to))
         return [
           {
             ...edge,
@@ -60,7 +61,7 @@ export function graphView(machine, focus = null, includeOutside = true) {
       ];
     });
     const context = includeOutside
-      ? boundaryContext(machine, states, edges)
+      ? boundaryContext(machine, states, edges, focusedGroup.contextPositions)
       : {
           states,
           edges,
@@ -166,6 +167,17 @@ export function validateGroups(machine) {
     )
       throw Error('Invalid group.');
     groups.add(group.id);
+    if (group.contextPositions !== undefined) {
+      if (
+        !group.contextPositions ||
+        typeof group.contextPositions !== 'object' ||
+        Array.isArray(group.contextPositions)
+      )
+        throw Error('Invalid group context positions.');
+      for (const point of Object.values(group.contextPositions))
+        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y))
+          throw Error('Invalid group context position.');
+    }
     for (const id of group.stateIds) {
       if (!ids.has(id) || members.has(id)) throw Error('Invalid group membership.');
       members.add(id);

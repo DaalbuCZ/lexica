@@ -30,6 +30,10 @@ export function simpleBranch(machine) {
   return seen.size === machine.states.length;
 }
 function place(machine, focus, options) {
+  if (focus) {
+    const group = machine.groups?.find((group) => group.id === focus);
+    if (group) delete group.contextPositions;
+  }
   const shown = graphView(machine, focus, false),
     copy = structuredClone(shown),
     anchors = commentAnchors(machine);
@@ -95,23 +99,25 @@ function place(machine, focus, options) {
           b = nodes.get(e.to);
         if (a && b) flow += Math.max(0, 170 - b.x + a.x) + Math.abs(b.y - a.y) * 0.22;
       }
-    let routedCrossings = 0;
+    let routedCrossings = 0,
+      boundaryObstruction = 0;
     if (focus) {
       const positioned = {
         ...machine,
         states: machine.states.map((state) => nodes.get(state.id) ?? state),
       };
       const projected = graphView(positioned, focus);
-      for (const [a, b] of crossingPairs(projected, true, simpleTransitionLabel)) {
-        routedCrossings += projected.edges[a].outside || projected.edges[b].outside ? 35 : 250;
-      }
+      const clearance = drawingClearance(projected.states, projected.edges);
+      if (clearance.wire < 64.99 || clearance.node < 159.99) boundaryObstruction = 100000000;
+      routedCrossings += crossingPairs(projected, true, simpleTransitionLabel).length * 1000000;
     }
     return (
       (focus ? longest / 5 + wire / 60 : 0) +
       flow / 70 +
       routedCrossings +
-      c.crossings * 2000 +
-      (c.wire < 65 ? 2000 : 0) +
+      boundaryObstruction +
+      c.crossings * 10000 +
+      (c.wire < 64.99 || c.node < 159.99 ? 100000000 : 0) +
       Math.sqrt(width * height) / 35 +
       extent(candidate.states) / 70 +
       wire / 800
@@ -121,6 +127,14 @@ function place(machine, focus, options) {
   let best = cost(copy),
     chosen = copy.states,
     limit = Math.max(2200, extent(copy.states) * (focus ? 2.5 : 1.5));
+  if (focus) {
+    const original = structuredClone(shown),
+      clearance = drawingClearance(original.states, original.edges);
+    if (clearance.node >= 160 && clearance.wire >= 65 && cost(original) < best) {
+      chosen = original.states;
+      best = cost(original);
+    }
+  }
   if (analytical.positions) {
     // Use the planar embedding to order branches, then assign coordinates in the
     // requested style. A grid drawing must not silently replace Radial or Tree.
@@ -213,6 +227,84 @@ function place(machine, focus, options) {
       }
     }
   }
+  if (focus) {
+    const candidate = { ...structuredClone(copy), states: structuredClone(chosen) };
+    if (candidate.states.length <= 40 && crossingPairs(candidate).length) {
+      untangle(candidate);
+      const next = cost(candidate);
+      if (next < best) {
+        best = next;
+        chosen = structuredClone(candidate.states);
+      }
+    }
+    const members = new Set(copy.states.map((state) => state.id)),
+      entries = new Set(),
+      outputs = new Set(
+        copy.states
+          .filter(
+            (state) =>
+              (state.token && state.accepting !== false) ||
+              !copy.edges.some((edge) => edge.from === state.id && edge.to !== state.id),
+          )
+          .map((state) => state.id),
+      );
+    for (const edge of machine.edges) {
+      let to;
+      try {
+        to = destination(machine, edge)?.id;
+      } catch {
+        continue;
+      }
+      if (!members.has(edge.from) && members.has(to)) entries.add(to);
+    }
+    const orientation = (states) => {
+      const xs = states.map((s) => s.x),
+        ys = states.map((s) => s.y),
+        left = Math.min(...xs),
+        right = Math.max(...xs),
+        top = Math.min(...ys);
+      return states.reduce(
+        (sum, state) =>
+          sum +
+          (entries.has(state.id) ? state.x - left + (state.y - top) * 0.25 : 0) +
+          (outputs.has(state.id) ? right - state.x : 0),
+        0,
+      );
+    };
+    let preferred = orientation(chosen);
+    const baseline = cost({ ...copy, states: chosen });
+    for (const [cos, sin] of [
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const states = chosen.map((state) => ({
+          ...state,
+          x: state.x * cos - state.y * sin,
+          y: state.x * sin + state.y * cos,
+        })),
+        candidate = { ...copy, states },
+        next = cost(candidate),
+        direction = orientation(states);
+      if (next <= baseline + 0.001 && direction < preferred) {
+        chosen = states;
+        preferred = direction;
+      }
+    }
+  }
+  if (focus && chosen.length) {
+    const center = (states) => ({
+        x: states.reduce((sum, s) => sum + s.x, 0) / states.length,
+        y: states.reduce((sum, s) => sum + s.y, 0) / states.length,
+      }),
+      old = center(shown.states),
+      next = center(chosen);
+    chosen = chosen.map((state) => ({
+      ...state,
+      x: state.x + old.x - next.x,
+      y: state.y + old.y - next.y,
+    }));
+  }
   const selected = new Map(chosen.map((s) => [s.id, s]));
   for (const state of copy.states) {
     state.x = selected.get(state.id).x;
@@ -234,6 +326,10 @@ function place(machine, focus, options) {
           member.x += dx;
           member.y += dy;
         }
+      for (const point of Object.values(group.contextPositions ?? {})) {
+        point.x += dx;
+        point.y += dy;
+      }
     } else {
       state.x = next.x;
       state.y = next.y;
@@ -242,6 +338,15 @@ function place(machine, focus, options) {
   delete machine.startViews;
   positionComments(anchors);
   placeCommentsAfterLayout(machine);
+  if (focus) {
+    const group = machine.groups?.find((group) => group.id === focus);
+    if (group)
+      group.contextPositions = Object.fromEntries(
+        graphView(machine, focus)
+          .states.filter((state) => state.outside)
+          .map((state) => [state.id, { x: state.x, y: state.y }]),
+      );
+  }
 }
 
 // Swapping occupied positions preserves node clearance while reducing wire crossings and detours.
