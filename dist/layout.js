@@ -51,9 +51,9 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
     const weight=branches.reduce((sum,id)=>sum+heights.get(id)+gap,0);let angle=item.start;
     for(const id of branches){const span=item.span*(heights.get(id)+gap)/weight;queue.push({id,depth:item.depth+1,start:angle,span});angle+=span}
    }
-   const placed=[],radii=new Map();let extent=0;
+   const placed=[],radii=new Map(),rootRadius=Math.max(step,children.get(root).length*step/6);let extent=0;
    for(const item of queue){
-    const ux=Math.cos(item.angle),uy=Math.sin(item.angle);let r=item.depth?(radii.get(parents.get(item.id))+step):0;
+    const ux=Math.cos(item.angle),uy=Math.sin(item.angle);let r=item.depth?(item.depth===1?rootRadius:radii.get(parents.get(item.id))+step):0;
     const intervals=[];
     for(const other of placed){
      const projection=other.x*ux+other.y*uy,perpendicular=other.x*uy-other.y*ux;
@@ -167,13 +167,20 @@ function computeRoutes(machine,labels){
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {from,dx,dy,length:dx*dx+dy*dy}});
  const ordered=machine.edges.map((e,i)=>({e,i})).sort((a,b)=>(a.e.from!==a.e.to)-(b.e.from!==b.e.to));
- for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){const siblings=machine.edges.filter(x=>x.from===e.from&&x.portal!=null),fan=(siblings.indexOf(e)-(siblings.length-1)/2)*85,width=Math.max(60,e.portal.length*7+20);let best,bestScore=Infinity;for(const [dx,dy] of [[140,fan],[-140,fan],[110,fan-115],[-110,fan-115],[110,fan+115],[-110,fan+115]]){const len=Math.hypot(dx,dy),p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox={x:p3.x+(dx<0?-width/2:width/2),y:p3.y,w:width,h:22};let score=0;for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}if(score<bestScore){best=c;bestScore=score}}applyBend(best,e,a,e.portal!=null?null:b);best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
+ for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){const width=Math.max(60,e.portal.length*7+20);let best,bestScore=Infinity;for(const [dx,dy] of [140,220,300].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy),p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox={x:p3.x+(dx<0?-width/2:width/2),y:p3.y,w:width,h:22};let score=len*.01;for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}if(score<bestScore){best=c;bestScore=score}}applyBend(best,e,a,e.portal!=null?null:b);best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
  let best,bestScore=Infinity;
  const loop=a===b,rotation=loop?[...a.id].reduce((n,ch)=>n+ch.codePointAt(0),0)%4:0;
  for(let attempt=0;attempt<(loop?64:61);attempt++){
  let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*65*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*42,y:b.y+Math.sin(endAngle)*42};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
- const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};let score=(loop?Math.floor(attempt/4):attempt)*.1;
- for(const box of reserved)if(overlaps(c.label,box))score+=1000;
+ const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};
+ if(!loop)applyBend(c,e,a,b);
+ let labelScore=Infinity,bestLabel=c.label;
+ for(const t of loop?[.5]:[.5,.4,.6,.3,.7,.2,.8,.1,.9]){
+  const point=sample(c,t),label={...c.label,x:point.x,y:point.y-13};let collisions=0;
+  for(const box of reserved)if(overlaps(label,box))collisions++;
+  if(collisions<labelScore){labelScore=collisions;bestLabel=label}if(!collisions)break;
+ }
+ c.label=bestLabel;let score=(loop?Math.floor(attempt/4):attempt)*.1+labelScore*1000;
  // A Bezier curve stays inside its control-point bounds; outside obstacles cannot collide.
  const left=Math.min(c.p0.x,c.c1.x,c.c2.x,c.p3.x),right=Math.max(c.p0.x,c.c1.x,c.c2.x,c.p3.x),top=Math.min(c.p0.y,c.c1.y,c.c2.y,c.p3.y),bottom=Math.max(c.p0.y,c.c1.y,c.c2.y,c.p3.y);
  const nearby=score<bestScore?machine.states.filter(s=>s!==a&&s!==b&&s.x>=left-65&&s.x<=right+65&&s.y>=top-65&&s.y<=bottom+65):[];
@@ -182,7 +189,8 @@ function computeRoutes(machine,labels){
  if(loop)for(let t=.1;t<.95&&score<bestScore;t+=.05){const p=sample(c,t);if((p.x-a.x)**2+(p.y-a.y)**2<48**2)continue;for(const {from,dx,dy,length} of nearbySegments){if(!length)continue;const u=Math.max(0,Math.min(1,((p.x-from.x)*dx+(p.y-from.y)*dy)/length));if((p.x-from.x-u*dx)**2+(p.y-from.y-u*dy)**2<14**2)score+=200}}
  if(score<bestScore){best=c;bestScore=score}if(!loop&&score<1||loop&&attempt%4===3&&bestScore<=(Math.floor(attempt/4)+1)*.1)break;
  }
- applyBend(best,e,a,e.portal!=null?null:b);best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
+ if(loop)applyBend(best,e,a,b);
+ best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
  }
  return routes;
 }
