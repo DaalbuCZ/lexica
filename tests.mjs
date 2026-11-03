@@ -1008,6 +1008,21 @@ import {arrangeGraph} from './dist/basic-layout.js';
 import {smartArrange,layoutQuality,untangle} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
 import {planarCoordinates,drawingClearance} from './dist/planar-layout.js';
+import {radialTree} from './dist/tidy-tree.js';
+
+test('a string-like subgraph keeps cyclic blocks compact and terminal continuations aligned',()=>{
+ const names=['outside','open','content','accepted','empty','tripleEntry','quote1','body','quote2','tripleAccepted','escape'];
+ const pairs=[['outside','open'],['open','content'],['content','accepted'],['content','content'],['open','empty'],['empty','tripleEntry'],['tripleEntry','quote1'],['tripleEntry','body'],['body','quote1'],['quote1','quote2'],['quote2','tripleAccepted'],['body','body'],['content','escape'],['escape','content'],['open','escape'],['quote1','body'],['quote2','body']];
+ const m={start:'outside',states:names.map(id=>({id,name:id,token:'',x:0,y:0})),edges:pairs.map(([from,to])=>({from,to,label:'a'}))},edges=JSON.stringify(m.edges),group=createGroup(m,names.slice(1),'Strings');
+ const baseline=structuredClone(graphView(m,group.id,false));baseline.start='open';radialTree(baseline);
+ const area=states=>(Math.max(...states.map(s=>s.x))-Math.min(...states.map(s=>s.x)))*(Math.max(...states.map(s=>s.y))-Math.min(...states.map(s=>s.y)));
+ smartArrange(m,group.id,{mode:'circle'});const view=graphView(m,group.id,false),get=id=>view.states.find(s=>s.id===id);
+ assert.equal(crossingPairs(view,true).length,0);assert.ok(area(view.states)<area(baseline.states)*.6);
+ assert.ok(Math.abs(get('accepted').x-get('content').x)<1e-6);assert.ok(Math.abs(get('tripleAccepted').x-get('quote2').x)<1e-6);
+ assert.ok(Math.abs(get('open').x-get('empty').x)<1e-6);assert.ok(Math.abs(get('empty').x-get('tripleEntry').x)<1e-6);
+ assert.ok((get('body').x-get('tripleEntry').x)*(get('quote1').x-get('tripleEntry').x)<0);
+ assert.equal(JSON.stringify(m.edges),edges);validate(m);
+});
 
 test('Radial retains centered breadth-first rings even when planar embedding finds a different drawing',()=>{
  const m={start:'root',states:['root',...Array.from({length:12},(_,i)=>`n${i}`)].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[]};

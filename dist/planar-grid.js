@@ -1,7 +1,7 @@
 import {Graph} from '@khalidsaidi/topoloom/graph';
 import {testPlanarity} from '@khalidsaidi/topoloom/planarity';
 
-function faces(order){
+export function faces(order){
  const seen=new Set(),result=[];
  for(let u=0;u<order.length;u++)for(const v of order[u]){
   if(seen.has(`${u}:${v}`))continue;const face=[];let a=u,b=v;
