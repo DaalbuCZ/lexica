@@ -491,10 +491,10 @@ test('tree and radial layouts keep stable subtree placement without changing top
   for(let i=0;i<next.states.length;i++)for(let j=i+1;j<next.states.length;j++)assert.ok(Math.hypot(next.states[i].x-next.states[j].x,next.states[i].y-next.states[j].y)>=72);
  }
 });
-test('optional layout portals remove remaining routed crossings without adding states or changing tokens',()=>{
+test('automatic portals preserve small branches despite remaining crossings',()=>{
  const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
  const before=tokenize(m,'a0b1c2'),plain=autoLayout(structuredClone(m));assert.ok(crossingPairs(plain,true).length>0);assert.ok(plain.edges.every(e=>e.portal==null));
- autoLayout(m,'tree',1,true);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.ok(m.edges.some(e=>e.portal));assert.equal(crossingPairs(m,true).length,0);assert.deepEqual(tokenize(m,'a0b1c2'),before);validate(m);assert.doesNotThrow(()=>toTikz(m));
+ autoLayout(m,'tree',1,true);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.ok(m.edges.filter(e=>e.portal!=null).every(e=>['a','b','c'].includes(e.to)));assert.deepEqual(tokenize(m,'a0b1c2'),before);validate(m);assert.doesNotThrow(()=>toTikz(m));
  for(const e of m.edges)assert.equal(destination(m,e).id,e.to);
 });
 test('character steps use Unicode code points, portal targets, inversion and the same emitted tokens',()=>{
@@ -544,9 +544,9 @@ test('spring density controls spacing and supports cycles, portals, coincident n
  const one={start:'a',states:[{id:'a',name:'a',token:'A',x:0,y:0}],edges:[{from:'a',to:'a',label:'a'}]};autoLayout(one,'spring');assert.ok(Number.isFinite(one.states[0].x));assert.doesNotThrow(()=>toTikz(one));
 });
 
-test('spring layout can automatically portalize crossings without changing state or transition counts',()=>{
+test('spring layout retains small branches without portals',()=>{
  const m={start:'r',states:['r','a','b','c','x','y','z'].map((id,i)=>({id,name:id,token:i>3?'END':'',x:0,y:0})),edges:[['r','a','a'],['r','b','b'],['r','c','c'],...['a','b','c'].flatMap(a=>['x','y','z'].map((b,i)=>[a,b,String(i)]))].map(([from,to,label])=>({from,to,label}))};
- const expected=tokenize(m,'a0b1c2');autoLayout(m,'spring',.75,true);assert.equal(crossingPairs(m,true).length,0);assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.deepEqual(tokenize(m,'a0b1c2'),expected);
+ const expected=tokenize(m,'a0b1c2');autoLayout(m,'spring',.75,true);assert.ok(m.edges.filter(e=>e.portal!=null).every(e=>['a','b','c'].includes(e.to)));assert.equal(m.states.length,7);assert.equal(m.edges.length,12);assert.deepEqual(tokenize(m,'a0b1c2'),expected);
 });
 
 
@@ -988,3 +988,19 @@ import {copyConditions,pasteConditions} from './dist/memory.js';
 test('condition clipboard replaces rules and preserves mode and disabled state',()=>{const m=stackMachine(),source={guard:{cell:'s',op:'empty'},guards:[{cell:'s',op:'==',value:7}],guardMode:'any',guardDisabled:true},target=m.edges[1];pasteConditions(target,copyConditions(source));assert.deepEqual(JSON.parse(copyConditions(target)),JSON.parse(copyConditions(source)));validate(m);assert.throws(()=>pasteConditions(target,'invalid'),/Copy conditions/);const before=JSON.stringify(m);const next=structuredClone(m);pasteConditions(next.edges[1],copyConditions({guard:{cell:'missing',op:'empty'}}));assert.throws(()=>validate(next),/guard/);assert.equal(JSON.stringify(m),before)});
 
 test('ordinary transition tips reach the state boundary',()=>{const m=example();for(const bend of [undefined,{x:30,y:50}]){m.edges[0].bend=bend;const r=routeEdges(m)[0],target=m.states.find(s=>s.id===m.edges[0].to);assert.ok(Math.abs(Math.hypot(r.p3.x-target.x,r.p3.y-target.y)-37)<.001)}});
+
+import {visualMachine} from './dist/start-views.js';
+test('grouped radial starts keep one logical start and render each transition once',()=>{
+ const ids=['root',...Array.from({length:12},(_,i)=>'q'+i)],m={start:'root',states:ids.map(id=>({id,name:id,token:id==='root'?'':'END',x:0,y:0})),edges:ids.slice(1).map((id,i)=>({from:'root',to:id,label:String.fromCharCode(97+i)}))};
+ const expected=tokenize(m,'abcdefghijkl'),before=structuredClone(m.edges);autoLayout(m,'circle',.5,true);
+ assert.ok(m.startViews.length>0);assert.equal(m.states.length,ids.length);assert.deepEqual(m.edges,before);assert.deepEqual(tokenize(m,'abcdefghijkl'),expected);
+ const displayed=visualMachine(m);assert.equal(displayed.edges.length,m.edges.length);assert.equal(new Set(displayed.states.map(s=>s.id)).size,displayed.states.length);assert.equal(routeEdges(m).length,m.edges.length);
+ for(const view of m.startViews)assert.ok(view.targets.length<=12);
+ for(const state of displayed.states)if(state.startView!==undefined)assert.ok(displayed.edges.filter(e=>e.from===state.id).length<=6);
+ const restored=validate(JSON.parse(JSON.stringify(m)));assert.deepEqual(tokenize(restored,'abc'),tokenize(m,'abc'));assert.doesNotThrow(()=>toTikz(m));
+ const first=JSON.stringify(m);autoLayout(m,'circle',.5,true);assert.equal(JSON.stringify(m),first);
+});
+test('manual connection bends keep their base curve stable during dragging',()=>{
+ const m=example(),edge=m.edges[0];edge.bend={x:40,y:30};const a=routeEdges(m)[0];edge.bend={x:41,y:31};const b=routeEdges(m)[0];
+ assert.ok(Math.abs(b.c1.x-a.c1.x-4/3)<1e-6);assert.ok(Math.abs(b.c1.y-a.c1.y-4/3)<1e-6);
+});

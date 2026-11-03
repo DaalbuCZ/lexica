@@ -1,14 +1,17 @@
 import {forceSimulation,forceManyBody,forceLink,forceX,forceY,forceCollide} from 'd3-force';
 import {springSettings} from './spring-settings.js';
 import {transitionLabel} from './labels.js?v=16';
+import {visualMachine,startGroups} from './start-views.js';
 import {simpleTransitionLabel} from './editor-settings.js';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
 import {destination,statePortalBox,enablePortal,portalBoxAtTip} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
-export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}) {
+export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={},groupStarts=true) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
  if(!machine.states.length)return machine;
  const anchors=commentAnchors(machine);
+ if(groupStarts&&mode==='circle'&&machine.edges.filter(e=>e.from===machine.start&&e.to!==machine.start).length>=8){groupedLayout(machine,spacing);if(portals)portalizeCrossings(machine);positionComments(anchors);return machine}
+ delete machine.startViews;
  if(mode==='spring'){springLayout(machine,spacing,forces);if(portals)portalizeCrossings(machine);positionComments(anchors);return machine}
  const states=new Map(machine.states.map(s=>[s.id,s])),children=new Map(machine.states.map(s=>[s.id,[]])),seen=new Set(),order=[],roots=[],parents=new Map();
  const outgoing=new Map(machine.states.map(s=>[s.id,[]]));
@@ -100,6 +103,25 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
  positionComments(anchors);
  return machine;
 }
+function groupedLayout(machine,spacing){
+ const root=machine.states.find(s=>s.id===machine.start);if(!root)return;
+ const groups=startGroups(machine),islands=[],retired=new Set();
+ for(const ids of groups){
+  const members=new Set(ids),states=[{...root},...machine.states.filter(s=>members.has(s.id)).map(s=>({...s}))];
+  const edges=machine.edges.filter(e=>members.has(e.from)||e.from===root.id&&members.has(e.to)).map(original=>{
+   const edge={...original};if(edge.from===root.id||portalBranchSize(machine,edge)<=2){if(edge.portal!=null){try{edge.to=destination(machine,edge).id;original.to=edge.to}catch{}retired.add(original.portal);delete edge.portal;delete original.portal}}return edge;
+  });
+  const local={...machine,startViews:undefined,states,edges,comments:[]};autoLayout(local,'circle',spacing,false,{},false);
+  const routes=routeEdges(local,simpleTransitionLabel),boxes=[...states.map(s=>({x:s.x-100,y:s.y-100,w:200,h:200})),...routes.flatMap(r=>[{x:r.label.x-r.label.w/2,y:r.label.y-25,w:r.label.w,h:50},...([r.p0,r.c1,r.c2,r.p3].map(p=>({x:p.x-10,y:p.y-10,w:20,h:20}))),...(r.portalBox?[{x:r.portalBox.x-r.portalBox.w/2,y:r.portalBox.y-11,w:r.portalBox.w,h:22}]:[])]),...states.filter(s=>s.portal).map(s=>{const b=statePortalBox(s);return {x:b.x-b.w/2,y:b.y-11,w:b.w,h:22}})];
+  const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y)),w=Math.max(...boxes.map(b=>b.x+b.w))-x,h=Math.max(...boxes.map(b=>b.y+b.h))-y;
+  islands.push({ids,states,x,y,w,h});
+ }
+ for(const state of machine.states)if(retired.has(state.portal)&&!machine.edges.some(e=>e.portal===state.portal))delete state.portal;
+ const width=Math.sqrt(islands.reduce((sum,i)=>sum+(i.w+220)*(i.h+220),0));let left=100,top=100,row=0;machine.startViews=[];
+ islands.forEach((island,index)=>{if(left>100&&left+island.w>width){left=100;top+=row+220;row=0}const dx=left-island.x,dy=top-island.y;for(const state of island.states){const original=machine.states.find(s=>s.id===state.id);if(state.id!==root.id||index===0){original.x=state.x+dx;original.y=state.y+dy}}
+  if(index)machine.startViews.push({x:island.states[0].x+dx,y:island.states[0].y+dy,targets:island.ids});left+=island.w+220;row=Math.max(row,island.h);
+ });
+}
 export function springLayout(machine,spacing=1,options={}){
  if(!machine.states.length)return machine;
  const settings=springSettings(options),anchors=commentAnchors(machine),ideal=Math.max(80,settings.distance*spacing);
@@ -132,10 +154,14 @@ export function springLayout(machine,spacing=1,options={}){
  machine.states.forEach((s,i)=>{s.x=nodes[i].x+ox;s.y=nodes[i].y+oy});positionComments(anchors);
  return machine;
 }
+function portalBranchSize(machine,edge){
+ const visited=new Set();let target;try{target=destination(machine,edge)?.id}catch{return 0}const queue=[target];
+ while(queue.length&&visited.size<3){const id=queue.pop();if(!id||id===machine.start||visited.has(id))continue;visited.add(id);for(const e of machine.edges)if(e.from===id){try{const next=destination(machine,e);if(next)queue.push(next.id)}catch{}}}return visited.size;
+}
 function portalizeCrossings(machine){
  for(let attempts=0;attempts<machine.edges.length;attempts++){
   const pairs=crossingPairs(machine,true,simpleTransitionLabel);if(!pairs.length)break;
-  const counts=new Map();for(const pair of pairs)for(const i of pair)counts.set(i,(counts.get(i)??0)+1);
+  const counts=new Map();for(const pair of pairs)for(const i of pair)if(portalBranchSize(machine,machine.edges[i])>2)counts.set(i,(counts.get(i)??0)+1);if(!counts.size)break;
   const index=[...counts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];enablePortal(machine,machine.edges[index]);
  }
 }
@@ -149,6 +175,7 @@ function intersects(a,b,c,d){
  return turn(a,b,c)*turn(a,b,d)<-1e-8&&turn(c,d,a)*turn(c,d,b)<-1e-8;
 }
 export function crossingPairs(machine,routed=false,labelFor=transitionLabel){
+ machine=visualMachine(machine);
  const segments=visibleSegments(machine),pairs=[],routes=routed?routeEdges(machine,labelFor):null,paths=routed?new Map(segments.map(e=>[e.i,Array.from({length:17},(_,i)=>sample(routes[e.i],i/16))])):null;
  for(let i=0;i<segments.length;i++)for(let j=i+1;j<segments.length;j++){
   const a=segments[i],b=segments[j];if(a.a===b.a||a.a===b.b||a.b===b.a||a.b===b.b)continue;
@@ -172,6 +199,7 @@ function segmentHitsBox(a,b,box){
 }
 const routeCache=new Map();
 export function routeEdges(machine,labelFor=transitionLabel){
+ machine=visualMachine(machine);
  const labels=machine.edges.map(labelFor);
  const key=JSON.stringify([machine.states,machine.edges,machine.comments,labels]);
  if(routeCache.has(key))return routeCache.get(key);
@@ -193,7 +221,7 @@ function computeRoutes(machine,labels){
  for(let attempt=0;attempt<(loop?64:61);attempt++){
  let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*65*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*37,y:b.y+Math.sin(endAngle)*37};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
  const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};
- if(!loop)applyBend(c,e,a,b);
+
  let labelScore=Infinity,bestLabel=c.label;
  for(const t of loop?[.5]:[.5,.4,.6,.3,.7,.2,.8,.1,.9]){
   const point=sample(c,t),label={...c.label,x:point.x,y:point.y-13};let collisions=0;
@@ -210,7 +238,7 @@ function computeRoutes(machine,labels){
  if(loop)for(let t=.1;t<.95&&score<bestScore;t+=.05){const p=sample(c,t);if((p.x-a.x)**2+(p.y-a.y)**2<48**2)continue;for(const {from,dx,dy,length} of nearbySegments){if(!length)continue;const u=Math.max(0,Math.min(1,((p.x-from.x)*dx+(p.y-from.y)*dy)/length));if((p.x-from.x-u*dx)**2+(p.y-from.y-u*dy)**2<14**2)score+=200}}
  if(score<bestScore){best=c;bestScore=score}if(!loop&&score<1||loop&&attempt%4===3&&bestScore<=(Math.floor(attempt/4)+1)*.1)break;
  }
- if(loop)applyBend(best,e,a,b);
+ applyBend(best,e,a,b);
  best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
  }
  const paths=routes.map(route=>{const points=Array.from({length:25},(_,i)=>sample(route,i/24)),xs=points.map(p=>p.x),ys=points.map(p=>p.y);return {points,left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}});
