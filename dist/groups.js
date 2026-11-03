@@ -49,8 +49,8 @@ export function graphView(machine, focus = null) {
     if ((from === to && membership.has(edge.from)) || !states.some(s => s.id === from) || !states.some(s => s.id === to)) continue;
     if (!membership.has(edge.from) && !membership.has(target)) {edges.push({...edge, originalIndex}); continue;}
     const key = JSON.stringify([from, to]);
-    if (!seen.has(key)) {seen.set(key, edges.length); edges.push({from, to, label: '', summary: true, count: 0});}
-    edges[seen.get(key)].count++;
+    if (!seen.has(key)) {seen.set(key, edges.length); edges.push({from, to, label: '', summary: true, count: 0, edgeIndices: []});}
+    edges[seen.get(key)].count++;edges[seen.get(key)].edgeIndices.push(originalIndex);
   }
   return {start: membership.get(machine.start) ?? machine.start, states, edges,
     comments: (machine.comments ?? []).filter(comment => !(comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some(id => membership.has(id))),

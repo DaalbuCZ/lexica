@@ -1005,8 +1005,20 @@ test('manual connection bends keep their base curve stable during dragging',()=>
  assert.ok(Math.abs(b.c1.x-a.c1.x-4/3)<1e-6);assert.ok(Math.abs(b.c1.y-a.c1.y-4/3)<1e-6);
 });
 import {arrangeGraph} from './dist/basic-layout.js';
-import {smartArrange,layoutQuality} from './dist/smart-layout.js';
+import {smartArrange,layoutQuality,untangle} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
+
+test('untangling removes avoidable wire crossings without changing occupied positions or topology',()=>{
+ const m={start:null,states:[['a',0,0],['b',200,200],['c',0,200],['d',200,0]].map(([id,x,y])=>({id,name:id,token:'',x,y})),edges:[{from:'a',to:'b',label:'a'},{from:'c',to:'d',label:'b'}]};
+ const positions=m.states.map(s=>`${s.x},${s.y}`).sort(),edges=JSON.stringify(m.edges);assert.equal(crossingPairs(m).length,1);untangle(m);assert.equal(crossingPairs(m).length,0);assert.deepEqual(m.states.map(s=>`${s.x},${s.y}`).sort(),positions);assert.equal(JSON.stringify(m.edges),edges);
+});
+
+test('overview connections retain every underlying transition for inspection',()=>{
+ const m=example(),g=createGroup(m,['s1','s2'],'Tokens'),bundle=graphView(m).edges.find(e=>e.to===g.id);
+ assert.deepEqual(bundle.edgeIndices,[0,2]);assert.equal(bundle.count,2);
+ m.edges[1].bend={x:900,y:900};m.edges[0].bend={x:12,y:13};smartArrange(m,g.id,{mode:'circle'});
+ assert.equal(m.edges[1].bend,undefined);assert.deepEqual(m.edges[0].bend,{x:12,y:13});
+});
 
 test('smart arrangement folds connected crowded branches and preserves lexer behavior in every mode',()=>{
  const source={start:'root',states:[{id:'root',name:'start',token:'',x:0,y:0}],edges:[]};
