@@ -567,3 +567,7 @@ a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[r
 .group-overlay-actions [data-delete-group]:hover{background:#931d2c;color:white}
 .group-target-list{display:grid;gap:5px;max-height:55vh;overflow:auto}
 .group-target-list small{display:block;opacity:.72}
+
+:root{--token-accent-0:#3d7fb8;--token-accent-1:#478f60;--token-accent-2:#b88a33;--token-accent-3:#c25a6c;--token-accent-4:#8567bf;--token-accent-5:#3f968c;--token-accent-6:#c47a43;--token-accent-7:#6f79bf;--token-accent-8:#bf5d92;--token-accent-9:#8aa13c;--token-accent-0:#7fb8e8;--token-accent-1:#72c08d;--token-accent-2:#d9b45f;--token-accent-3:#e58b9b;--token-accent-4:#b39ae6;--token-accent-5:#6fc6bb;--token-accent-6:#e19b65;--token-accent-7:#9aa5ea;--token-accent-8:#e28bb9;--token-accent-9:#b5c86b;}
+
+[data-theme=dark] .node.token-state circle{fill:color-mix(in srgb,var(--state-token) 20%,var(--node-fill,#f9fbf5));}
