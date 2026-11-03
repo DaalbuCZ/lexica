@@ -715,6 +715,13 @@ test('routing moves a transition label along its curve to avoid a state',()=>{
  const r=routeEdges(m)[0],mid={x:(r.p0.x+3*r.c1.x+3*r.c2.x+r.p3.x)/8,y:(r.p0.y+3*r.c1.y+3*r.c2.y+r.p3.y)/8-13};
  assert.ok(Math.abs(r.label.x-mid.x)>20);assert.ok(Math.abs(r.label.x-500)>(r.label.w+90)/2+8||Math.abs(r.label.y)>(r.label.h+90)/2+8);
 });
+test('portal routing keeps the transition label separate from its destination tag',()=>{
+ const m={states:[{id:'a',name:'source',x:0,y:0},{id:'b',name:'destination',portal:'DESTINATION',x:600,y:0}],edges:[{from:'a',to:'b',portal:'DESTINATION',label:'[a-z]',guard:{cell:'some_stack',op:'notEmpty'}}]};
+ const [route]=routeEdges(m,simpleTransitionLabel),a=route.label,b=route.portalBox;
+ assert.equal(route.label.w,simpleTransitionLabel(m.edges[0]).length*7+14);
+ assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2+8||Math.abs(a.y-b.y)>=(a.h+b.h)/2+8);
+ assert.equal(destination(m,m.edges[0]).id,'b');
+});
 
 test('Canvas paints current routes and hit-tests states, labels, portals and comments without SVG nodes',()=>{
  const previousDocument=globalThis.document,previousPath=globalThis.Path2D;globalThis.document={documentElement:{dataset:{theme:'light'}}};globalThis.Path2D=class{constructor(d){this.d=d}};

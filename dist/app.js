@@ -299,7 +299,7 @@ new ResizeObserver(resizeCanvas).observe($('canvas'));
 
 $('show-skipped').onchange=()=>{save();test()};
 
-try{$('layout-portals').checked=localStorage.getItem('lexica-layout-portals')==='true'}catch{}
+try{$('layout-portals').checked=localStorage.getItem('lexica-layout-portals')!=='false'}catch{}
 $('layout-portals').onchange=()=>{try{localStorage.setItem('lexica-layout-portals',String($('layout-portals').checked))}catch{}};
 
 new MutationObserver(()=>{draw();drawMap()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});

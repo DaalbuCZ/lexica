@@ -1,6 +1,7 @@
 import {forceSimulation,forceManyBody,forceLink,forceX,forceY,forceCollide} from 'd3-force';
 import {springSettings} from './spring-settings.js';
 import {transitionLabel} from './labels.js?v=16';
+import {simpleTransitionLabel} from './editor-settings.js';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
 import {destination,statePortalBox,enablePortal} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
@@ -40,7 +41,7 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
   const branches=children.get(id);
   heights.set(id,Math.max(own,branches.reduce((sum,c)=>sum+heights.get(c),0)+Math.max(0,branches.length-1)*gap));
  }
- const step=Math.max(120,Math.max(320,...machine.edges.map(e=>transitionLabel(e).length*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
+ const step=Math.max(120,Math.max(320,...machine.edges.map(e=>Math.max(transitionLabel(e).length,simpleTransitionLabel(e).length)*7+180),...machine.states.map(s=>Math.max((s.token?.length??0)*7+140,(s.portal?.length??0)*7+280)))*spacing);
  function place(){
  if(mode==='circle'){
   let left=160;
@@ -123,7 +124,7 @@ export function springLayout(machine,spacing=1,options={}){
 }
 function portalizeCrossings(machine){
  for(let attempts=0;attempts<machine.edges.length;attempts++){
-  const pairs=crossingPairs(machine,true);if(!pairs.length)break;
+  const pairs=crossingPairs(machine,true,simpleTransitionLabel);if(!pairs.length)break;
   const counts=new Map();for(const pair of pairs)for(const i of pair)counts.set(i,(counts.get(i)??0)+1);
   const index=[...counts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];enablePortal(machine,machine.edges[index]);
  }
@@ -137,8 +138,8 @@ function intersects(a,b,c,d){
  const turn=(p,q,r)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
  return turn(a,b,c)*turn(a,b,d)<-1e-8&&turn(c,d,a)*turn(c,d,b)<-1e-8;
 }
-export function crossingPairs(machine,routed=false){
- const segments=visibleSegments(machine),pairs=[],routes=routed?routeEdges(machine):null,paths=routed?new Map(segments.map(e=>[e.i,Array.from({length:17},(_,i)=>sample(routes[e.i],i/16))])):null;
+export function crossingPairs(machine,routed=false,labelFor=transitionLabel){
+ const segments=visibleSegments(machine),pairs=[],routes=routed?routeEdges(machine,labelFor):null,paths=routed?new Map(segments.map(e=>[e.i,Array.from({length:17},(_,i)=>sample(routes[e.i],i/16))])):null;
  for(let i=0;i<segments.length;i++)for(let j=i+1;j<segments.length;j++){
   const a=segments[i],b=segments[j];if(a.a===b.a||a.a===b.b||a.b===b.a||a.b===b.b)continue;
   let crossing=false;
@@ -151,6 +152,14 @@ export function crossingPairs(machine,routed=false){
 const at=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 function sample(c,t){const a=at(c.p0,c.c1,t),b=at(c.c1,c.c2,t),d=at(c.c2,c.p3,t);return at(at(a,b,t),at(b,d,t),t)}
 function overlaps(a,b){return Math.abs(a.x-b.x)<(a.w+b.w)/2+8&&Math.abs(a.y-b.y)<(a.h+b.h)/2+8}
+function segmentHitsBox(a,b,box){
+ let lo=0,hi=1;
+ for(const [start,delta,min,max] of [[a.x,b.x-a.x,box.x-box.w/2-4,box.x+box.w/2+4],[a.y,b.y-a.y,box.y-box.h/2-4,box.y+box.h/2+4]]){
+  if(Math.abs(delta)<1e-9){if(start<min||start>max)return false;continue}
+  const t1=(min-start)/delta,t2=(max-start)/delta;lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));if(lo>hi)return false;
+ }
+ return true;
+}
 const routeCache=new Map();
 export function routeEdges(machine,labelFor=transitionLabel){
  const labels=machine.edges.map(labelFor);
@@ -165,9 +174,10 @@ function applyBend(route,edge,start,end){if(!edge.bend)return;if(start===end){co
 function computeRoutes(machine,labels){
  const reserved=machine.states.flatMap(s=>[{x:s.x,y:s.y,w:90,h:90},...(s.portal?[statePortalBox(s)]:[]),...(s.token?[{x:s.x,y:s.y+57,w:Math.max(70,s.token.length*7),h:20}]:[])]),routes=[];
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
- const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {from,dx,dy,length:dx*dx+dy*dy}});
+ const obstacles=[...reserved];
+ const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {edge:e,from,to,dx,dy,length:dx*dx+dy*dy}});
  const ordered=machine.edges.map((e,i)=>({e,i})).sort((a,b)=>(a.e.from!==a.e.to)-(b.e.from!==b.e.to));
- for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){const width=Math.max(60,e.portal.length*7+20);let best,bestScore=Infinity;for(const [dx,dy] of [140,220,300].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy),p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox={x:p3.x+(dx<0?-width/2:width/2),y:p3.y,w:width,h:22};let score=len*.01;for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}if(score<bestScore){best=c;bestScore=score}}applyBend(best,e,a,e.portal!=null?null:b);best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
+ for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){const width=Math.max(60,e.portal.length*7+20);let best,bestScore=Infinity;for(const [dx,dy] of [140,220,300].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy),p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox={x:p3.x+(dx<0?-width/2:width/2),y:p3.y,w:width,h:22};applyBend(c,e,a,null);let score=len*.01+(overlaps(c.label,c.portalBox)?1000:0);for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}if(score<bestScore){best=c;bestScore=score}}best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
  let best,bestScore=Infinity;
  const loop=a===b,rotation=loop?[...a.id].reduce((n,ch)=>n+ch.codePointAt(0),0)%4:0;
  for(let attempt=0;attempt<(loop?64:61);attempt++){
@@ -177,10 +187,11 @@ function computeRoutes(machine,labels){
  let labelScore=Infinity,bestLabel=c.label;
  for(const t of loop?[.5]:[.5,.4,.6,.3,.7,.2,.8,.1,.9]){
   const point=sample(c,t),label={...c.label,x:point.x,y:point.y-13};let collisions=0;
-  for(const box of reserved)if(overlaps(label,box))collisions++;
+  for(const box of reserved)if(overlaps(label,box))collisions+=100;
+  for(const segment of segments)if(segment.edge!==e&&segmentHitsBox(segment.from,segment.to,label))collisions++;
   if(collisions<labelScore){labelScore=collisions;bestLabel=label}if(!collisions)break;
  }
- c.label=bestLabel;let score=(loop?Math.floor(attempt/4):attempt)*.1+labelScore*1000;
+ c.label=bestLabel;let score=(loop?Math.floor(attempt/4):attempt)*.1+labelScore*10;
  // A Bezier curve stays inside its control-point bounds; outside obstacles cannot collide.
  const left=Math.min(c.p0.x,c.c1.x,c.c2.x,c.p3.x),right=Math.max(c.p0.x,c.c1.x,c.c2.x,c.p3.x),top=Math.min(c.p0.y,c.c1.y,c.c2.y,c.p3.y),bottom=Math.max(c.p0.y,c.c1.y,c.c2.y,c.p3.y);
  const nearby=score<bestScore?machine.states.filter(s=>s!==a&&s!==b&&s.x>=left-65&&s.x<=right+65&&s.y>=top-65&&s.y<=bottom+65):[];
@@ -191,6 +202,25 @@ function computeRoutes(machine,labels){
  }
  if(loop)applyBend(best,e,a,b);
  best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label);
+ }
+ const paths=routes.map(route=>{const points=Array.from({length:25},(_,i)=>sample(route,i/24)),xs=points.map(p=>p.x),ys=points.map(p=>p.y);return {points,left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}});
+ for(let pass=0;pass<2;pass++)for(let i=0;i<routes.length;i++){
+  const edge=machine.edges[i],route=routes[i];if(edge.from===edge.to||edge.portal!=null)continue;
+  const collisionScore=label=>{
+   let score=0;for(const box of obstacles)if(overlaps(label,box))score+=1000;
+   for(let j=0;j<routes.length;j++)if(j!==i){
+    if(overlaps(label,routes[j].label)||routes[j].portalBox&&overlaps(label,routes[j].portalBox))score+=1000;
+    const path=paths[j];if(path.right<label.x-label.w/2-4||path.left>label.x+label.w/2+4||path.bottom<label.y-label.h/2-4||path.top>label.y+label.h/2+4)continue;
+    for(let k=1;k<path.points.length;k++)if(segmentHitsBox(path.points[k-1],path.points[k],label)){score++;break}
+   }
+   return score;
+  };
+  let best=route.label,bestScore=collisionScore(best);
+  for(const t of [.5,.45,.55,.4,.6,.35,.65,.3,.7,.25,.75,.2,.8,.15,.85,.1,.9]){
+   if(!bestScore)break;const point=sample(route,t),candidate={...route.label,x:point.x,y:point.y-13},score=collisionScore(candidate);
+   if(score<bestScore){best=candidate;bestScore=score}
+  }
+  route.label=best;
  }
  return routes;
 }
