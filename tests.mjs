@@ -1009,6 +1009,21 @@ import {smartArrange,layoutQuality,untangle} from './dist/smart-layout.js';
 import {createGroup,dissolveGroup,graphView} from './dist/groups.js';
 import {planarCoordinates,drawingClearance} from './dist/planar-layout.js';
 
+test('Radial retains centered breadth-first rings even when planar embedding finds a different drawing',()=>{
+ const m={start:'root',states:['root',...Array.from({length:12},(_,i)=>`n${i}`)].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[]};
+ for(let i=0;i<12;i++){m.edges.push({from:'root',to:`n${i}`,label:'a'});m.edges.push({from:`n${i}`,to:`n${(i+1)%12}`,label:'b'})}
+ smartArrange(m,null,{mode:'circle',smartGroups:false});const root=m.states[0],radii=m.states.slice(1).map(s=>Math.hypot(s.x-root.x,s.y-root.y));
+ assert.ok(Math.max(...radii)-Math.min(...radii)<1e-6);assert.ok(Math.max(...radii)<1000);
+ const xs=m.states.slice(1).map(s=>s.x),ys=m.states.slice(1).map(s=>s.y);assert.ok(Math.min(...xs)<root.x&&Math.max(...xs)>root.x);assert.ok(Math.min(...ys)<root.y&&Math.max(...ys)>root.y);
+});
+
+test('Tree remains a compact forward tree despite long labels and planar coordinate alternatives',()=>{
+ const m={start:'root',states:['root','a','b','c','a1','a2','b1','c1'].map(id=>({id,name:id,token:'',x:0,y:0})),edges:[['root','a'],['root','b'],['root','c'],['a','a1'],['a','a2'],['b','b1'],['c','c1']].map(([from,to])=>({from,to,label:'x'.repeat(150)}))};
+ smartArrange(m,null,{mode:'tree',smartGroups:false});const get=id=>m.states.find(s=>s.id===id);
+ assert.equal(get('a').x,get('b').x);assert.equal(get('b').x,get('c').x);assert.ok(get('root').x<get('a').x&&get('a').x<get('a1').x);
+ const xs=m.states.map(s=>s.x),ys=m.states.map(s=>s.y);assert.ok(Math.max(...xs)-Math.min(...xs)<1000);assert.ok(Math.max(...ys)-Math.min(...ys)<1500);
+});
+
 test('topological grid embedding handles planar cycles, nested faces, cut vertices and disconnected components',()=>{
  const fixtures=[
   [4,[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]]],

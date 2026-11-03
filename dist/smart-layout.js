@@ -3,6 +3,7 @@ import {graphView,createGroup,groupFor} from './groups.js';
 import {destination} from './portals.js';
 import {commentAnchors,positionComments} from './comments.js';
 import {planarCoordinates,drawingClearance} from './planar-layout.js';
+import {tidyTree,radialTree} from './tidy-tree.js';
 
 export function simpleBranch(machine){
  if(!machine.start||machine.states.length>12)return false;
@@ -21,15 +22,26 @@ function place(machine,focus,options){
  const analytical=planarCoordinates(copy);
  // Small directed branches read as a flow even when the surrounding graph uses a radial layout.
  const compactBranch=focus&&simpleBranch(copy);
- autoLayout(copy,compactBranch?'tree':options.mode??'circle',options.spacing??.75,false,options.forces??{},false);
- const clearance=drawingClearance(copy.states,copy.edges);
- if(analytical.positions&&(clearance.crossings||clearance.wire<65||clearance.node<160)){
-  // Uniform transforms retain the embedding; don't snap or repel vertices afterwards.
-  const root=analytical.positions.get(copy.start),points=[...analytical.positions.values()];
-  const center={x:points.reduce((sum,p)=>sum+p.x,0)/points.length,y:points.reduce((sum,p)=>sum+p.y,0)/points.length};
-  const angle=root?Math.atan2(center.y-root.y,center.x-root.x):0,cos=Math.cos(angle),sin=Math.sin(angle);
-  for(const state of copy.states){const p=analytical.positions.get(state.id),x=p.x-(root?.x??0),y=p.y-(root?.y??0);state.x=160+x*cos+y*sin;state.y=160-x*sin+y*cos}
- }else if(!analytical.positions)untangle(copy);
+ const mode=compactBranch?'tree':options.mode??'circle',spacing=options.spacing??.75;
+ const arrange=candidate=>{if(mode==='tree')tidyTree(candidate,spacing);else if(mode==='circle')radialTree(candidate,spacing);else autoLayout(candidate,mode,spacing,false,options.forces??{},false)};
+ const extent=states=>states.length?Math.max(Math.max(...states.map(s=>s.x))-Math.min(...states.map(s=>s.x)),Math.max(...states.map(s=>s.y))-Math.min(...states.map(s=>s.y))):0;
+ const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges);return c.crossings*2000+(c.wire<65?2000:0)+extent(candidate.states)/50};
+ arrange(copy);let best=cost(copy),chosen=copy.states,limit=Math.max(2200,extent(copy.states)*1.5);
+ if(analytical.positions){
+  // Use the planar embedding to order branches, then assign coordinates in the
+  // requested style. A grid drawing must not silently replace Radial or Tree.
+  for(const offset of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
+   const candidate=structuredClone(shown);candidate.start=copy.start;
+   candidate.edges.sort((a,b)=>{if(a.from!==b.from)return candidate.states.findIndex(s=>s.id===a.from)-candidate.states.findIndex(s=>s.id===b.from);const origin=analytical.positions.get(a.from),pa=analytical.positions.get(a.to),pb=analytical.positions.get(b.to);if(!origin||!pa||!pb)return 0;const angle=p=>(Math.atan2(p.y-origin.y,p.x-origin.x)+offset+Math.PI*2)%(Math.PI*2);return angle(pa)-angle(pb)});
+   arrange(candidate);const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best){best=next;chosen=candidate.states}
+  }
+  if(mode==='spring'){
+   const candidate=structuredClone(copy);for(const state of candidate.states)Object.assign(state,analytical.positions.get(state.id));
+   const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best)chosen=candidate.states;
+  }
+ }
+ const selected=new Map(chosen.map(s=>[s.id,s]));for(const state of copy.states){state.x=selected.get(state.id).x;state.y=selected.get(state.id).y}
+
  for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
  const positions=new Map(copy.states.map(s=>[s.id,s]));
  for(const state of shown.states){const next=positions.get(state.id);if(!next)continue;
