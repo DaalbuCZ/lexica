@@ -1,3 +1,4 @@
+import { Button } from './ui.jsx';
 import { useEffect, useRef } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
@@ -67,10 +68,10 @@ export function Inspector() {
         {total > 1 ? (
           <>
             <p className="selection-summary">{total} items selected</p>
-            <button onClick={() => controller.copy()}>Copy selection</button>
-            <button className="danger" onClick={() => controller.remove()}>
+            <Button onClick={() => controller.copy()}>Copy selection</Button>
+            <Button className="danger" onClick={() => controller.remove()}>
               Delete selection
-            </button>
+            </Button>
           </>
         ) : selection.type === 'state' ? (
           <StateProperties
@@ -98,9 +99,9 @@ export function Inspector() {
         ) : selection.type === 'comment-link' ? (
           <>
             <p className="selection-summary">Comment connection</p>
-            <button className="danger" onClick={() => controller.remove()}>
+            <Button className="danger" onClick={() => controller.remove()}>
               Delete connection
-            </button>
+            </Button>
           </>
         ) : machineType(machine) === 'extended' ? (
           <MemoryCells />
@@ -161,7 +162,7 @@ function StateProperties({ state: s, machine, controller, simple }) {
         />
       )}
       {!simple && (
-        <button
+        <Button
           id="new-portal"
           onClick={() => {
             controller.update((next) =>
@@ -176,7 +177,7 @@ function StateProperties({ state: s, machine, controller, simple }) {
           }}
         >
           ↗ New portal transition
-        </button>
+        </Button>
       )}
       {(machine.start == null || machine.start === s.id) && (
         <Check
@@ -232,18 +233,18 @@ function StateProperties({ state: s, machine, controller, simple }) {
           {machine.edges.map(
             (edge, index) =>
               edge.from === s.id && (
-                <button
+                <Button
                   key={index}
                   className="transition-item"
                   onClick={() => controller.select('edge', index)}
                 >
                   {transitionLabel(edge)} → {destinationName(machine, edge)}
-                </button>
+                </Button>
               ),
           )}
-          <button id="delete" className="danger" onClick={() => controller.remove()}>
+          <Button id="delete" className="danger" onClick={() => controller.remove()}>
             Delete state
-          </button>
+          </Button>
         </>
       )}
     </>
@@ -313,7 +314,7 @@ function EdgeProperties({ edge: e, index, machine, controller, simple }) {
             <div className="advanced-expression">
               <strong>Advanced expression</strong>
               <p>This regex cannot be shown as a character set.</p>
-              <button
+              <Button
                 onClick={() => {
                   useStudio.setState({
                     settings: {
@@ -324,7 +325,7 @@ function EdgeProperties({ edge: e, index, machine, controller, simple }) {
                 }}
               >
                 Edit in Classic view
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -423,7 +424,7 @@ function EdgeProperties({ edge: e, index, machine, controller, simple }) {
               })
             }
           />
-          <button
+          <Button
             onClick={() => {
               try {
                 controller.select('state', destination(machine, e).id);
@@ -434,7 +435,7 @@ function EdgeProperties({ edge: e, index, machine, controller, simple }) {
             }}
           >
             ↗ Go to destination
-          </button>
+          </Button>
         </>
       )}
       {machineType(machine) === 'extended' && (
@@ -446,9 +447,9 @@ function EdgeProperties({ edge: e, index, machine, controller, simple }) {
             One character per transition. Examples: [a-z], [0-9], {'\\s'}, {'\\+'}. Overlapping
             transitions are reported when testing.
           </p>
-          <button className="danger" onClick={() => controller.remove()}>
+          <Button className="danger" onClick={() => controller.remove()}>
             Delete transition
-          </button>
+          </Button>
         </>
       )}
     </>
@@ -479,9 +480,9 @@ function CommentProperties({ comment, controller }) {
           )
         }
       />
-      <button className="danger" onClick={() => controller.remove()}>
+      <Button className="danger" onClick={() => controller.remove()}>
         Delete comment
-      </button>
+      </Button>
     </>
   );
 }

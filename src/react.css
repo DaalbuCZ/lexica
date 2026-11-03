@@ -113,12 +113,12 @@
   scrollbar-gutter: stable;
 }
 .virtual-token-row {
-  display: grid;
+  display: flex;
   gap: 6px;
   align-items: start;
 }
 .virtual-token-row > .token {
-  width: 100%;
+  width: max-content;
   height: auto;
   content-visibility: visible;
   contain-intrinsic-size: none;

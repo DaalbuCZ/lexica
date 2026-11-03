@@ -2,21 +2,32 @@ import { editorSettings } from '../core/editor-settings.js';
 import { groupFor } from '../core/groups.js';
 export function createGroupNavigation(context) {
   function syncGroupPresentation() {
+    if (
+      context.openGroup &&
+      !context.machine.groups?.some((group) => group.id === context.openGroup)
+    )
+      context.openGroup = null;
     const group = context.machine.groups?.find((g) => g.id === context.openGroup),
       active = editorSettings.groupPresentation === 'overlay' && !!group;
+    // Reveal the destination surface before measuring the reparented canvas.
+    context.elements.surface.hidden = active;
     context.groupBar.hidden = editorSettings.groupPresentation === 'overlay';
-    if (active && !context.overviewView) context.overviewView = context.view();
+    if (active && !context.overviewView)
+      context.overviewView = context.groupReturnView ?? context.view();
     if (active && context.elements.canvas.parentElement !== context.groupPanel) {
       context.groupPanel.hidden = false;
       context.groupPanel.append(context.elements.canvas);
+      context.groupPanelViewInitialized = false;
       context.canvasSize = {
         width: context.elements.canvas.clientWidth,
         height: context.elements.canvas.clientHeight,
       };
     } else if (!active && context.overviewView) {
+      const overview = context.overviewView;
       context.elements.surface.append(context.elements.canvas);
-      context.graph.setView(context.overviewView);
       context.overviewView = null;
+      if (group) context.resizeCanvas();
+      else context.graph.setView(overview);
       context.canvasSize = {
         width: context.elements.canvas.clientWidth,
         height: context.elements.canvas.clientHeight,
@@ -24,9 +35,11 @@ export function createGroupNavigation(context) {
     }
     context.groupPanel.hidden = !active;
     context.overviewCanvas.hidden = !active;
+    context.elements.surface.hidden = active;
   }
   function closeGroup(fromHistory = false) {
     if (!context.openGroup) return;
+    const returnView = context.overviewView ?? context.groupReturnView;
     if (!fromHistory && window.history.state?.lexicaGroup === context.openGroup)
       window.history.back();
     context.cancelConnect();
@@ -37,11 +50,13 @@ export function createGroupNavigation(context) {
     context.clearSelection();
     context.showProperties(false);
     context.render();
-    context.fit();
+    if (returnView) context.setView(returnView);
+    context.groupReturnView = null;
   }
   function openGroupById(id) {
     if (!context.machine.groups?.some((g) => g.id === id)) return;
-    if (!context.openGroup)
+    if (!context.openGroup) {
+      context.groupReturnView = context.view();
       window.history.pushState(
         {
           ...window.history.state,
@@ -49,7 +64,7 @@ export function createGroupNavigation(context) {
         },
         '',
       );
-    else
+    } else
       window.history.replaceState(
         {
           ...window.history.state,
@@ -59,6 +74,8 @@ export function createGroupNavigation(context) {
       );
     context.cancelConnect();
     context.openGroup = id;
+    context.groupPanelBoundsId = null;
+    context.groupPanelViewInitialized = false;
     context.clearSelection();
     context.showProperties(false);
     context.render();

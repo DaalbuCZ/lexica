@@ -552,6 +552,7 @@ export function createEditorController(
     showProperties(true);
   }
   installInteractions();
+  context.installGroupWindow();
   const observer = new ResizeObserver(() => {
     resizeCanvas();
     queueDraw();

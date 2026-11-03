@@ -1,3 +1,4 @@
+import { Button } from './ui.jsx';
 import { useState } from 'react';
 import { useStudio } from '../state/studio.js';
 import {
@@ -107,12 +108,12 @@ export function MemoryCells() {
               })
             }
           />
-          <button className="danger" onClick={() => remove(index)}>
+          <Button className="danger" onClick={() => remove(index)}>
             Delete cell
-          </button>
+          </Button>
         </div>
       ))}
-      <button
+      <Button
         data-add-stack
         onClick={() =>
           edit((next) => {
@@ -128,7 +129,7 @@ export function MemoryCells() {
         }
       >
         ＋ Add stack
-      </button>
+      </Button>
     </>
   );
 }
@@ -210,12 +211,12 @@ export function MemoryRules({ edge, index, edit, machine }) {
               />
               {kind === 'guard' && (
                 <div className="condition-clipboard">
-                  <button type="button" disabled={!exists} onClick={copy}>
+                  <Button type="button" disabled={!exists} onClick={copy}>
                     Copy conditions
-                  </button>
-                  <button type="button" onClick={paste}>
+                  </Button>
+                  <Button type="button" onClick={paste}>
                     Paste conditions
-                  </button>
+                  </Button>
                 </div>
               )}
               {enabled && (
@@ -249,7 +250,7 @@ export function MemoryRules({ edge, index, edit, machine }) {
                         cells={cells}
                         onChange={(change) => edit((e) => change(e[list][i]))}
                       />
-                      <button
+                      <Button
                         type="button"
                         onClick={() =>
                           edit((e) => {
@@ -259,12 +260,12 @@ export function MemoryRules({ edge, index, edit, machine }) {
                         }
                       >
                         Remove {kind === 'guard' ? 'condition' : 'action'}
-                      </button>
+                      </Button>
                     </div>
                   ))}
-                  <button type="button" disabled={!firstStack} onClick={add}>
+                  <Button type="button" disabled={!firstStack} onClick={add}>
                     ＋ Add {kind === 'guard' ? 'condition' : 'action'}
-                  </button>
+                  </Button>
                 </>
               )}
             </section>

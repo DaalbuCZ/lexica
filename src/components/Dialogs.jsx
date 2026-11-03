@@ -1,12 +1,7 @@
+import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
-import {
-  useStudio,
-  persistedMachine,
-  readStorage,
-  writeStorage,
-  machineType,
-} from '../state/studio.js';
+import { TextField, TextArea, Slider } from '@radix-ui/themes';
+import { useStudio, persistedMachine, readStorage, writeStorage } from '../state/studio.js';
 import { parseMachine, toTikz } from '../core/lexer.js';
 import { machineSvg } from '../core/svg-export.js';
 import { SPRING_DEFAULTS, SPRING_LIMITS, springSettings } from '../core/spring-settings.js';
@@ -16,7 +11,7 @@ import { createGraphCanvas, graphBounds } from '../core/canvas-graph.js';
 import { transitionLabel } from '../core/labels.js';
 import { simpleTransitionLabel } from '../core/editor-settings.js';
 import { tokenColorClass } from '../core/token-colors.js';
-import { toggleTheme } from '../hooks/useTheme.js';
+import { SettingsPanel } from './SettingsPanel.jsx';
 import { Check, Select, Modal } from './ui.jsx';
 import { MemoryCells } from './MemoryEditor.jsx';
 import { destinationName } from './Inspector.jsx';
@@ -33,7 +28,7 @@ export function Dialogs() {
   };
   switch (dialog.type) {
     case 'settings':
-      return <SettingsDialog {...props} />;
+      return <SettingsPanel {...props} />;
     case 'import':
       return <ImportDialog {...props} />;
     case 'export':
@@ -42,7 +37,7 @@ export function Dialogs() {
       return <LayoutDialog {...props} />;
     case 'memory':
       return (
-        <Modal title="Memory cells" onClose={close}>
+        <Modal title="Memory cells" onClose={close} anchorId={dialog.anchorId}>
           <MemoryCells />
         </Modal>
       );
@@ -60,130 +55,7 @@ export function Dialogs() {
       return null;
   }
 }
-function SettingsDialog({ onClose }) {
-  const settings = useStudio((s) => s.settings),
-    showSkipped = useStudio((s) => s.showSkipped),
-    machine = useStudio((s) => s.scene.machine),
-    controller = useStudio((s) => s.controller);
-  const change = (changes) =>
-    useStudio.setState({
-      settings: {
-        ...settings,
-        ...changes,
-      },
-    });
-  return (
-    <Modal title="Settings" onClose={onClose}>
-      <section className="setting-section">
-        <h3>Machine</h3>
-        {[
-          ['fsm', 'Standard FSM', 'Character transitions.'],
-          ['extended', 'Extended FSM', 'Numeric stacks, guards, and side effects.'],
-        ].map(([type, title, description]) => (
-          <label className="setting-choice" key={type}>
-            <input
-              type="radio"
-              name="machine-type"
-              value={type}
-              checked={machineType(machine) === type}
-              onChange={() =>
-                controller.update((next) => {
-                  next.machineType = type;
-                })
-              }
-            />
-            <span>
-              <strong>{title}</strong>
-              <small>{description}</small>
-            </span>
-          </label>
-        ))}
-      </section>
-      <section className="setting-section">
-        <h3>Editing</h3>
-        <Check
-          id="label-boxes"
-          label="Label backgrounds"
-          checked={machine.labelBoxes}
-          onChange={(value) =>
-            controller.update((next) => {
-              next.labelBoxes = value;
-            })
-          }
-        />
-        <Check
-          id="simplified-setting"
-          label="Simplified view"
-          checked={settings.simplified}
-          onChange={(simplified) =>
-            change({
-              simplified,
-            })
-          }
-        />
-      </section>
-      <section className="setting-section">
-        <h3>Lexer tester</h3>
-        <Check
-          id="show-skipped"
-          label="Show skipped tokens"
-          checked={showSkipped}
-          onChange={(showSkipped) =>
-            useStudio.setState({
-              showSkipped,
-            })
-          }
-        />
-      </section>
-      <section className="setting-section">
-        <h3>Groups</h3>
-        <Select
-          id="group-presentation"
-          label="Open groups in"
-          value={settings.groupPresentation}
-          onChange={(groupPresentation) =>
-            change({
-              groupPresentation,
-            })
-          }
-        >
-          <option value="canvas">Full canvas with breadcrumbs</option>
-          <option value="overlay">Canvas overlay</option>
-        </Select>
-      </section>
-      <section className="setting-section">
-        <h3>Pinch zoom</h3>
-        <label className="setting-row" htmlFor="pinch-sensitivity">
-          <span>
-            <strong>Sensitivity</strong>
-            <output>{settings.pinchSensitivity.toFixed(1)}×</output>
-          </span>
-          <input
-            id="pinch-sensitivity"
-            type="range"
-            min="0.2"
-            max="2"
-            step="0.1"
-            value={settings.pinchSensitivity}
-            onChange={(e) =>
-              change({
-                pinchSensitivity: Number(e.target.value),
-              })
-            }
-          />
-        </label>
-      </section>
-      <section className="setting-section">
-        <h3>Appearance</h3>
-        <button id="theme-toggle" onClick={toggleTheme}>
-          <Moon className="tool-icon theme-moon" />
-          <Sun className="tool-icon theme-sun" /> Switch theme
-        </button>
-      </section>
-    </Modal>
-  );
-}
-function ImportDialog({ onClose }) {
+function ImportDialog({ onClose, dialog }) {
   const [text, setText] = useState(''),
     [error, setError] = useState(''),
     file = useRef(null);
@@ -199,11 +71,17 @@ function ImportDialog({ onClose }) {
     }
   };
   return (
-    <Modal title="Import machine" onClose={onClose}>
+    <Modal
+      title="Import machine"
+      onClose={onClose}
+      anchorId={dialog.anchorId}
+      className="import-panel"
+    >
       <label className="field-label" htmlFor="import-json">
         PASTE MACHINE JSON
       </label>
-      <textarea
+      <TextArea
+        size="2"
         id="import-json"
         rows={10}
         spellCheck={false}
@@ -232,17 +110,17 @@ function ImportDialog({ onClose }) {
         }}
       />
       <div className="dialog-actions">
-        <button id="import-file" onClick={() => file.current.click()}>
+        <Button id="import-file" onClick={() => file.current.click()}>
           Choose .json file
-        </button>
-        <button id="import-paste" className="primary" onClick={() => importText(text)}>
+        </Button>
+        <Button id="import-paste" className="primary" onClick={() => importText(text)}>
           Import JSON
-        </button>
+        </Button>
       </div>
     </Modal>
   );
 }
-function ExportDialog({ onClose }) {
+function ExportDialog({ onClose, dialog }) {
   const [format, setFormat] = useState('json'),
     [standalone, setStandalone] = useState(true);
   const machine = persistedMachine();
@@ -276,7 +154,12 @@ function ExportDialog({ onClose }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <Modal title="Export your machine" onClose={onClose}>
+    <Modal
+      title="Export your machine"
+      onClose={onClose}
+      anchorId={dialog.anchorId}
+      className="export-panel"
+    >
       <div className="export-options">
         <Select id="format" label="Format" value={format} onChange={setFormat}>
           <option value="json">Editable machine (.json)</option>
@@ -292,7 +175,7 @@ function ExportDialog({ onClose }) {
           />
         )}
       </div>
-      <textarea id="export-preview" spellCheck={false} readOnly value={text} />
+      <TextArea size="2" id="export-preview" spellCheck={false} readOnly value={text} />
       {error && <p role="alert">{error}</p>}
       {format === 'tex' && (
         <p className="export-help">
@@ -300,7 +183,7 @@ function ExportDialog({ onClose }) {
         </p>
       )}
       <div className="dialog-actions">
-        <button
+        <Button
           id="copy"
           disabled={!!error}
           onClick={async () => {
@@ -313,15 +196,15 @@ function ExportDialog({ onClose }) {
           }}
         >
           Copy to clipboard
-        </button>
-        <button id="download" className="primary" disabled={!!error} onClick={download}>
+        </Button>
+        <Button id="download" className="primary" disabled={!!error} onClick={download}>
           ↓ Download .{format}
-        </button>
+        </Button>
       </div>
     </Modal>
   );
 }
-function LayoutDialog({ onClose }) {
+function LayoutDialog({ onClose, dialog }) {
   const [mode, setMode] = useState(() => {
     const value = readStorage('lexica-layout-mode', 'circle', false);
     return ['tree', 'circle', 'spring'].includes(value) ? value : 'circle';
@@ -361,7 +244,12 @@ function LayoutDialog({ onClose }) {
     );
   };
   return (
-    <Modal title="Arrange graph" onClose={onClose} className="layout-dialog">
+    <Modal
+      title="Arrange graph"
+      onClose={onClose}
+      className="layout-dialog"
+      anchorId={dialog.anchorId}
+    >
       <Select id="layout-mode" label="Layout" value={mode} onChange={setMode}>
         <option value="tree">Tree</option>
         <option value="circle">Radial</option>
@@ -381,23 +269,23 @@ function LayoutDialog({ onClose }) {
                 ? 'Link distance'
                 : key[0].toUpperCase() + key.slice(1) + ' force'}
               <output>{forces[key]}</output>
-              <input
+              <Slider
                 id={'spring-' + key}
-                type="range"
+                aria-label={key === 'distance' ? 'Link distance' : key + ' force'}
                 min={SPRING_LIMITS[key][0]}
                 max={SPRING_LIMITS[key][1]}
                 step={key === 'distance' ? 10 : key === 'repel' ? 0.5 : 0.01}
-                value={forces[key]}
-                onChange={(e) =>
+                value={[forces[key]]}
+                onValueChange={([value]) =>
                   setForces({
                     ...forces,
-                    [key]: Number(e.target.value),
+                    [key]: value,
                   })
                 }
               />
             </label>
           ))}
-          <button
+          <Button
             onClick={() =>
               setForces({
                 ...SPRING_DEFAULTS,
@@ -405,7 +293,7 @@ function LayoutDialog({ onClose }) {
             }
           >
             Reset forces
-          </button>
+          </Button>
         </div>
       )}
       <Check
@@ -421,9 +309,9 @@ function LayoutDialog({ onClose }) {
         onChange={setDisregardGroups}
       />
       <div className="dialog-actions">
-        <button id="arrange" className="primary" disabled={busy} aria-busy={busy} onClick={apply}>
+        <Button id="arrange" className="primary" disabled={busy} aria-busy={busy} onClick={apply}>
           {busy ? 'Arranging…' : 'Apply layout'}
-        </button>
+        </Button>
       </div>
     </Modal>
   );
@@ -444,7 +332,7 @@ function GroupDialog({ dialog, onClose }) {
       >
         <label className="prop-field">
           Name
-          <input
+          <TextField.Root
             id="group-name"
             value={name}
             maxLength={60}
@@ -453,12 +341,12 @@ function GroupDialog({ dialog, onClose }) {
           />
         </label>
         <div className="dialog-actions">
-          <button type="button" onClick={onClose}>
+          <Button type="button" onClick={onClose}>
             Cancel
-          </button>
-          <button className="primary" type="submit">
+          </Button>
+          <Button className="primary" type="submit">
             {dialog.groupId ? 'Save name' : 'Create group'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>
@@ -478,15 +366,15 @@ function MoveGroupDialog({ dialog, onClose }) {
         ))}
       </Select>
       <div className="dialog-actions">
-        <button onClick={onClose}>Cancel</button>
-        <button
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
           className="primary"
           onClick={() => {
             if (useStudio.getState().controller.moveToGroup(dialog.stateIds, target)) onClose();
           }}
         >
           Move states
-        </button>
+        </Button>
       </div>
     </Modal>
   );
@@ -501,7 +389,7 @@ function CombinedTransitionDialog({ dialog, onClose }) {
           const edge = machine.edges[index];
           return (
             edge && (
-              <button
+              <Button
                 key={index}
                 onClick={() => {
                   controller.select('edge', index);
@@ -510,7 +398,7 @@ function CombinedTransitionDialog({ dialog, onClose }) {
               >
                 {machine.states.find((s) => s.id === edge.from)?.name} →{' '}
                 {destinationName(machine, edge)} · {transitionLabel(edge) || 'empty'}
-              </button>
+              </Button>
             )
           );
         })}
@@ -581,7 +469,7 @@ function GroupTargetDialog({ dialog, onClose }) {
       />
       <div className="group-target-list" aria-label="Group states">
         {group?.stateIds.map((id) => (
-          <button
+          <Button
             key={id}
             onClick={() => {
               controller.connect(dialog.from, id);
@@ -589,7 +477,7 @@ function GroupTargetDialog({ dialog, onClose }) {
             }}
           >
             {machine.states.find((s) => s.id === id)?.name ?? id}
-          </button>
+          </Button>
         ))}
       </div>
     </Modal>

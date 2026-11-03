@@ -134,7 +134,7 @@ export function createCanvasInteractions(context) {
     context.pan = {
       x: e.clientX,
       y: e.clientY,
-      v: context.overviewView ?? context.view(),
+      v: context.view(),
     };
     document.body.classList.add('panning');
   }
@@ -221,12 +221,11 @@ export function createCanvasInteractions(context) {
       }
     });
     setupCanvasGestures(context.$('canvas'), {
-      getView: () => context.overviewView ?? context.view(),
+      getView: () => context.view(),
       setView: context.setView,
-      toWorld: (event) =>
-        context.overviewView ? context.overviewGraph.point(event) : context.point(event),
+      toWorld: (event) => context.point(event),
       signal: context.scope.signal,
-      viewport: () => (context.overviewView ? context.overviewCanvas : context.$('canvas')),
+      viewport: () => context.$('canvas'),
       sensitivity: () => editorSettings.pinchSensitivity,
       onInterrupt: () => {
         if (context.drag?.moved) {
@@ -516,7 +515,7 @@ export function createCanvasInteractions(context) {
         return;
       }
       if (context.pan) {
-        const surface = context.overviewView ? context.overviewCanvas : context.$('canvas'),
+        const surface = context.$('canvas'),
           scale = Math.min(
             surface.clientWidth / context.pan.v.width,
             surface.clientHeight / context.pan.v.height,
@@ -784,7 +783,7 @@ export function createCanvasInteractions(context) {
       toWorld: context.overviewGraph.point,
       sensitivity: () => editorSettings.pinchSensitivity,
       onInterrupt: () => {
-        context.overviewCanvas.onpointermove = null;
+        context.outsideGroupPress = null;
       },
       signal: context.scope.signal,
     });

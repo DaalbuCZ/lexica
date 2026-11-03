@@ -1,4 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Theme } from '@radix-ui/themes';
 import {
   ArrowUpFromLine,
   ArrowDownToLine,
@@ -24,13 +25,23 @@ import { IconButton } from './ui.jsx';
 export function Toolbar() {
   const controller = useStudio((s) => s.controller),
     scene = useStudio((s) => s.scene),
+    simplified = useStudio((s) => s.settings.simplified),
     propertiesOpen = useStudio((s) => s.propertiesOpen),
     grip = useDockGrip('toolbar');
   const dialog = (type) =>
     useStudio.setState({
-      dialog: {
-        type,
-      },
+      dialog:
+        useStudio.getState().dialog?.type === type
+          ? null
+          : {
+              type,
+              anchorId:
+                type === 'layout'
+                  ? 'layout-toggle'
+                  : type === 'memory'
+                    ? 'memory-cells'
+                    : 'app-menu-toggle',
+            },
     });
   return (
     <nav className="toolbar" aria-label="Diagram tools">
@@ -46,21 +57,23 @@ export function Toolbar() {
           <IconButton id="app-menu-toggle" icon={Menu} label="Menu" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            className="layout-popover app-menu react-menu"
-            sideOffset={8}
-            collisionPadding={12}
-          >
-            <MenuItem icon={ArrowUpFromLine} onSelect={() => dialog('import')}>
-              Import
-            </MenuItem>
-            <MenuItem icon={ArrowDownToLine} onSelect={() => dialog('export')}>
-              Export
-            </MenuItem>
-            <MenuItem icon={Settings} onSelect={() => dialog('settings')}>
-              Settings
-            </MenuItem>
-          </DropdownMenu.Content>
+          <Theme asChild>
+            <DropdownMenu.Content
+              className="layout-popover app-menu react-menu"
+              sideOffset={8}
+              collisionPadding={12}
+            >
+              <MenuItem icon={ArrowUpFromLine} onSelect={() => dialog('import')}>
+                Import
+              </MenuItem>
+              <MenuItem icon={ArrowDownToLine} onSelect={() => dialog('export')}>
+                Export
+              </MenuItem>
+              <MenuItem icon={Settings} onSelect={() => dialog('settings')}>
+                Settings
+              </MenuItem>
+            </DropdownMenu.Content>
+          </Theme>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <span className="separator" />
@@ -98,6 +111,7 @@ export function Toolbar() {
         id="group-selection"
         icon={Group}
         label="Group selected states"
+        hidden={simplified}
         disabled={!scene.selectedStates.size}
         onClick={() => controller?.makeGroup()}
       />
@@ -150,6 +164,7 @@ export function Toolbar() {
         id="toggle-properties"
         icon={PanelRight}
         label="Toggle properties"
+        hidden={simplified}
         aria-expanded={propertiesOpen}
         onClick={() => controller?.showProperties(!propertiesOpen)}
       />

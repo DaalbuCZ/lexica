@@ -54,7 +54,7 @@ React owns the application UI. The canvas engine owns high-frequency pointer sta
 
 Keep lexer semantics and validation in `src/core/`, and editable form drafts inside components. Document changes go through the canvas session's transaction/history API so validation, undo, persistence, and redraw stay consistent. Canvas movements use animation frames. Large lexer input uses a cancellable worker; large token lists use TanStack Virtual.
 
-Radix supplies dialog focus management and application menus, Lucide supplies icons, and Zustand supplies shared UI state. Dialogs and graph arrangement code load separately from the initial editor.
+Radix Themes supplies the shared controls and visual tokens; Radix primitives provide window and menu behavior. Lucide supplies icons, and Zustand supplies shared UI state. The legacy graph styling is isolated in a CSS layer, while component spacing, borders, and focus states use the shared design system. Tool panels open beside their toolbar button without blocking the graph. Dialogs and graph arrangement code load separately from the initial editor.
 
 ## Editing
 
@@ -63,10 +63,10 @@ Radix supplies dialog focus management and application menus, Lucide supplies ic
 - Right-drag between states to connect them. Ctrl-drag inserts an intermediary state; continue onto blank canvas to build a chain.
 - Use **A** to toggle accepting states and **C** to place comments.
 - Use Ctrl/Cmd+C, X, V, A, Z, and Shift+Z for clipboard, selection, and history.
-- Select states and choose Group; open a group to edit its contents. Settings offers full-canvas and overlay presentations.
+- Select states and choose Group (or use the selection context menu in simplified view); open a group to edit its contents. Settings offers full-canvas and floating-window presentations. Floating groups have independent navigation, a move handle, and a resize handle; arrow keys work on both handles.
 - Settings also controls standard/extended FSM mode, simplified properties, label backgrounds, skipped tokens, zoom sensitivity, and theme.
 - Extended FSMs support numeric stacks, legacy counters, conditions, and ordered side effects.
-- Use the debugger or Alt+S, Alt+Left/Right, and Alt+Shift+Left/Right to inspect execution.
+- Use the debugger or Alt+S, Alt+Left/Right, and Alt+Shift+Left/Right to inspect execution. Debug controls, status, and memory values appear together in a separate window above the graph.
 - Drag the toolbar/tester grips to dock them, or focus a grip and use arrow keys. The tester separator supports dragging and arrow keys.
 - Open Keyboard shortcuts for the full reference.
 

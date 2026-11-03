@@ -2,7 +2,10 @@ import { wheelZoomFactor } from '../core/canvas-gestures.js';
 import { canvasTransform } from '../core/canvas-graph.js';
 import { editorSettings } from '../core/editor-settings.js';
 import { placeFloatingRect } from '../core/floating-placement.js';
+import { createGroupWindow } from './group-window.js';
 export function createViewport(context) {
+  const { positionGroupPanel, installWindow } = createGroupWindow(context);
+  context.installGroupWindow = installWindow;
   function floatingObstacles(exclude) {
     return [
       document.querySelector('.brand'),
@@ -15,59 +18,6 @@ export function createViewport(context) {
     ]
       .filter((el) => el && el !== exclude && !el.hidden && getComputedStyle(el).display !== 'none')
       .map((el) => el.getBoundingClientRect());
-  }
-  function positionGroupPanel(group, bounds) {
-    const area = context.canvasWrap.getBoundingClientRect();
-    if (!group || !area.width || !area.height || !bounds) return;
-    if (context.groupPanelBoundsId !== group.id) {
-      context.groupPanelBoundsId = group.id;
-      context.groupPanelBounds = null;
-      context.groupPanelSize = null;
-      context.groupPanelViewInitialized = false;
-    }
-    const isDragging = !!context.drag?.moved,
-      layoutBounds = isDragging && context.groupPanelBounds ? context.groupPanelBounds : bounds;
-    if (!isDragging)
-      context.groupPanelBounds = {
-        ...bounds,
-      };
-    const { scale, x, y } = canvasTransform(context.overviewView, area.width, area.height),
-      heading = context.groupPanel.querySelector('.group-overlay-heading').offsetHeight || 42;
-    let panelWidth =
-        context.groupPanelSize?.width ??
-        Math.max(180, Math.min(area.width * 0.78, area.width - 20)),
-      panelHeight =
-        context.groupPanelSize?.height ??
-        Math.max(140, Math.min(area.height * 0.78, area.height - 20));
-    const center = {
-      x: area.left + x + group.x * scale,
-      y: area.top + y + group.y * scale,
-    };
-    context.groupPanel.style.width = panelWidth + 'px';
-    context.groupPanel.style.height = panelHeight + 'px';
-    if (!isDragging) {
-      context.groupPanel.style.left = center.x - area.left + 'px';
-      context.groupPanel.style.top = center.y - area.top + 'px';
-    }
-    if (!context.groupPanelSize)
-      context.groupPanelSize = {
-        width: panelWidth,
-        height: panelHeight,
-      };
-    if (!context.groupPanelViewInitialized) {
-      const innerHeight = panelHeight - heading,
-        worldPerPixel = Math.max(
-          (layoutBounds.width + 80) / panelWidth,
-          (layoutBounds.height + 80) / innerHeight,
-        );
-      context.graph.setView({
-        x: layoutBounds.x + layoutBounds.width / 2 - (panelWidth * worldPerPixel) / 2,
-        y: layoutBounds.y + layoutBounds.height / 2 - (innerHeight * worldPerPixel) / 2,
-        width: panelWidth * worldPerPixel,
-        height: innerHeight * worldPerPixel,
-      });
-      context.groupPanelViewInitialized = true;
-    }
   }
   function showProperties(show, event) {
     context.onUI({
@@ -158,31 +108,10 @@ export function createViewport(context) {
     grid.style.backgroundPosition = `${x}px ${y}px`;
   }
   function setView(v) {
-    if (context.overviewView) {
-      context.overviewView = v;
-      context.overviewGraph.setView(v);
-      if (context.openGroup) {
-        const group = context.machine.groups?.find((item) => item.id === context.openGroup),
-          scale = canvasTransform(
-            v,
-            context.overviewCanvas.clientWidth,
-            context.overviewCanvas.clientHeight,
-          ).scale,
-          canvas = context.$('canvas');
-        if (group && scale > 0)
-          context.graph.setView({
-            x: group.x - canvas.clientWidth / (2 * scale),
-            y: group.y - canvas.clientHeight / (2 * scale),
-            width: canvas.clientWidth / scale,
-            height: canvas.clientHeight / scale,
-          });
-      }
-    } else {
-      context.graph.setView(v);
-      if ((context.placingState || context.placingComment) && context.commentCursor)
-        context.placementPoint = context.point(context.commentCursor);
-      syncGrid();
-    }
+    context.graph.setView(v);
+    if ((context.placingState || context.placingComment) && context.commentCursor)
+      context.placementPoint = context.point(context.commentCursor);
+    syncGrid();
     context.queueDraw();
     if (!document.body.classList.contains('properties-hidden')) showProperties(true);
   }
@@ -203,15 +132,10 @@ export function createViewport(context) {
     showProperties(true);
   }
   function fit() {
-    setView(
-      fittedView(
-        context.overviewView ? context.overviewGraph.bounds() : context.graph.bounds(),
-        context.overviewView ? context.overviewCanvas : context.$('canvas'),
-      ),
-    );
+    setView(fittedView(context.graph.bounds(), context.elements.canvas));
   }
   function zoom(factor, p) {
-    const v = context.overviewView ?? view(),
+    const v = view(),
       center = p ?? {
         x: v.x + v.width / 2,
         y: v.y + v.height / 2,
@@ -225,22 +149,33 @@ export function createViewport(context) {
     });
   }
   function wheelGraph(e) {
+    if (e.target !== context.elements.canvas && e.target !== context.overviewCanvas) return;
     e.preventDefault();
-    const canvas = context.overviewView ? context.overviewCanvas : context.$('canvas');
+    const outside = e.target === context.overviewCanvas;
+    const canvas = outside ? context.overviewCanvas : context.elements.canvas;
+    const current = outside ? context.overviewView : view();
+    if (!current) return;
+    const apply = outside ? setOverviewView : setView;
     if (e.ctrlKey || e.metaKey) {
-      if (e.deltaY)
-        zoom(
-          wheelZoomFactor(e.deltaY, editorSettings.pinchSensitivity),
-          context.overviewView ? context.overviewGraph.point(e) : context.point(e),
-        );
+      if (e.deltaY) {
+        const factor = wheelZoomFactor(e.deltaY, editorSettings.pinchSensitivity),
+          p = outside ? context.overviewGraph.point(e) : context.point(e);
+        if (current.width * factor >= 160 && current.width * factor <= 30000)
+          apply({
+            x: p.x + (current.x - p.x) * factor,
+            y: p.y + (current.y - p.y) * factor,
+            width: current.width * factor,
+            height: current.height * factor,
+          });
+      }
       return;
     }
-    const v = context.overviewView ?? view(),
+    const v = current,
       unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1,
       shifted = e.deltaMode !== 0 && e.shiftKey && !e.deltaX,
       dx = shifted ? e.deltaY : e.deltaX,
       dy = shifted ? 0 : e.deltaY;
-    setView({
+    apply({
       ...v,
       x: v.x + (dx * unit * v.width) / canvas.clientWidth,
       y: v.y + (dy * unit * v.height) / canvas.clientHeight,
@@ -256,6 +191,11 @@ export function createViewport(context) {
       (width === context.canvasSize.width && height === context.canvasSize.height)
     )
       return;
+    if (!context.canvasSize.width || !context.canvasSize.height) {
+      context.canvasSize = { width, height };
+      context.queueDraw();
+      return;
+    }
     const v = view(),
       nextWidth = (v.width * width) / context.canvasSize.width,
       nextHeight = (v.height * height) / context.canvasSize.height;
@@ -269,16 +209,18 @@ export function createViewport(context) {
       width: nextWidth,
       height: nextHeight,
     };
-    if (context.overviewView) context.draw();
-    else setView(next);
+    setView(next);
     if (!document.body.classList.contains('properties-hidden')) showProperties(true);
   }
   function setOverviewView(next) {
-    setView(next);
+    if (!context.overviewView) return;
+    context.overviewView = next;
+    context.overviewGraph.setView(next);
+    context.queueDraw();
   }
   function navigateMap(e) {
     const p = context.graph.mapPoint(e, context.mapTransform ?? context.graph.mapTransform()),
-      v = context.overviewView ?? view();
+      v = view();
     setView({
       ...v,
       x: p.x - v.width / 2,

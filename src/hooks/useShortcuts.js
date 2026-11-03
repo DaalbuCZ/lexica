@@ -4,7 +4,14 @@ export function useShortcuts(debuggerRef) {
   useEffect(() => {
     const keydown = (event) => {
       const { controller, dialog, contextMenu, scene, propertiesOpen } = useStudio.getState();
-      if (!controller || dialog || contextMenu || event.defaultPrevented) return;
+      if (!controller || (dialog && !dialog.anchorId) || contextMenu || event.defaultPrevented)
+        return;
+      if (event.key === 'Escape' && dialog) {
+        event.preventDefault();
+        useStudio.setState({ dialog: null });
+        return;
+      }
+      if (event.target.closest('.tool-panel')) return;
       const typing = event.target.closest('input,textarea,select,[contenteditable="true"]');
       const control = event.ctrlKey || event.metaKey,
         key = event.key.toLowerCase();

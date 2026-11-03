@@ -1,3 +1,4 @@
+import { Button } from './components/ui.jsx';
 import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Expand, HelpCircle, Minus, Plus } from 'lucide-react';
 import { useStudio, readStorage, writeStorage } from './state/studio.js';
@@ -89,7 +90,7 @@ export default function App() {
         </div>
         <div className="canvas-status">
           <div id="tips-panel" hidden={!tipsVisible}>
-            <button
+            <Button
               id="hide-tips"
               aria-label="Hide tips"
               title="Hide tips"
@@ -99,7 +100,7 @@ export default function App() {
               }}
             >
               ×
-            </button>
+            </Button>
             <span id="modehint" />
           </div>
           <IconButton
@@ -145,8 +146,8 @@ export class AppErrorBoundary extends Component {
         <h1>Lexica could not open this view</h1>
         <p>{this.state.error.message}</p>
         <p>Your saved machine is still in this browser.</p>
-        <button onClick={() => location.reload()}>Reload Lexica</button>
-        <button
+        <Button onClick={() => location.reload()}>Reload Lexica</Button>
+        <Button
           onClick={() => {
             const url = URL.createObjectURL(
               new Blob(
@@ -176,7 +177,7 @@ export class AppErrorBoundary extends Component {
           }}
         >
           Download machine
-        </button>
+        </Button>
       </div>
     ) : (
       this.props.children

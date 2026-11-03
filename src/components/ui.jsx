@@ -1,35 +1,70 @@
-import { useEffect, useRef, useState } from 'react';
+import { Children, useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import {
+  Button as ThemeButton,
+  IconButton as ThemeIconButton,
+  TextField,
+  TextArea,
+  Checkbox,
+  Select as ThemeSelect,
+  Theme,
+} from '@radix-ui/themes';
 import { X } from 'lucide-react';
+import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js';
 export function IconButton({ icon: Icon, label, title = label, children, ...props }) {
+  const Component = children ? ThemeButton : ThemeIconButton;
   return (
-    <button type="button" aria-label={label} title={title} {...props}>
+    <Component size="2" variant="ghost" type="button" aria-label={label} title={title} {...props}>
       {Icon && <Icon className="tool-icon" aria-hidden="true" />}
       {children}
-    </button>
+    </Component>
   );
 }
-export function Modal({ title, children, onClose, className = '' }) {
+export function Button({ className = '', type = 'button', ...props }) {
+  return (
+    <ThemeButton
+      size="2"
+      type={type}
+      variant={className.includes('primary') ? 'solid' : 'soft'}
+      color={className.includes('danger') ? 'red' : undefined}
+      className={className}
+      {...props}
+    />
+  );
+}
+export function Modal({ title, children, onClose, className = '', anchorId }) {
+  const [panel, setPanel] = useState(null);
+  useAnchoredPanel(panel, anchorId);
   return (
     <Dialog.Root
       open
+      modal={!anchorId}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="modal-backdrop" />
-        <Dialog.Content className={`react-dialog ${className}`} aria-describedby={undefined}>
-          <div className="dialog-heading">
-            <Dialog.Title asChild>
-              <h2>{title}</h2>
-            </Dialog.Title>
-            <Dialog.Close asChild>
-              <IconButton icon={X} label={`Close ${title}`} />
-            </Dialog.Close>
-          </div>
-          {children}
-        </Dialog.Content>
+        {!anchorId && <Dialog.Overlay className="modal-backdrop" />}
+        <Theme asChild>
+          <Dialog.Content
+            ref={setPanel}
+            className={`react-dialog ${anchorId ? 'tool-panel' : ''} ${className}`}
+            aria-describedby={undefined}
+            onInteractOutside={(event) => {
+              if (anchorId) event.preventDefault();
+            }}
+          >
+            <div className="dialog-heading">
+              <Dialog.Title asChild>
+                <h2>{title}</h2>
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <IconButton icon={X} label={`Close ${title}`} />
+              </Dialog.Close>
+            </div>
+            {children}
+          </Dialog.Content>
+        </Theme>
       </Dialog.Portal>
     </Dialog.Root>
   );
@@ -87,17 +122,17 @@ export function Field({
   return (
     <label className={className}>
       {label}
-      {multiline ? <textarea {...shared} /> : <input {...shared} />}
+      {multiline ? <TextArea size="2" {...shared} /> : <TextField.Root size="2" {...shared} />}
     </label>
   );
 }
 export function Check({ label, checked, onChange, ...props }) {
   return (
     <label className="check">
-      <input
-        type="checkbox"
+      <Checkbox
+        size="2"
         checked={!!checked}
-        onChange={(e) => onChange(e.target.checked)}
+        onCheckedChange={(value) => onChange(value === true)}
         {...props}
       />
       {label}
@@ -105,17 +140,33 @@ export function Check({ label, checked, onChange, ...props }) {
   );
 }
 export function Select({ label, value, onChange, children, ...props }) {
+  const empty = '__lexica_empty_option__';
   return (
     <label className="prop-field">
       {label}
-      <select
-        aria-label={typeof label === 'string' ? label : undefined}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        {...props}
+      <ThemeSelect.Root
+        size="2"
+        value={value || empty}
+        onValueChange={(value) => onChange(value === empty ? '' : value)}
       >
-        {children}
-      </select>
+        <ThemeSelect.Trigger
+          aria-label={typeof label === 'string' ? label : undefined}
+          {...props}
+        />
+        <ThemeSelect.Content position="popper">
+          {Children.toArray(children)
+            .filter(Boolean)
+            .map((option) => (
+              <ThemeSelect.Item
+                key={option.props.value || empty}
+                value={option.props.value || empty}
+                disabled={option.props.disabled}
+              >
+                {option.props.children}
+              </ThemeSelect.Item>
+            ))}
+        </ThemeSelect.Content>
+      </ThemeSelect.Root>
     </label>
   );
 }

@@ -1,15 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  GripVertical,
-  Play,
-  Square,
-  ArrowDown,
-} from 'lucide-react';
+import { ChevronDown, GripVertical, Play, ArrowDown } from 'lucide-react';
 import { useStudio, readStorage, writeStorage } from '../state/studio.js';
 import { useLexer } from '../hooks/useLexer.js';
 import { setupInputHighlights } from '../core/input-highlights.js';
@@ -21,6 +11,7 @@ import { TokenOutput } from './TokenOutput.jsx';
 import { IconButton } from './ui.jsx';
 import { useDockGrip } from '../hooks/useDocking.js';
 import { useTesterResize } from '../hooks/useTesterResize.js';
+import { DebuggerWindow } from './DebuggerWindow.jsx';
 export function Tester({ debuggerRef }) {
   const scene = useStudio((s) => s.scene),
     machine = scene.machine,
@@ -147,6 +138,7 @@ export function Tester({ debuggerRef }) {
   const selectToken = (token) => {
     session.current = null;
     setFrame(null);
+    highlights.current.clearStep();
     const area = inputRef.current;
     area.focus({
       preventScroll: true,
@@ -157,7 +149,7 @@ export function Tester({ debuggerRef }) {
   };
   const showFrame = () => {
     const next = session.current?.current();
-    setFrame(next);
+    setFrame(next ? { ...next, position: session.current.position() } : null);
     setCanPrevious(session.current?.canPrevious() ?? false);
     setCanNext(session.current?.canNext() ?? false);
     if (next) reveal(highlights.current.step(next));
@@ -218,9 +210,7 @@ export function Tester({ debuggerRef }) {
     highlights.current?.hover(null);
   };
   return (
-    <section
-      className={`tester ${analysis.pending ? 'analysis-pending' : ''} ${frame ? 'stepping' : ''}`}
-    >
+    <section className={`tester ${analysis.pending ? 'analysis-pending' : ''}`}>
       <div
         id="tester-resize"
         role="separator"
@@ -256,55 +246,13 @@ export function Tester({ debuggerRef }) {
         </div>
       </div>
       {frame && (
-        <>
-          <div
-            id="step-controls"
-            className="step-controls"
-            role="group"
-            aria-label="Lexer debugger"
-          >
-            <div className="step-navigation">
-              <IconButton
-                icon={ChevronsLeft}
-                label="Previous token"
-                disabled={!canPrevious}
-                onClick={() => move('previousToken')}
-              />
-              <IconButton
-                icon={ChevronLeft}
-                label="Previous step"
-                disabled={!canPrevious}
-                onClick={() => move('previous')}
-              />
-              <IconButton
-                icon={ChevronRight}
-                label="Next step"
-                disabled={!canNext}
-                onClick={() => move('next')}
-              />
-              <IconButton
-                icon={ChevronsRight}
-                label="Next token"
-                disabled={!canNext}
-                onClick={() => move('nextToken')}
-              />
-              <IconButton icon={Square} label="Stop debugging" onClick={toggle} />
-            </div>
-            <span id="step-status" role="status" aria-live="polite">
-              {frame.message} · {frame.offset}
-            </span>
-          </div>
-          {Object.keys(frame.memory ?? {}).length > 0 && (
-            <div id="step-memory" className="step-memory">
-              {Object.entries(frame.memory).map(([name, value]) => (
-                <span className="step-memory-cell" key={name}>
-                  <b>{name}</b>
-                  <output>{Array.isArray(value) ? `[${value.join(', ')}] ← top` : value}</output>
-                </span>
-              ))}
-            </div>
-          )}
-        </>
+        <DebuggerWindow
+          frame={frame}
+          canPrevious={canPrevious}
+          canNext={canNext}
+          onMove={move}
+          onStop={toggle}
+        />
       )}
       <div className="test-grid">
         <div>

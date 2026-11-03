@@ -66,7 +66,8 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.getByLabel('Use a condition', { exact: true }).check();
   await page.getByRole('button', { name: 'Add condition', exact: false }).click();
   await expect(page.getByLabel('Combine conditions', { exact: true })).toBeVisible();
-  await page.getByLabel('Combine conditions', { exact: true }).selectOption('any');
+  await page.getByLabel('Combine conditions', { exact: true }).click();
+  await page.getByRole('option', { name: 'Any condition (OR)', exact: true }).click();
   await page.getByLabel('Use a condition', { exact: true }).uncheck();
   await page.getByRole('button', { name: 'Close properties', exact: true }).click();
   await page.locator('#toolbar-grip').focus();
@@ -79,7 +80,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.locator('#input').fill('hello 42 '.repeat(2000));
   await expect(page.locator('#tokens')).toHaveAttribute('aria-busy', 'false', { timeout: 20000 });
   await expect(page.locator('#tokens')).toHaveClass('react-virtual-tokens');
-  expect(await page.locator('#tokens .token').count()).toBeLessThan(100);
+  expect(await page.locator('#tokens .token').count()).toBeLessThan(250);
   await page.locator('#input').focus();
   await page.locator('#input').press('Control+End');
   await page.locator('#input').press('ArrowLeft');
