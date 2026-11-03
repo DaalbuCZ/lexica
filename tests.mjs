@@ -8,6 +8,7 @@ test('import rejects broken references and malformed regex',()=>{const m=example
 test('longest match backtracks to last accepting state',()=>{const m={start:'a',states:[{id:'a',name:'a',token:'',x:0,y:0},{id:'b',name:'b',token:'B',x:1,y:1},{id:'c',name:'c',token:'',x:2,y:2}],edges:[{from:'a',to:'b',label:'a'},{from:'b',to:'c',label:'b'}]};assert.deepEqual(tokenize(m,'ab').map(t=>t.token),['B','ERROR'])});
 
 import {autoLayout,routeEdges,loopDragBend} from './dist/layout.js';
+import {statePortalBox} from './dist/portals.js';
 test('auto layout separates all states and retains topology',()=>{const m=example();for(const s of m.states){s.x=0;s.y=0}const edges=JSON.stringify(m.edges);autoLayout(m);assert.equal(JSON.stringify(m.edges),edges);for(let i=0;i<m.states.length;i++)for(let j=i+1;j<m.states.length;j++)assert.ok(Math.hypot(m.states[i].x-m.states[j].x,m.states[i].y-m.states[j].y)>=160);assert.ok(m.states.find(s=>s.id===m.start).x<m.states[1].x)});
 test('routed labels avoid nodes and one another after layout',()=>{const m=autoLayout(example()),routes=routeEdges(m);for(const r of routes){for(const s of m.states)assert.ok(Math.abs(r.label.x-s.x)>(r.label.w+90)/2||Math.abs(r.label.y-s.y)>(r.label.h+90)/2);assert.ok(!r.d.includes('NaN'))}for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++){const a=routes[i].label,b=routes[j].label;assert.ok(Math.abs(a.x-b.x)>(a.w+b.w)/2||Math.abs(a.y-b.y)>(a.h+b.h)/2)}});
 test('layout handles disconnected states and multiple loops',()=>{const m=example();m.states.push({id:'unused',name:'unused',token:'',x:0,y:0});m.edges.push({from:'s1',to:'s1',label:'[0-9]'});autoLayout(m);assert.equal(new Set(m.states.map(s=>s.x+','+s.y)).size,m.states.length);const r=routeEdges(m);assert.notEqual(r[1].d,r.at(-1).d);assert.equal(r.length,m.edges.length)});
@@ -44,7 +45,7 @@ test('Ctrl-left-drag release inserts between states or continues from blank canv
  const release=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const target of ['s2',null]){
   let pointerup,inserted;const canvas={setPointerCapture(){}};
-  const context={commentSource:null,source:null,space:false,marquee:null,edgeDrag:null,rightStart:null,drag:null,pan:null,connectPoint:null,
+  const context={commentSource:null,source:null,space:false,marquee:null,edgeDrag:null,portalDrag:null,rightStart:null,drag:null,pan:null,connectPoint:null,
    point:e=>({x:e.clientX,y:e.clientY}),draw:()=>{},showProperties:()=>{},$:()=>canvas,graph:{hitClient:()=>target?{type:'state',id:target}:null},
    insertBetween:(...args)=>{inserted=args},
    window:{addEventListener:(_,fn)=>{pointerup=fn}},
@@ -80,7 +81,7 @@ test('Ctrl pressed during an arrow drag stays latched until release',()=>{
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8');
  const move=app.slice(app.indexOf("window.addEventListener('pointermove'"),app.indexOf("window.addEventListener('pointerup'"));
  let pointermove;
- const context={commentSource:null,source:'s0',marquee:null,edgeDrag:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
+ const context={commentSource:null,source:'s0',marquee:null,edgeDrag:null,portalDrag:null,pan:null,rightStart:{insert:false},point:()=>({x:100,y:200}),queueDraw:()=>{},draw:()=>{},window:{addEventListener:(_,fn)=>{pointermove=fn}}};
  runInNewContext(move,context);pointermove({ctrlKey:true});pointermove({ctrlKey:false});assert.equal(context.rightStart.insert,true);
 });
 
@@ -274,7 +275,7 @@ test('right-drag joins comments and states in either direction and cancels on bl
  const app=readFileSync(new URL('./dist/app.js',import.meta.url),'utf8'),script=app.slice(app.indexOf("window.addEventListener('pointerup'"),app.indexOf('function add('));
  for(const scenario of ['comment-to-state','state-to-comment','comment-to-blank']){
   let release,joined,added,cancelled=0;
-  const context={graph:{hitClient:()=>scenario==='comment-to-state'?{type:'state',id:'s2'}:scenario==='state-to-comment'?{type:'comment',id:'note'}:null},marquee:null,edgeDrag:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
+  const context={graph:{hitClient:()=>scenario==='comment-to-state'?{type:'state',id:'s2'}:scenario==='state-to-comment'?{type:'comment',id:'note'}:null},marquee:null,edgeDrag:null,portalDrag:null,drag:null,pan:null,source:scenario==='state-to-comment'?'s0':null,commentSource:scenario==='state-to-comment'?null:'note',rightStart:scenario==='state-to-comment'?{id:'s0',x:0,y:0}:{commentId:'note',x:0,y:0},point:e=>({x:e.clientX,y:e.clientY}),connectComment:(...args)=>joined=args,add:(...args)=>added=args,cancelConnect:()=>cancelled++,window:{addEventListener:(_,fn)=>release=fn},document:{elementFromPoint:()=>({closest:selector=>selector==='[data-node]'&&scenario==='comment-to-state'?{dataset:{node:'s2'}}:selector==='[data-comment]'&&scenario==='state-to-comment'?{dataset:{comment:'note'}}:selector==='#canvas'?{}:null}),body:{classList:{remove:()=>{}}}}};
   runInNewContext(script,context);release({clientX:200,clientY:100,ctrlKey:false});
   if(scenario==='comment-to-blank'){assert.equal(added,undefined);assert.equal(cancelled,1)}else assert.deepEqual(joined,['note',scenario==='state-to-comment'?'s0':'s2']);
  }
@@ -722,17 +723,34 @@ test('portal routing keeps the transition label separate from its destination ta
  assert.ok(Math.abs(a.x-b.x)>=(a.w+b.w)/2+8||Math.abs(a.y-b.y)>=(a.h+b.h)/2+8);
  assert.equal(destination(m,m.edges[0]).id,'b');
 });
+test('portal tips attach to wires and moved portal positions survive JSON',()=>{
+ const m=example(),edge=m.edges[0],target=m.states.find(s=>s.id===edge.to);enablePortal(m,edge);
+ edge.portalOffset={x:-260,y:80};target.portalOffset={x:160,y:-50};
+ let r=routeEdges(m)[0],box=statePortalBox(target);
+ assert.equal(r.portalBox.side,'right');assert.equal(r.p3.x,r.portalBox.x+r.portalBox.w/2);assert.equal(r.p3.y,r.portalBox.y);
+ assert.equal(box.side,'left');assert.equal(box.x-box.w/2,target.x+160);assert.equal(box.y,target.y-50);
+ const restored=validate(JSON.parse(JSON.stringify(m)));assert.deepEqual(restored.edges[0].portalOffset,edge.portalOffset);assert.deepEqual(restored.states.find(s=>s.id===target.id).portalOffset,target.portalOffset);
+ edge.portalOffset={x:260,y:80};r=routeEdges(m)[0];assert.equal(r.portalBox.side,'left');assert.equal(r.p3.x,r.portalBox.x-r.portalBox.w/2);
+ target.portalOffset={x:-160,y:50};box=statePortalBox(target);assert.equal(box.side,'right');assert.equal(box.x+box.w/2,target.x-160);
+ restored.edges[0].portalOffset.x='bad';assert.throws(()=>validate(restored),/transition/);
+});
+test('radial layout uses a portal for a long start branch without duplicating transitions',()=>{
+ const ids=['root','a','b','c','d','other'],links=[['root','a'],['a','b'],['b','c'],['c','d'],['root','other']];
+ const m={start:'root',states:ids.map(id=>({id,name:id,token:'',x:0,y:0})),edges:links.map(([from,to])=>({from,to,label:'x'}))};
+ autoLayout(m,'circle',.5,true);const edge=m.edges.find(e=>e.from==='root'&&e.to==='a');assert.ok(edge.portal);assert.equal(destination(m,edge).id,'a');assert.equal(m.edges.length,links.length);assert.equal(m.states.length,ids.length);
+});
 
 test('Canvas paints current routes and hit-tests states, labels, portals and comments without SVG nodes',()=>{
  const previousDocument=globalThis.document,previousPath=globalThis.Path2D;globalThis.document={documentElement:{dataset:{theme:'light'}}};globalThis.Path2D=class{constructor(d){this.d=d}};
  try{
   const calls=[],context=()=>new Proxy({isPointInStroke:()=>false},{get(target,key){return key in target?target[key]:(...args)=>calls.push({method:key,args,stroke:target.strokeStyle,width:target.lineWidth})},set(target,key,value){target[key]=value;return true}});
   const canvas={clientWidth:800,clientHeight:600,getContext:()=>main,getBoundingClientRect:()=>({left:0,top:0})},map={clientWidth:170,clientHeight:106,getContext:()=>mini},main=context(),mini=context(),renderer=createGraphCanvas(canvas,map),m=example();
-  m.states[1].portal='IDENT';m.comments=[{id:'note',text:'Canvas note',x:1000,y:1000}];m.edges.push({from:'s0',to:'s1',label:'p',portal:'IDENT'});
+  m.states[1].portal='IDENT';m.states[1].portalOffset={x:-200,y:-300};m.comments=[{id:'note',text:'Canvas note',x:1000,y:1000}];m.edges.push({from:'s0',to:'s1',label:'p',portal:'IDENT'});
   const scene={machine:m,routes:routeEdges(m),selectedStates:new Set(),selectedComments:new Set(),selectedCommentLinks:new Set(),edgeSelected:()=>false,failures:{states:[],edges:[]},trace:{kind:'character',state:'s1',traceStates:['s0','s1'],traceEdges:[0]}};
   renderer.draw(scene);renderer.drawMap();assert.equal(canvas.width,800);assert.equal(map.width,170);assert.ok(calls.some(c=>c.method==='stroke'&&c.stroke==='#a71abb'&&c.width===4));
   assert.deepEqual(renderer.hit(m.states[1]),{type:'state',id:'s1'});assert.deepEqual(renderer.hit({x:1005,y:1005}),{type:'comment',id:'note'});
-  const r=scene.routes.at(-1);assert.deepEqual(renderer.hit(r.portalBox),{type:'edge',index:m.edges.length-1});assert.deepEqual(renderer.hit({x:scene.routes[0].label.x,y:scene.routes[0].label.y-5}),{type:'edge',index:0});
+  assert.deepEqual(renderer.hit(statePortalBox(m.states[1])),{type:'portal-target',id:'s1'});
+  const r=scene.routes.at(-1);assert.deepEqual(renderer.hit(r.portalBox),{type:'portal-source',index:m.edges.length-1});assert.deepEqual(renderer.hit({x:scene.routes[0].label.x,y:scene.routes[0].label.y-5}),{type:'edge',index:0});
   scene.label=simpleTransitionLabel;const captionStart=calls.length;renderer.draw(scene);assert.ok(calls.slice(captionStart).some(c=>c.method==='fillText'&&c.args[0]===simpleTransitionLabel(m.edges[0])));
   const before=scene.routes[0].d;m.states[1].x+=200;scene.routes=routeEdges(m);renderer.draw(scene);assert.notEqual(scene.routes[0].d,before);assert.ok(calls.some(c=>c.method==='stroke'&&c.args[0]?.d===scene.routes[0].d));const bounds=graphBounds(m,scene.routes);assert.ok(bounds.x+bounds.width>=1000);assert.ok(bounds.y+bounds.height>=1000);
  }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;if(previousPath===undefined)delete globalThis.Path2D;else globalThis.Path2D=previousPath}
@@ -937,7 +955,7 @@ test('virtual cards reuse fitting measurements during resize and mount only near
  }finally{if(previous===undefined)delete globalThis.ResizeObserver;else globalThis.ResizeObserver=previous}
 });
 
-test('manual bends move the curve and survive serialization and TikZ export',()=>{const m=example(),before=routeEdges(m)[0];m.edges[0].bend={x:30,y:50};const saved=validate(JSON.parse(JSON.stringify(m))),after=routeEdges(saved)[0];assert.notDeepEqual(after.p0,before.p0);assert.notDeepEqual(after.p3,before.p3);for(const [point,state,radius] of [[after.p0,saved.states[0],37],[after.p3,saved.states[1],42]])assert.ok(Math.abs(Math.hypot(point.x-state.x,point.y-state.y)-radius)<.001);assert.notEqual(toTikz(saved),toTikz(example()));saved.edges[0].bend.x='bad';assert.throws(()=>validate(saved),/bend/)});
+test('manual bends move the curve and survive serialization and TikZ export',()=>{const m=example(),before=routeEdges(m)[0];m.edges[0].bend={x:30,y:50};const saved=validate(JSON.parse(JSON.stringify(m))),after=routeEdges(saved)[0];assert.notDeepEqual(after.p0,before.p0);assert.notDeepEqual(after.p3,before.p3);for(const [point,state,radius] of [[after.p0,saved.states[0],37],[after.p3,saved.states[1],37]])assert.ok(Math.abs(Math.hypot(point.x-state.x,point.y-state.y)-radius)<.001);assert.notEqual(toTikz(saved),toTikz(example()));saved.edges[0].bend.x='bad';assert.throws(()=>validate(saved),/bend/)});
 
 
 test('dragging a self-loop toward its state shrinks it while keeping its endpoints attached',()=>{const m=example(),edge=m.edges[1],state=m.states.find(s=>s.id===edge.from),before=routeEdges(m)[1],apex={x:before.label.x-state.x,y:before.label.y+13-state.y};edge.bend={x:-apex.x*.45,y:-apex.y*.45};const after=routeEdges(m)[1],distance=p=>Math.hypot(p.x-state.x,p.y-state.y);assert.ok(distance(after.c1)<distance(before.c1));assert.ok(distance(after.c2)<distance(before.c2));assert.ok(Math.abs(distance(after.p0)-distance(before.p0))<.001);assert.ok(Math.abs(distance(after.p3)-distance(before.p3))<.001);});
@@ -966,3 +984,5 @@ test('deleting a stack removes only disabled references while active rules still
 
 import {copyConditions,pasteConditions} from './dist/memory.js';
 test('condition clipboard replaces rules and preserves mode and disabled state',()=>{const m=stackMachine(),source={guard:{cell:'s',op:'empty'},guards:[{cell:'s',op:'==',value:7}],guardMode:'any',guardDisabled:true},target=m.edges[1];pasteConditions(target,copyConditions(source));assert.deepEqual(JSON.parse(copyConditions(target)),JSON.parse(copyConditions(source)));validate(m);assert.throws(()=>pasteConditions(target,'invalid'),/Copy conditions/);const before=JSON.stringify(m);const next=structuredClone(m);pasteConditions(next.edges[1],copyConditions({guard:{cell:'missing',op:'empty'}}));assert.throws(()=>validate(next),/guard/);assert.equal(JSON.stringify(m),before)});
+
+test('ordinary transition tips reach the state boundary',()=>{const m=example();for(const bend of [undefined,{x:30,y:50}]){m.edges[0].bend=bend;const r=routeEdges(m)[0],target=m.states.find(s=>s.id===m.edges[0].to);assert.ok(Math.abs(Math.hypot(r.p3.x-target.x,r.p3.y-target.y)-37)<.001)}});

@@ -1,6 +1,7 @@
 import {stateLabel,transitionLabel} from './labels.js?v=16';
 import {commentLayout,commentLinks,commentLinkKey} from './comments.js?v=16';
 import {isAccepting,transitionError,statePortalBox} from './lexer.js';
+import {portalTip} from './portals.js';
 
 export function canvasTransform(view,width,height){
  const scale=Math.min(width/view.width,height/view.height);
@@ -8,16 +9,16 @@ export function canvasTransform(view,width,height){
 }
 export function clientToWorld(client,rect,transform){return {x:(client.x-rect.left-transform.x)/transform.scale,y:(client.y-rect.top-transform.y)/transform.scale}}
 export function graphBounds(machine,routes){
- const boxes=machine.states.flatMap(s=>[{x:s.x-85,y:s.y-80,width:170,height:150}]);
+ const boxes=machine.states.flatMap(s=>[{x:s.x-85,y:s.y-80,width:170,height:150},...(s.portal?[{x:statePortalBox(s).x-statePortalBox(s).w/2,y:statePortalBox(s).y-11,width:statePortalBox(s).w,height:22}]:[])]);
  for(const r of routes){const xs=[r.p0.x,r.c1.x,r.c2.x,r.p3.x],ys=[r.p0.y,r.c1.y,r.c2.y,r.p3.y];boxes.push({x:Math.min(...xs),y:Math.min(...ys),width:Math.max(...xs)-Math.min(...xs),height:Math.max(...ys)-Math.min(...ys)},{x:r.label.x-r.label.w/2,y:r.label.y-16,width:r.label.w,height:24});if(r.portalBox)boxes.push({x:r.portalBox.x-r.portalBox.w/2,y:r.portalBox.y-11,width:r.portalBox.w,height:22})}
  for(const c of machine.comments??[]){const size=commentLayout(c);boxes.push({x:c.x,y:c.y,width:size.w,height:size.h})}
  if(!boxes.length)return {x:0,y:0,width:100,height:100};const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));return {x,y,width:Math.max(...boxes.map(b=>b.x+b.width))-x,height:Math.max(...boxes.map(b=>b.y+b.height))-y};
 }
 const contains=(p,b)=>p.x>=b.x&&p.x<=b.x+b.width&&p.y>=b.y&&p.y<=b.y+b.height;
 function curve(ctx,r){ctx.beginPath();ctx.moveTo(r.p0.x,r.p0.y);ctx.bezierCurveTo(r.c1.x,r.c1.y,r.c2.x,r.c2.y,r.p3.x,r.p3.y)}
-function arrow(ctx,r,color){const angle=Math.atan2(r.p3.y-r.c2.y,r.p3.x-r.c2.x);ctx.save();ctx.translate(r.p3.x,r.p3.y);ctx.rotate(angle);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-10,-4);ctx.lineTo(-10,4);ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.restore()}
+function arrow(ctx,r,color){const angle=Math.atan2(r.p3.y-r.c2.y,r.p3.x-r.c2.x);ctx.save();ctx.translate(r.p3.x,r.p3.y);ctx.rotate(angle);ctx.beginPath();ctx.moveTo(2,0);ctx.lineTo(-10,-4);ctx.lineTo(-10,4);ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.restore()}
 function line(ctx,a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
-function portal(ctx,name,box,color,fill){const l=box.x-box.w/2,r=box.x+box.w/2,t=box.y-box.h/2,b=box.y+box.h/2;ctx.beginPath();ctx.moveTo(l,box.y);ctx.lineTo(l+7,t);ctx.lineTo(r,t);ctx.lineTo(r,b);ctx.lineTo(l+7,b);ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.stroke();ctx.fillStyle=color;ctx.font='10px "IBM Plex Mono", monospace';ctx.textAlign='center';ctx.fillText(name||'?',box.x,box.y+3)}
+function portal(ctx,name,box,color,fill){const l=box.x-box.w/2,r=box.x+box.w/2,t=box.y-box.h/2,b=box.y+box.h/2;ctx.beginPath();const right=box.side==='right';ctx.moveTo(right?r:l,box.y);ctx.lineTo(right?r-7:l+7,t);ctx.lineTo(right?l:r,t);ctx.lineTo(right?l:r,b);ctx.lineTo(right?r-7:l+7,b);ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.stroke();ctx.fillStyle=color;ctx.font='10px "IBM Plex Mono", monospace';ctx.textAlign='center';ctx.fillText(name||'?',box.x,box.y+3)}
 
 export function graphPalette(dark,style){
  const variable=(name,fallback)=>style?.getPropertyValue(name).trim()||fallback;
@@ -41,7 +42,7 @@ export function createGraphCanvas(canvas,minimap){
    ctx.beginPath();ctx.arc(s.x,s.y,36,0,Math.PI*2);ctx.fillStyle=active?c.stepFill:selected?c.selectedFill:c.node;ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=active?4:selected||bad||traceStates.has(s.id)?3:1.7;ctx.stroke();if(isAccepting(s)){ctx.beginPath();ctx.arc(s.x,s.y,31,0,Math.PI*2);ctx.lineWidth=1.7;ctx.stroke()}
    const label=stateLabel(s.name);ctx.font=`${label.fontSize}px "DM Sans",sans-serif`;ctx.fillStyle=bad?c.error:active?c.stepText:traceStates.has(s.id)?c.traceText:c.text;ctx.textAlign='center';for(let i=0;i<label.lines.length;i++)ctx.fillText(label.lines[i],s.x,s.y+label.y+i*label.lineHeight,label.width);
    if(isAccepting(s)){ctx.font='9px "IBM Plex Mono",monospace';ctx.fillText(s.token+(s.skip?' · skip':''),s.x,s.y+57)}
-   if(s.portal){ctx.strokeStyle=c.green;line(ctx,{x:s.x,y:s.y-55},{x:s.x,y:s.y-36});portal(ctx,s.portal,{...statePortalBox(s),x:s.x,y:s.y-66},machine.states.filter(n=>n.portal===s.portal).length>1?c.error:c.green,c.panel)}
+   if(s.portal){const box=statePortalBox(s),tip=portalTip(box),dx=tip.x-s.x,dy=tip.y-s.y,len=Math.hypot(dx,dy)||1;ctx.strokeStyle=c.green;line(ctx,tip,{x:s.x+dx/len*36,y:s.y+dy/len*36});portal(ctx,s.portal,box,machine.states.filter(n=>n.portal===s.portal).length>1?c.error:c.green,c.panel)}
   }
   for(let i=0;i<routes.length;i++){const e=machine.edges[i],r=routes[i],bad=!!transitionError(machine,e)||failureEdges.has(i)||(trace?.token==='ERROR'&&traceEdges.has(i)),color=bad?c.error:currentEdge===i?c.step:traceEdges.has(i)?c.traceText:c.text;ctx.font='11px "IBM Plex Mono",monospace';ctx.textAlign='center';
    if(machine.labelBoxes&&e.label){ctx.fillStyle=c.panel;ctx.strokeStyle=bad?c.error:c.edge;ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(r.label.x-r.label.w/2,r.label.y-15,r.label.w,22,3);ctx.fill();ctx.stroke()}else{ctx.strokeStyle=c.background;ctx.lineWidth=6;ctx.strokeText(labelFor(e)||'⚠ empty',r.label.x,r.label.y)}ctx.fillStyle=color;ctx.fillText(labelFor(e)||'⚠ empty',r.label.x,r.label.y);
@@ -58,8 +59,9 @@ export function createGraphCanvas(canvas,minimap){
  function drawMap(){if(!scene)return;const {machine,routes}=scene,bounds=graphBounds(machine,routes),left=Math.min(bounds.x,view.x)-100,top=Math.min(bounds.y,view.y)-100;let width=Math.max(bounds.x+bounds.width,view.x+view.width)-left+100,height=Math.max(bounds.y+bounds.height,view.y+view.height)-top+100,x=left,y=top;const ratio=minimap.clientWidth/minimap.clientHeight;if(width/height<ratio){const next=height*ratio;x-=(next-width)/2;width=next}else{const next=width/ratio;y-=(next-height)/2;height=next}mapView={x,y,width,height};if(!surface(minimap,mapCtx,mapView))return;const c=colors();mapCtx.strokeStyle=c.edge;mapCtx.lineWidth=5;routes.forEach(r=>{curve(mapCtx,r);mapCtx.stroke()});mapCtx.fillStyle=c.mapNode;for(const s of machine.states){mapCtx.beginPath();mapCtx.arc(s.x,s.y,24,0,Math.PI*2);mapCtx.fill()}mapCtx.fillStyle=c.note;for(const note of machine.comments??[]){const size=commentLayout(note);mapCtx.fillRect(note.x,note.y,size.w,size.h)}mapCtx.fillStyle=c.mapFill;mapCtx.fillRect(view.x,view.y,view.width,view.height);mapCtx.strokeStyle=c.mapStroke;mapCtx.lineWidth=2/canvasTransform(mapView,minimap.clientWidth,minimap.clientHeight).scale;mapCtx.strokeRect(view.x,view.y,view.width,view.height)}
  function hit(p){if(!scene)return null;const {machine,routes}=scene;
   for(const note of [...machine.comments??[]].reverse()){const size=commentLayout(note);if(contains(p,{x:note.x,y:note.y,width:size.w,height:size.h}))return {type:'comment',id:note.id}}
-  for(let i=routes.length-1;i>=0;i--){const r=routes[i];if(contains(p,{x:r.label.x-r.label.w/2,y:r.label.y-16,width:r.label.w,height:24})||(r.portalBox&&contains(p,{x:r.portalBox.x-r.portalBox.w/2,y:r.portalBox.y-11,width:r.portalBox.w,height:22})))return {type:'edge',index:i}}
-  for(const s of [...machine.states].reverse())if(Math.hypot(p.x-s.x,p.y-s.y)<=36||(s.portal&&contains(p,{x:s.x-statePortalBox(s).w/2,y:s.y-77,width:statePortalBox(s).w,height:41})))return {type:'state',id:s.id};
+  for(let i=routes.length-1;i>=0;i--){const r=routes[i];if(r.portalBox&&contains(p,{x:r.portalBox.x-r.portalBox.w/2,y:r.portalBox.y-11,width:r.portalBox.w,height:22}))return {type:'portal-source',index:i};if(contains(p,{x:r.label.x-r.label.w/2,y:r.label.y-16,width:r.label.w,height:24}))return {type:'edge',index:i}}
+  for(const s of [...machine.states].reverse())if(s.portal){const box=statePortalBox(s);if(contains(p,{x:box.x-box.w/2,y:box.y-11,width:box.w,height:22}))return {type:'portal-target',id:s.id}}
+  for(const s of [...machine.states].reverse())if(Math.hypot(p.x-s.x,p.y-s.y)<=36)return {type:'state',id:s.id};
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.lineWidth=Math.max(14,8/transform().scale);let found=null;for(let i=paths.length-1;i>=0;i--)if(ctx.isPointInStroke(paths[i],p.x,p.y)){found={type:'edge',index:i};break}ctx.restore();if(found)return found;
   for(const link of commentLinks(machine)){const dx=link.to.x-link.from.x,dy=link.to.y-link.from.y,length=dx*dx+dy*dy,t=length?Math.max(0,Math.min(1,((p.x-link.from.x)*dx+(p.y-link.from.y)*dy)/length)):0;if(Math.hypot(p.x-link.from.x-t*dx,p.y-link.from.y-t*dy)<Math.max(7,5/transform().scale))return {type:'comment-link',id:commentLinkKey(link.commentId,link.nodeId)}}return null;
  }

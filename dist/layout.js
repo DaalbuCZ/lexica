@@ -3,7 +3,7 @@ import {springSettings} from './spring-settings.js';
 import {transitionLabel} from './labels.js?v=16';
 import {simpleTransitionLabel} from './editor-settings.js';
 import {commentLayout,commentAnchors,positionComments} from './comments.js?v=16';
-import {destination,statePortalBox,enablePortal} from './portals.js';
+import {destination,statePortalBox,enablePortal,portalBoxAtTip} from './portals.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}) {
  spacing=Number.isFinite(spacing)?Math.max(.35,Math.min(2,spacing)):1;
@@ -86,7 +86,15 @@ export function autoLayout(machine,mode='tree',spacing=1,portals=false,forces={}
  }
  }
  place();
- if(portals)portalizeCrossings(machine);
+ if(portals){
+  if(mode==='circle'&&states.has(machine.start)){
+   const sizes=new Map();for(const id of [...order].reverse())sizes.set(id,1+children.get(id).reduce((sum,child)=>sum+sizes.get(child),0));
+   for(const id of children.get(machine.start))if(sizes.get(id)>=4){
+    const edge=machine.edges.find(e=>e.from===machine.start&&e.portal==null&&e.to===id);if(edge)enablePortal(machine,edge);
+   }
+  }
+  portalizeCrossings(machine);
+ }
  positionComments(anchors);
  return machine;
 }
@@ -177,11 +185,11 @@ function computeRoutes(machine,labels){
  const obstacles=[...reserved];
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {edge:e,from,to,dx,dy,length:dx*dx+dy*dy}});
  const ordered=machine.edges.map((e,i)=>({e,i})).sort((a,b)=>(a.e.from!==a.e.to)-(b.e.from!==b.e.to));
- for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){const width=Math.max(60,e.portal.length*7+20);let best,bestScore=Infinity;for(const [dx,dy] of [140,220,300].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy),p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox={x:p3.x+(dx<0?-width/2:width/2),y:p3.y,w:width,h:22};applyBend(c,e,a,null);let score=len*.01+(overlaps(c.label,c.portalBox)?1000:0);for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}if(score<bestScore){best=c;bestScore=score}}best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
+ for(const {e,i} of ordered){const a=machine.states.find(s=>s.id===e.from),b=machine.states.find(s=>s.id===e.to);if(e.portal!=null){let best,bestScore=Infinity;for(const [dx,dy] of e.portalOffset?[[e.portalOffset.x,e.portalOffset.y]]:[140,220,300,420,560,720].flatMap(radius=>Array.from({length:16},(_,i)=>[Math.cos(i*Math.PI/8)*radius,Math.sin(i*Math.PI/8)*radius]))){const len=Math.hypot(dx,dy)||1,p0={x:a.x+dx/len*37,y:a.y+dy/len*37},p3={x:a.x+dx,y:a.y+dy},c={p0,p3,c1:at(p0,p3,1/3),c2:at(p0,p3,2/3)};const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};c.portalBox=portalBoxAtTip(e.portal,p3,dx<0?'right':'left');applyBend(c,e,a,null);let score=len*.01+(overlaps(c.label,c.portalBox)?1000:0);for(const box of reserved){if(overlaps(c.label,box))score+=1000;if(overlaps(c.portalBox,box))score+=1000}for(const segment of segments)if(segment.edge!==e){if(segmentHitsBox(segment.from,segment.to,c.label))score+=100;if(segmentHitsBox(segment.from,segment.to,c.portalBox))score+=100}if(score<bestScore){best=c;bestScore=score}}best.d=`M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;routes[i]=best;reserved.push(best.label,best.portalBox);continue}
  let best,bestScore=Infinity;
  const loop=a===b,rotation=loop?[...a.id].reduce((n,ch)=>n+ch.codePointAt(0),0)%4:0;
  for(let attempt=0;attempt<(loop?64:61);attempt++){
- let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*65*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*42,y:b.y+Math.sin(endAngle)*42};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
+ let c;if(a===b){const size=80+Math.floor(attempt/4)*25,angle=((attempt%4+rotation)%4)*Math.PI/2;const rotate=(x,y)=>({x:a.x+x*Math.cos(angle)-y*Math.sin(angle),y:a.y+x*Math.sin(angle)+y*Math.cos(angle)});c={p0:rotate(-22,-29),c1:rotate(-size,-size*1.45),c2:rotate(size,-size*1.45),p3:rotate(22,-29)}}else{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;const reverse=machine.edges.some(x=>x.from===e.to&&x.to===e.from);const bend=(attempt===0?0:Math.ceil(attempt/2)*65*(attempt%2?1:-1))+(reverse?45:0);const mid={x:(a.x+b.x)/2-uy*bend,y:(a.y+b.y)/2+ux*bend};const startAngle=Math.atan2(mid.y-a.y,mid.x-a.x),endAngle=Math.atan2(mid.y-b.y,mid.x-b.x);const p0={x:a.x+Math.cos(startAngle)*37,y:a.y+Math.sin(startAngle)*37},p3={x:b.x+Math.cos(endAngle)*37,y:b.y+Math.sin(endAngle)*37};c={p0,p3,c1:at(p0,mid,2/3),c2:at(p3,mid,2/3)}}
  const center=sample(c,.5);c.label={x:center.x,y:center.y-13,w:labels[i].length*7+14,h:22};
  if(!loop)applyBend(c,e,a,b);
  let labelScore=Infinity,bestLabel=c.label;

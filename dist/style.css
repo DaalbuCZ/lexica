@@ -536,3 +536,6 @@ body.tester-collapsed .tester .step-controls,body.tester-collapsed .tester .step
 .inspector{overflow-y:auto;overscroll-behavior:contain}
 
 .condition-toggle-row{display:flex;align-items:center;gap:4px}.condition-toggle-row>label{flex:1;min-width:0}.condition-clipboard{display:flex;gap:2px}.condition-clipboard button{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:4px;border:0;background:transparent;color:inherit}.condition-clipboard button:hover{background:#0001}.condition-clipboard .tool-icon{width:16px;height:16px}[data-theme=dark] .condition-clipboard button:hover{background:#fff1}
+
+.portal-preview{position:fixed;z-index:12;max-width:220px;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:inherit;box-shadow:0 4px 16px #0003;font-size:11px;line-height:1.5;white-space:pre-line;pointer-events:none}
+.portal-preview[hidden]{display:none}
