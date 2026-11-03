@@ -210,7 +210,9 @@ export function routeEdges(machine,labelFor=transitionLabel){
 export function loopDragBend(center,apex,initial,current,bend){const a={x:initial.x-center.x,y:initial.y-center.y},b={x:current.x-center.x,y:current.y-center.y},angle=Math.atan2(b.y,b.x)-Math.atan2(a.y,a.x),v={x:apex.x-center.x,y:apex.y-center.y},radius=Math.max(0,Math.hypot(v.x,v.y)+Math.hypot(b.x,b.y)-Math.hypot(a.x,a.y)),startAngle=Math.atan2(v.y,v.x);return {x:bend.x+Math.cos(startAngle+angle)*radius-v.x,y:bend.y+Math.sin(startAngle+angle)*radius-v.y}}
 function applyBend(route,edge,start,end){if(!edge.bend)return;if(start===end){const apex=sample(route,.5),x=apex.x-start.x,y=apex.y-start.y,base=Math.hypot(x,y),tx=x+edge.bend.x,ty=y+edge.bend.y,target=Math.hypot(tx,ty),angle=Math.atan2(target>1e-6?ty:y,target>1e-6?tx:x)-Math.atan2(y,x),cos=Math.cos(angle),sin=Math.sin(angle),scale=Math.max(55,target)/base;for(const [point,factor] of [[route.p0,1],[route.p3,1],[route.c1,scale],[route.c2,scale]]){const dx=point.x-start.x,dy=point.y-start.y;point.x=start.x+(dx*cos-dy*sin)*factor;point.y=start.y+(dx*sin+dy*cos)*factor}const center=sample(route,.5);route.label.x=center.x;route.label.y=center.y-13;return}for(const p of [route.c1,route.c2]){p.x+=edge.bend.x*4/3;p.y+=edge.bend.y*4/3}const attach=(point,control,state)=>{const radius=Math.hypot(point.x-state.x,point.y-state.y),dx=control.x-state.x,dy=control.y-state.y,len=Math.hypot(dx,dy);if(len>1e-6){point.x=state.x+radius*dx/len;point.y=state.y+radius*dy/len}};attach(route.p0,route.c1,start);if(end)attach(route.p3,route.c2,end);const center=sample(route,.5);route.label.x=center.x;route.label.y=center.y-13}
 function computeRoutes(machine,labels){
- const reserved=machine.states.flatMap(s=>[{x:s.x,y:s.y,w:90,h:90},...(s.portal?[statePortalBox(s)]:[]),...(s.token?[{x:s.x,y:s.y+57,w:Math.max(70,s.token.length*7),h:20}]:[])]),routes=[];
+ const captions=machine.states.flatMap(s=>s.group?[{x:s.x,y:s.y+50,w:(String(s.count).length+15)*5.5,h:14}]:s.token&&s.accepting!==false?[{x:s.x,y:s.y+53,w:(s.token.length+(s.skip?7:0))*5.5+8,h:14}]:[]);
+ const reserved=machine.states.flatMap(s=>[{x:s.x,y:s.y,w:90,h:90},...(s.portal?[statePortalBox(s)]:[])]);
+ reserved.push(...captions);const routes=[];
  for(const c of machine.comments??[]){const size=commentLayout(c);reserved.push({x:c.x+size.w/2,y:c.y+size.h/2,w:size.w,h:size.h})}
  const obstacles=[...reserved];
  const segments=machine.edges.filter(e=>e.from!==e.to&&e.portal==null).map(e=>{const from=machine.states.find(s=>s.id===e.from),to=machine.states.find(s=>s.id===e.to),dx=to.x-from.x,dy=to.y-from.y;return {edge:e,from,to,dx,dy,length:dx*dx+dy*dy}});
@@ -235,6 +237,13 @@ function computeRoutes(machine,labels){
  const nearby=score<bestScore?machine.states.filter(s=>s!==a&&s!==b&&s.x>=left-65&&s.x<=right+65&&s.y>=top-65&&s.y<=bottom+65):[];
  const nearbySegments=loop&&score<bestScore?segments.filter(s=>Math.max(s.from.x,s.from.x+s.dx)>=left-14&&Math.min(s.from.x,s.from.x+s.dx)<=right+14&&Math.max(s.from.y,s.from.y+s.dy)>=top-14&&Math.min(s.from.y,s.from.y+s.dy)<=bottom+14):[];
  for(let t=.04;t<.98&&score<bestScore;t+=.03){const p=sample(c,t);for(const s of nearby)if((p.x-s.x)**2+(p.y-s.y)**2<65**2)score+=10000}
+ const nearbyCaptions=captions.filter(box=>box.x+box.w/2+4>=left&&box.x-box.w/2-4<=right&&box.y+box.h/2+4>=top&&box.y-box.h/2-4<=bottom);
+ let previous=c.p0;
+ for(let k=1;k<=24&&score<bestScore&&nearbyCaptions.length;k++){
+  const point=sample(c,k/24);
+  if(nearbyCaptions.some(box=>segmentHitsBox(previous,point,box))){score+=12000;break}
+  previous=point;
+ }
  if(loop)for(let t=.1;t<.95&&score<bestScore;t+=.05){const p=sample(c,t);if((p.x-a.x)**2+(p.y-a.y)**2<48**2)continue;for(const {from,dx,dy,length} of nearbySegments){if(!length)continue;const u=Math.max(0,Math.min(1,((p.x-from.x)*dx+(p.y-from.y)*dy)/length));if((p.x-from.x-u*dx)**2+(p.y-from.y-u*dy)**2<14**2)score+=200}}
  if(score<bestScore){best=c;bestScore=score}if(!loop&&score<1||loop&&attempt%4===3&&bestScore<=(Math.floor(attempt/4)+1)*.1)break;
  }
@@ -243,7 +252,7 @@ function computeRoutes(machine,labels){
  }
  const paths=routes.map(route=>{const points=Array.from({length:25},(_,i)=>sample(route,i/24)),xs=points.map(p=>p.x),ys=points.map(p=>p.y);return {points,left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}});
  for(let pass=0;pass<2;pass++)for(let i=0;i<routes.length;i++){
-  const edge=machine.edges[i],route=routes[i];if(edge.from===edge.to||edge.portal!=null)continue;
+  const edge=machine.edges[i],route=routes[i];if(edge.portal!=null||edge.from===edge.to&&edge.bend)continue;
   const collisionScore=label=>{
    let score=0;for(const box of obstacles)if(overlaps(label,box))score+=1000;
    for(let j=0;j<routes.length;j++)if(j!==i){
@@ -257,6 +266,13 @@ function computeRoutes(machine,labels){
   for(const t of [.5,.45,.55,.4,.6,.35,.65,.3,.7,.25,.75,.2,.8,.15,.85,.1,.9]){
    if(!bestScore)break;const point=sample(route,t),candidate={...route.label,x:point.x,y:point.y-13},score=collisionScore(candidate);
    if(score<bestScore){best=candidate;bestScore=score}
+  }
+  if(bestScore>=1000)for(const t of [.5,.35,.65,.2,.8]){
+   const point=sample(route,t);
+   for(const [dx,dy] of [[0,-26],[0,24],[-route.label.w/2-12,0],[route.label.w/2+12,0],[0,-48],[0,46]]){
+    const candidate={...route.label,x:point.x+dx,y:point.y-13+dy},score=collisionScore(candidate)+Math.hypot(dx,dy)/100;
+    if(score<bestScore){best=candidate;bestScore=score}
+   }
   }
   route.label=best;
  }

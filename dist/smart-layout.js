@@ -1,3 +1,4 @@
+import {simpleTransitionLabel} from './editor-settings.js';
 import {autoLayout,crossingPairs} from './layout.js';
 import {graphView,createGroup,groupFor} from './groups.js';
 import {destination} from './portals.js';
@@ -27,7 +28,15 @@ function place(machine,focus,options){
  const mode=compactBranch?'tree':options.mode??'circle',spacing=options.spacing??.75;
  const arrange=candidate=>{if(mode==='tree')tidyTree(candidate,spacing);else if(mode==='circle')radialTree(candidate,spacing);else autoLayout(candidate,mode,spacing,false,options.forces??{},false)};
  const extent=states=>states.length?Math.max(Math.max(...states.map(s=>s.x))-Math.min(...states.map(s=>s.x)),Math.max(...states.map(s=>s.y))-Math.min(...states.map(s=>s.y))):0;
- const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges),xs=candidate.states.map(s=>s.x),ys=candidate.states.map(s=>s.y),width=xs.length?Math.max(...xs)-Math.min(...xs):0,height=ys.length?Math.max(...ys)-Math.min(...ys):0,nodes=new Map(candidate.states.map(s=>[s.id,s]));let wire=0;for(const e of candidate.edges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)wire+=Math.hypot(a.x-b.x,a.y-b.y)}return c.crossings*2000+(c.wire<65?2000:0)+Math.sqrt(width*height)/35+extent(candidate.states)/70+wire/800};
+ const preferFlow=focus&&copy.states.length>=11;
+ const directions=new Set(copy.edges.map(e=>JSON.stringify([e.from,e.to])));
+ const forwardEdges=copy.edges.filter(e=>e.from!==e.to&&!directions.has(JSON.stringify([e.to,e.from])));
+ const cost=candidate=>{const c=drawingClearance(candidate.states,candidate.edges),xs=candidate.states.map(s=>s.x),ys=candidate.states.map(s=>s.y),width=xs.length?Math.max(...xs)-Math.min(...xs):0,height=ys.length?Math.max(...ys)-Math.min(...ys):0,nodes=new Map(candidate.states.map(s=>[s.id,s]));let wire=0;for(const e of candidate.edges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)wire+=Math.hypot(a.x-b.x,a.y-b.y)}let flow=0;if(preferFlow)for(const e of forwardEdges){const a=nodes.get(e.from),b=nodes.get(e.to);if(a&&b)flow+=Math.max(0,170-b.x+a.x)+Math.abs(b.y-a.y)*.22}let routedCrossings=0;
+ if(preferFlow){
+  const positioned={...machine,states:machine.states.map(state=>nodes.get(state.id)??state)};
+  routedCrossings=crossingPairs(graphView(positioned,focus),true,simpleTransitionLabel).length;
+ }
+ return flow/45+routedCrossings*2000+c.crossings*2000+(c.wire<65?2000:0)+Math.sqrt(width*height)/35+extent(candidate.states)/70+wire/800};
  arrange(copy);let best=cost(copy),chosen=copy.states,limit=Math.max(2200,extent(copy.states)*(focus?2.5:1.5));
  if(analytical.positions){
   // Use the planar embedding to order branches, then assign coordinates in the
@@ -43,7 +52,22 @@ function place(machine,focus,options){
   }
  }
  if(focus&&!compactBranch){const candidate=structuredClone(shown);candidate.start=copy.start;if(blockLayout(candidate,spacing)){const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best){best=next;chosen=candidate.states}}}
- if(focus&&!compactBranch&&analytical.positions&&(()=>{const c=drawingClearance(chosen,copy.edges);return c.crossings||c.wire<65||c.node<170})()){const candidate=structuredClone(shown);candidate.start=copy.start;candidate.states=compactPlanar(candidate,analytical.positions);const next=cost(candidate);if(extent(candidate.states)<=limit&&next<best){best=next;chosen=candidate.states}}
+ if(focus&&!compactBranch&&analytical.positions){
+  const clearance=drawingClearance(chosen,copy.edges);
+  if(preferFlow||clearance.crossings||clearance.wire<65||clearance.node<170){
+   const candidate=structuredClone(shown);candidate.start=copy.start;
+   const rotations=preferFlow?[[1,0],[0,1],[-1,0],[0,-1]]:[[1,0]];
+   for(const [cos,sin] of rotations){
+    const seed=new Map([...analytical.positions].map(([id,p])=>[id,{x:p.x*cos-p.y*sin,y:p.x*sin+p.y*cos}]));
+    candidate.states=compactPlanar(candidate,seed,preferFlow);
+    const variants=preferFlow?[candidate.states,candidate.states.map(state=>({...state,x:-state.x}))]:[candidate.states];
+    for(const states of variants){
+     const next=cost({...candidate,states});
+     if(extent(states)<=limit&&next<best){best=next;chosen=states}
+    }
+   }
+  }
+ }
  const selected=new Map(chosen.map(s=>[s.id,s]));for(const state of copy.states){state.x=selected.get(state.id).x;state.y=selected.get(state.id).y}
 
  for(const edge of shown.edges)if(!edge.summary)delete machine.edges[edge.originalIndex??machine.edges.indexOf(edge)]?.bend;
