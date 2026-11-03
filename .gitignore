@@ -3,3 +3,6 @@ node_modules/
 *.log
 *-preview.png
 build/
+.migration/
+test-results/
+playwright-report/
