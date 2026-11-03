@@ -575,7 +575,7 @@ a,button:not(:disabled),select,input[type=checkbox],input[type=radio],summary,[r
 .group-overlay{transition:opacity 160ms ease,scale 160ms ease,display 160ms allow-discrete;scale:1;transition-behavior:allow-discrete}
 .group-overlay:not([hidden]){opacity:1}
 @starting-style{.group-overlay:not([hidden]){opacity:0;scale:.98}}
-.group-target-graph{display:block;width:min(80vw,640px);max-height:55vh;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.group-target-dialog{width:min(720px,calc(100vw - 32px));max-width:calc(100vw - 32px);overflow:hidden;color:var(--green)}.group-target-dialog h2{max-width:calc(100% - 48px);overflow-wrap:anywhere;color:var(--green);font-size:clamp(16px,4vw,21px);line-height:1.25}.group-target-dialog form{min-width:0}.group-target-graph{display:block;width:100%;max-width:100%;height:auto;max-height:55vh;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:8px}
 .target-edge{fill:none;stroke:#82918a;stroke-width:2;opacity:.72}
 .target-edge-label{font:10px 'IBM Plex Mono',monospace;text-anchor:middle;fill:var(--text,#52634f);paint-order:stroke;stroke:var(--panel);stroke-width:5px}
 .target-state{cursor:pointer}.target-state circle{fill:var(--panel);stroke:var(--green);stroke-width:2}.target-state:hover circle,.target-state:focus circle{fill:color-mix(in srgb,var(--green) 20%,var(--panel));stroke-width:3}.target-state text{font:11px 'DM Sans',sans-serif;text-anchor:middle;fill:var(--text,#52634f);pointer-events:none}.target-state .target-token{font:8px 'IBM Plex Mono',monospace;fill:var(--green)}
