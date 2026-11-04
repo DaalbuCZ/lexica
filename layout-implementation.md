@@ -45,6 +45,12 @@ Disconnected components now solve independently and are packed afterward using v
 
 Tree and subgroup cleanup tries exact horizontal alignment for edges within a small angle/offset tolerance. The start and outside images stay pinned; proposed alignment must pass node/edge clearance and adaptive rendered-route separation checks. Radial overview alignment is left to its separate outward-flow preference.
 
+## Constructive first ring and live connections
+
+The first-ring search now includes a constructive branch candidate: direct neighbors receive circle attachments, and each independently attached branch is rotated/translated with its attachment. This avoids relying exclusively on whole-drawing warps. This constructive candidate is judged by clearance and routed feasibility rather than the old relative-area cutoff; the smallest feasible circle candidate wins. The real auto-grouped fixture now has direct-neighbor radii from 757.9793267781499 to 757.9793267781503, with adaptive curve checks clear in the overview and all eight groups.
+
+Interactive automatic connections rotate their attachment frame with moved endpoints, and their captions search around the current curve immediately, including when live worker routing is disabled. Worker repair can freeze individual manual/portal routes rather than letting one such edge disable repair for the entire view. Unaffected route objects remain unchanged. These changes have dedicated preview and mixed-manual/automatic regression tests.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

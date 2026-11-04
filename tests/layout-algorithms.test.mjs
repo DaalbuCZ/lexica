@@ -20,6 +20,7 @@ import { solveLayout } from '../src/core/smart-layout.js';
 import { layoutTopology } from '../src/core/layout-topology.js';
 import { alignHorizontal } from '../src/core/horizontal-layout.js';
 import { renderedLabelBox } from '../src/core/label-clearance.js';
+import { interactiveRoutes } from '../src/core/interactive-routes.js';
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({
@@ -35,6 +36,67 @@ const machine = () => ({
 const snapshot = (m, routes) => ({
   routes,
   nodes: new Map(m.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+});
+
+test('circle construction can move a whole branch even when the old area cutoff would reject it', () => {
+  const states = [
+      { id: 'r', x: 0, y: 0 },
+      ...Array.from({ length: 6 }, (_, i) => ({
+        id: `s${i}`,
+        x: Math.cos((i * Math.PI) / 3) * (220 + i * 30),
+        y: Math.sin((i * Math.PI) / 3) * (220 + i * 30),
+      })),
+      { id: 'tip', x: 420, y: 0 },
+    ],
+    edges = [
+      ...Array.from({ length: 6 }, (_, i) => ({ from: 'r', to: `s${i}`, label: 'x'.repeat(70) })),
+      { from: 's0', to: 'tip', label: 'a' },
+    ],
+    m = { start: 'r', states, edges },
+    result = circularStartRing(m),
+    radii = result.filter((s) => s.id.startsWith('s')).map((s) => Math.hypot(s.x, s.y));
+  assert.ok(Math.min(...radii) >= 590);
+  assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6);
+  assert.ok(
+    corridorRoutes(
+      { ...m, states: result },
+      edges.map((e) => e.label),
+    ),
+  );
+  const anchor = result.find((s) => s.id === 's0'),
+    tip = result.find((s) => s.id === 'tip');
+  assert.ok(Math.hypot(tip.x, tip.y) > Math.hypot(anchor.x, anchor.y));
+});
+
+test('dragging reattaches automatic curves and reflows labels despite an unrelated manual bend', () => {
+  const m = {
+      states: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 240, y: 0 },
+        { id: 'c', x: 1000, y: 0 },
+        { id: 'd', x: 1240, y: 0 },
+      ],
+      edges: [
+        { from: 'a', to: 'b', label: 'abc' },
+        { from: 'c', to: 'd', label: 'manual', bend: { x: 0, y: 50 } },
+      ],
+    },
+    routes = routeEdges(m, (e) => e.label),
+    base = snapshot(m, routes);
+  m.states[1].x = 0;
+  m.states[1].y = 240;
+  const preview = interactiveRoutes(m, (e) => e.label, base)[0];
+  assert.ok(Math.abs(preview.p0.x) < 1e-6);
+  assert.ok(Math.abs(preview.p0.y - 37) < 1e-6);
+  assert.ok(Math.abs(preview.label.x) > 10);
+  const result = repairDraggedRoutes(m, (e) => e.label, base),
+    r = result.routes[0];
+  assert.equal(result.status, 'repaired');
+  assert.ok(Math.abs(r.p0.x) < 1e-6);
+  assert.ok(Math.abs(r.p0.y - 37) < 1e-6);
+  assert.ok(Math.abs(r.label.x) > 10);
+  assert.equal(result.routes[1], routes[1]);
+  assert.notDeepEqual(r.label, routes[0].label);
 });
 
 test('disconnected nodes do not change the connected graph or its automatic groups', () => {

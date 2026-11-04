@@ -1,6 +1,8 @@
 import { loopAngles, applyBend } from './layout.js';
 import { visualMachine } from './start-views.js';
 import { portalBoxAtTip } from './portals.js';
+import { reflowRouteLabels } from './label-clearance.js';
+import { finishRoute } from './route-geometry.js';
 export function dragEdgeRoute(drag) {
   const base = drag.route.unbent ?? drag.route;
   const route = structuredClone(base);
@@ -26,11 +28,13 @@ export function interactiveRoutes(machine, label, snapshot) {
       }),
     );
     const move = (point, d) => ({ ...point, x: point.x + d.x, y: point.y + d.y });
-    return machine.edges.map((edge, index) => {
+    const changed = new Set();
+    const routes = machine.edges.map((edge, index) => {
       const route = snapshot.routes[index],
         a = deltas.get(edge.from),
         b = edge.portal != null ? a : deltas.get(edge.to);
       if (!a.x && !a.y && !b.x && !b.y) return route;
+      changed.add(index);
       const translate = (geometry) => ({
         ...geometry,
         p0: move(geometry.p0, a),
@@ -42,9 +46,56 @@ export function interactiveRoutes(machine, label, snapshot) {
       });
       const next = translate(route);
       if (route.unbent) next.unbent = translate(route.unbent);
-      next.d = `M ${next.p0.x} ${next.p0.y} C ${next.c1.x} ${next.c1.y} ${next.c2.x} ${next.c2.y} ${next.p3.x} ${next.p3.y}`;
-      return next;
+      if (
+        !edge.bend &&
+        edge.portal == null &&
+        edge.from !== edge.to &&
+        (a.x !== b.x || a.y !== b.y)
+      ) {
+        const oldA = snapshot.nodes.get(edge.from),
+          oldB = snapshot.nodes.get(edge.to),
+          from = machine.states.find((s) => s.id === edge.from),
+          to = machine.states.find((s) => s.id === edge.to),
+          ox = oldB.x - oldA.x,
+          oy = oldB.y - oldA.y,
+          oldLength = Math.hypot(ox, oy),
+          nx = to.x - from.x,
+          ny = to.y - from.y,
+          newLength = Math.hypot(nx, ny);
+        if (oldLength > 1e-6 && newLength > 1e-6) {
+          const transform = (p) => {
+            const x = p.x - oldA.x,
+              y = p.y - oldA.y,
+              t = (x * ox + y * oy) / (oldLength * oldLength),
+              normal = (-x * oy + y * ox) / oldLength;
+            return {
+              x: from.x + t * nx - (normal * ny) / newLength,
+              y: from.y + t * ny + (normal * nx) / newLength,
+            };
+          };
+          next.c1 = transform(route.c1);
+          next.c2 = transform(route.c2);
+          const attach = (state, p, radius) => {
+            const dx = p.x - state.x,
+              dy = p.y - state.y,
+              d = Math.hypot(dx, dy) || 1;
+            return { x: state.x + (dx * radius) / d, y: state.y + (dy * radius) / d };
+          };
+          next.p0 = attach(
+            from,
+            transform(route.p0),
+            Math.hypot(route.p0.x - oldA.x, route.p0.y - oldA.y),
+          );
+          next.p3 = attach(
+            to,
+            transform(route.p3),
+            Math.hypot(route.p3.x - oldB.x, route.p3.y - oldB.y),
+          );
+        }
+      }
+      return finishRoute(next);
     });
+    return reflowRouteLabels(machine, routes, changed);
   }
   const nodes = new Map(machine.states.map((s) => [s.id, s])),
     directions = new Set(machine.edges.map((e) => e.from + '\0' + e.to)),

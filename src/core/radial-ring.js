@@ -45,6 +45,15 @@ export function circularStartRing(machine) {
       }
   let best = null,
     bestArea = Infinity;
+  const remaining = new Set(machine.states.filter((s) => s.id !== root.id).map((s) => s.id)),
+    branches = [];
+  for (const id of remaining) {
+    remaining.delete(id);
+    const branch = [id];
+    for (let i = 0; i < branch.length; i++)
+      for (const next of adjacency.get(branch[i])) if (remaining.delete(next)) branch.push(next);
+    branches.push(branch);
+  }
   const initialArea =
     (Math.max(...machine.states.map((s) => s.x)) -
       Math.min(...machine.states.map((s) => s.x)) +
@@ -53,7 +62,7 @@ export function circularStartRing(machine) {
       Math.min(...machine.states.map((s) => s.y)) +
       160);
   for (const radius of radii)
-    for (const mode of ['polar', 'harmonic', 'translate']) {
+    for (const mode of ['branches', 'polar', 'harmonic', 'translate']) {
       const targets = new Map(
         ring.map((p, i) => [
           p.s.id,
@@ -74,7 +83,50 @@ export function circularStartRing(machine) {
         ]),
       );
       const states = machine.states.map((s) => ({ ...s }));
-      if (mode !== 'harmonic')
+      if (mode === 'branches') {
+        const nodes = new Map(states.map((s) => [s.id, s]));
+        for (const branch of branches) {
+          const anchors = branch.filter((id) => targets.has(id));
+          if (anchors.length === 1) {
+            const anchor = { ...nodes.get(anchors[0]) },
+              target = targets.get(anchor.id),
+              others = branch.filter((id) => id !== anchor.id).map((id) => nodes.get(id));
+            const cx = others.reduce((v, s) => v + s.x - anchor.x, 0),
+              cy = others.reduce((v, s) => v + s.y - anchor.y, 0),
+              angle = Math.atan2(target.y - root.y, target.x - root.x) - Math.atan2(cy, cx),
+              cos = Math.cos(angle),
+              sin = Math.sin(angle);
+            for (const id of branch) {
+              const s = nodes.get(id),
+                x = s.x - anchor.x,
+                y = s.y - anchor.y;
+              s.x = target.x + x * cos - y * sin;
+              s.y = target.y + x * sin + y * cos;
+            }
+          } else {
+            // Fixed circle attachments, with the remaining local geometry
+            // following the nearest attachment rather than a global warp.
+            const owner = new Map(anchors.map((id) => [id, id])),
+              queue = [...anchors];
+            for (let i = 0; i < queue.length; i++)
+              for (const next of adjacency.get(queue[i]))
+                if (next !== root.id && !owner.has(next)) {
+                  owner.set(next, owner.get(queue[i]));
+                  queue.push(next);
+                }
+            const old = new Map(machine.states.map((s) => [s.id, s]));
+            for (const id of branch) {
+              const s = nodes.get(id),
+                a = old.get(owner.get(id)),
+                t = targets.get(a?.id);
+              if (t) {
+                s.x += t.x - a.x;
+                s.y += t.y - a.y;
+              }
+            }
+          }
+        }
+      } else if (mode !== 'harmonic')
         for (const s of states) {
           if (s.id === root.id) continue;
           const angle = (Math.atan2(s.y - root.y, s.x - root.x) + Math.PI * 2) % (Math.PI * 2);
@@ -142,7 +194,7 @@ export function circularStartRing(machine) {
       const area =
         (Math.max(...states.map((s) => s.x)) - Math.min(...states.map((s) => s.x))) *
         (Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y)));
-      if (area > initialArea * 1.1) continue;
+      if (mode !== 'branches' && area > initialArea * 1.1) continue;
       if (area < bestArea && corridorRoutes({ ...machine, states, comments: [] }, labels)) {
         best = states;
         bestArea = area;

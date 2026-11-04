@@ -2,7 +2,7 @@ import { curveClearance } from './curve-clearance.js';
 import { SpatialIndex } from './spatial-index.js';
 import { mix, curvePoint, finishRoute, curveAvoidsBox, routeBounds } from './route-geometry.js';
 import { commentLayout } from './comments.js';
-import { renderedLabelBox } from './label-clearance.js';
+import { renderedLabelBox, reflowRouteLabels } from './label-clearance.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
@@ -23,17 +23,22 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
     routes = previous ? [...previous] : [],
     index = new SpatialIndex(),
     obstacles = new SpatialIndex();
+  const frozen = new Set();
   for (const s of machine.states)
     obstacles.set(s.id, { left: s.x - 46, right: s.x + 46, top: s.y - 46, bottom: s.y + 46 });
   for (const [i, e] of machine.edges.entries()) {
-    if (e.portal != null || e.bend || !nodes.has(e.from) || !nodes.has(e.to)) return null;
+    if (e.portal != null || e.bend || !nodes.has(e.from) || !nodes.has(e.to)) {
+      if (!previous?.[i]) return null;
+      frozen.add(i);
+      continue;
+    }
     const key = JSON.stringify([e.from, e.to].sort(compare));
     if (!bundles.has(key)) bundles.set(key, []);
     bundles.get(key).push(i);
   }
   if (previous)
     for (let i = 0; i < previous.length; i++)
-      if (!dirty?.has(i)) index.set(i, routeBounds(previous[i], 2));
+      if (!dirty?.has(i) || frozen.has(i)) index.set(i, routeBounds(previous[i], 2));
   const ports = new Map(),
     rings = new Map();
   for (const members of bundles.values()) {
@@ -220,6 +225,9 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
   }
   // Labels move independently from wires. Deterministic bounded candidates.
   const labelIndex = new SpatialIndex();
+  if (previous)
+    for (const i of frozen)
+      if (dirty?.has(i)) routes[i] = { ...routes[i], label: { ...routes[i].label } };
   for (const [i, c] of (machine.comments ?? []).entries()) {
     const size = commentLayout(c);
     labelIndex.set(`comment:${i}`, {
@@ -270,7 +278,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
     r.label = best;
     labelIndex.set(i, labelBox(best));
   }
-  return routes;
+  return previous ? reflowRouteLabels(machine, routes, dirty ?? new Set()) : routes;
 }
 export function labelBox(l) {
   return renderedLabelBox(l);
