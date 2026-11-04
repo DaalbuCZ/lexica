@@ -43,16 +43,36 @@ export function GraphEditor({ children }) {
           }),
         notify: (message) => useStudio.getState().notify(message),
         startLayoutProgress: () => {
+          const options = {
+            duration: Infinity,
+            closeButton: false,
+            dismissible: false,
+            className: 'lexica-toast arrange-progress-toast',
+          };
           const content = (phase, fraction) => (
-            <div>
-              <div>{phase}</div>
-              <progress aria-label="Arrange graph progress" value={fraction} max={1} />
+            <div className="arrange-progress">
+              <div className="arrange-progress-heading">
+                <strong>Arranging graph</strong>
+                <span aria-hidden="true">{Math.round(fraction * 100)}%</span>
+              </div>
+              <div className="arrange-progress-phase">{phase}</div>
+              <div
+                className="arrange-progress-track"
+                role="progressbar"
+                aria-label="Arrange graph progress"
+                aria-valuenow={Math.round(fraction * 100)}
+                aria-valuetext={phase}
+              >
+                <div
+                  className="arrange-progress-fill"
+                  style={{ transform: `scaleX(${fraction})` }}
+                />
+              </div>
             </div>
           );
-          const id = toast(content('Starting layout', 0), { duration: Infinity });
+          const id = toast(content('Starting layout', 0), options);
           return {
-            update: ({ phase, fraction }) =>
-              toast(content(phase, fraction), { id, duration: Infinity }),
+            update: ({ phase, fraction }) => toast(content(phase, fraction), { ...options, id }),
             close: () => toast.dismiss(id),
           };
         },
