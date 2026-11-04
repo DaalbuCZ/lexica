@@ -858,7 +858,7 @@ details > summary::before {
 }
 .compact-memory > summary::before {
   order: 1;
-  margin-left: auto;
+  margin-inline: auto var(--space-2);
 }
 .compact-memory:not([open]) > summary::before {
   transform: rotate(135deg);
