@@ -87,7 +87,9 @@ export function Tester({ debuggerRef }) {
     sync();
   }, [analysis.tokens, analysis.pending, input]);
   useEffect(() => {
-    const observer = new ResizeObserver(sync);
+    const observer = new ResizeObserver(() => {
+      if (!document.body.classList.contains('resizing-tester')) sync();
+    });
     observer.observe(inputRef.current);
     window.addEventListener('resize', sync);
     return () => {
@@ -123,7 +125,7 @@ export function Tester({ debuggerRef }) {
     writeStorage('lexica-tester-collapsed', collapsed);
     const id = requestAnimationFrame(() => {
       sync();
-      controller?.refresh();
+      controller?.refreshViewport();
     });
     return () => cancelAnimationFrame(id);
   }, [collapsed, controller]);

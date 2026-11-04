@@ -1,7 +1,7 @@
 import { Button } from './components/ui.jsx';
-import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Expand, HelpCircle, Minus, Plus } from 'lucide-react';
-import { useStudio, readStorage, writeStorage } from './state/studio.js';
+import { Component, lazy, Suspense, useEffect, useRef } from 'react';
+import { Expand, Minus, Plus } from 'lucide-react';
+import { useStudio, writeStorage } from './state/studio.js';
 import { editorSettings } from './core/editor-settings.js';
 import { usePersistence } from './hooks/usePersistence.js';
 import { useTheme } from './hooks/useTheme.js';
@@ -26,7 +26,6 @@ export default function App() {
     notice = useStudio((s) => s.notice),
     contextMenu = useStudio((s) => s.contextMenu);
   const debuggerRef = useRef(null);
-  const [tipsVisible, setTipsVisible] = useState(() => !readStorage('lexica-tips-hidden', false));
   usePersistence();
   useTheme();
   useShortcuts(debuggerRef);
@@ -98,34 +97,7 @@ export default function App() {
           </div>
           <canvas id="minimap" role="img" aria-label="Minimap: click or drag to navigate" />
         </div>
-        <div className="canvas-status">
-          <div id="tips-panel" hidden={!tipsVisible}>
-            <Button
-              id="hide-tips"
-              aria-label="Hide tips"
-              title="Hide tips"
-              onClick={() => {
-                setTipsVisible(false);
-                writeStorage('lexica-tips-hidden', true);
-              }}
-            >
-              ×
-            </Button>
-            <span id="modehint" />
-          </div>
-          <IconButton
-            id="show-tips"
-            icon={HelpCircle}
-            label="Keyboard shortcuts"
-            onClick={() =>
-              useStudio.setState({
-                dialog: {
-                  type: 'shortcuts',
-                },
-              })
-            }
-          />
-        </div>
+        <span id="modehint" hidden />
         <Tester debuggerRef={debuggerRef} />
       </main>
       <Suspense fallback={null}>

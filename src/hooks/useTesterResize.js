@@ -45,7 +45,7 @@ export function useTesterResize() {
       [vertical(side) ? 'width' : 'height']: testerSize(value, side, innerWidth, innerHeight),
     };
     current.current = next;
-    setSizes(next);
+    if (!drag.current) setSizes(next);
     apply(next);
   };
   const flush = () => {

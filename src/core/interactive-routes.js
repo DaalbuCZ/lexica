@@ -1,6 +1,16 @@
 import { loopAngles, applyBend } from './layout.js';
 import { visualMachine } from './start-views.js';
 import { portalBoxAtTip } from './portals.js';
+export function dragEdgeRoute(drag) {
+  const base = drag.route.unbent ?? drag.route;
+  const route = structuredClone(base);
+  route.unbent = base;
+  applyBend(route, drag.edge, drag.from, drag.to);
+  route.label.x += drag.labelOffset.x;
+  route.label.y += drag.labelOffset.y;
+  route.d = `M ${route.p0.x} ${route.p0.y} C ${route.c1.x} ${route.c1.y} ${route.c2.x} ${route.c2.y} ${route.p3.x} ${route.p3.y}`;
+  return route;
+}
 /** Linear-time drag geometry. Full obstacle routing runs again after release. */
 export function interactiveRoutes(machine, label, snapshot) {
   machine = visualMachine(machine);
@@ -21,15 +31,17 @@ export function interactiveRoutes(machine, label, snapshot) {
         a = deltas.get(edge.from),
         b = edge.portal != null ? a : deltas.get(edge.to);
       if (!a.x && !a.y && !b.x && !b.y) return route;
-      const next = {
-        ...route,
-        p0: move(route.p0, a),
-        c1: move(route.c1, a),
-        p3: move(route.p3, b),
-        c2: move(route.c2, b),
-        label: move(route.label, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }),
-        portalBox: route.portalBox ? move(route.portalBox, a) : undefined,
-      };
+      const translate = (geometry) => ({
+        ...geometry,
+        p0: move(geometry.p0, a),
+        c1: move(geometry.c1, a),
+        p3: move(geometry.p3, b),
+        c2: move(geometry.c2, b),
+        label: move(geometry.label, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }),
+        portalBox: geometry.portalBox ? move(geometry.portalBox, a) : undefined,
+      });
+      const next = translate(route);
+      if (route.unbent) next.unbent = translate(route.unbent);
       next.d = `M ${next.p0.x} ${next.p0.y} C ${next.c1.x} ${next.c1.y} ${next.c2.x} ${next.c2.y} ${next.p3.x} ${next.p3.y}`;
       return next;
     });

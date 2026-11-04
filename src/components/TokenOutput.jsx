@@ -9,9 +9,14 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
   const [width, setWidth] = useState(300),
     [fontVersion, setFontVersion] = useState(0);
   useLayoutEffect(() => {
-    const node = ref.current,
-      observer = new ResizeObserver(() => setWidth(Math.max(1, node.clientWidth - 20)));
+    const node = ref.current;
+    const update = () => {
+      if (!document.body.classList.contains('resizing-tester'))
+        setWidth(Math.max(1, node.clientWidth - 20));
+    };
+    const observer = new ResizeObserver(update);
     observer.observe(node);
+    window.addEventListener('resize', update);
     let active = true;
     document.fonts.ready.then(() => {
       if (active) setFontVersion((value) => value + 1);
@@ -19,10 +24,11 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
     return () => {
       active = false;
       observer.disconnect();
+      window.removeEventListener('resize', update);
     };
   }, []);
   const virtual = tokens.length > 500;
-  const sizes = useMemo(() => {
+  const measurements = useMemo(() => {
     if (!virtual) return [];
     const context =
       measure.current ?? (measure.current = document.createElement('canvas').getContext('2d'));
@@ -31,12 +37,17 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
       const text = context.measureText(JSON.stringify(token.value)).width;
       context.font = '8px "IBM Plex Mono",monospace';
       const label = context.measureText(token.token + (token.skip ? ' · skip' : '')).width;
-      return {
-        width: Math.min(width, Math.ceil(Math.max(label, text) + 22)),
-        height: Math.max(48, Math.ceil(text / Math.max(1, width - 22)) * 17 + 29),
-      };
+      return { naturalWidth: Math.ceil(Math.max(label, text) + 22), text };
     });
-  }, [tokens, width, virtual, fontVersion]);
+  }, [tokens, virtual, fontVersion]);
+  const sizes = useMemo(
+    () =>
+      measurements.map(({ naturalWidth, text }) => ({
+        width: Math.min(width, naturalWidth),
+        height: Math.max(48, Math.ceil(text / Math.max(1, width - 22)) * 17 + 29),
+      })),
+    [measurements, width],
+  );
   const packed = useMemo(() => packTokenRows(sizes, width), [sizes, width]);
   const rows = useVirtualizer({
     count: virtual ? packed.length : 0,

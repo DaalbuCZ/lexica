@@ -8,8 +8,7 @@ export function useChromeLayout() {
       tester = document.querySelector('.tester'),
       crumbs = document.querySelector('.group-navigation'),
       map = document.querySelector('.minimap'),
-      mapCanvas = document.querySelector('#minimap'),
-      help = document.querySelector('.canvas-status');
+      mapCanvas = document.querySelector('#minimap');
     let frame,
       collapsed = document.body.classList.contains('tester-collapsed');
     const set = (element, values) => {
@@ -63,8 +62,7 @@ export function useChromeLayout() {
       });
       if (dock === 'bottom') {
         const baseline = side === 'left' && isCollapsed ? Math.min(bottom, box.top - gap) : bottom,
-          toolbarRight =
-            side === 'right' ? Math.min(right, box.left - 12 - 32 - gap) : right - 32 - gap;
+          toolbarRight = side === 'right' ? Math.min(right, box.left - gap) : right;
         toolbarLeft = left + mapWidth + 2 + gap;
         toolbarTop = baseline - row;
         set(toolbar, {
@@ -101,21 +99,6 @@ export function useChromeLayout() {
       const mapTop = mapBottom - map.offsetHeight;
       if (dock === 'left')
         set(toolbar, { maxHeight: Math.max(row, mapTop - gap - toolbarTop) + 'px' });
-      const helpSize = help.offsetHeight || 32,
-        helpRight = side === 'right' ? innerWidth - box.left + 12 : gap,
-        helpBottom =
-          (side === 'left' || side === 'right') && isCollapsed
-            ? innerHeight - (box.top + box.height / 2 + helpSize / 2)
-            : side === 'left' || side === 'right'
-              ? 8
-              : innerHeight - bottom;
-      set(help, {
-        position: 'fixed',
-        top: 'auto',
-        left: 'auto',
-        right: helpRight + 'px',
-        bottom: helpBottom + 'px',
-      });
       const debugLeft = innerWidth / 2 - 200,
         debugRight = innerWidth / 2 + 200;
       const debugTop = Math.max(

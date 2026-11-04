@@ -8,7 +8,7 @@ export function measureVisibleViewport(canvas) {
     top = 0,
     right = area.width,
     bottom = area.height;
-  if (tester) {
+  if (tester && !document.body.classList.contains('tester-collapsed')) {
     if (dock === 'left') left = Math.max(left, tester.right - area.left);
     else if (dock === 'right') right = Math.min(right, tester.left - area.left);
     else if (dock === 'top') top = Math.max(top, tester.bottom - area.top);

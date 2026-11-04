@@ -7,6 +7,7 @@ import {
   Copy,
   GripVertical,
   Hand,
+  HelpCircle,
   Menu,
   MousePointer2,
   PlusCircle,
@@ -44,7 +45,7 @@ export function Toolbar() {
           ? null
           : {
               type,
-              anchorId: ['settings', 'import', 'export'].includes(type)
+              anchorId: ['settings', 'import', 'export', 'shortcuts'].includes(type)
                 ? undefined
                 : type === 'layout'
                   ? 'layout-toggle'
@@ -69,7 +70,7 @@ export function Toolbar() {
         <DropdownMenu.Portal>
           <Theme asChild>
             <DropdownMenu.Content
-              className="layout-popover app-menu react-menu"
+              className="layout-popover app-menu react-menu animated-window"
               side={
                 dock === 'left'
                   ? 'right'
@@ -90,6 +91,9 @@ export function Toolbar() {
               </MenuItem>
               <MenuItem icon={Settings} onSelect={() => dialog('settings')}>
                 Settings
+              </MenuItem>
+              <MenuItem icon={HelpCircle} onSelect={() => dialog('shortcuts')}>
+                Keyboard shortcuts
               </MenuItem>
             </DropdownMenu.Content>
           </Theme>

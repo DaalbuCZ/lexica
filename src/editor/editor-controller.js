@@ -723,6 +723,10 @@ export function createEditorController(
       document.body.classList.toggle('pan-ready', pressed);
     },
     refresh: render,
+    refreshViewport() {
+      context.viewportVersion++;
+      queueDraw();
+    },
     setTrace(trace, failures) {
       context.graphTrace = trace;
       if (failures) context.graphFailures = failures;

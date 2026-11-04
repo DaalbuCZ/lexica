@@ -1118,6 +1118,7 @@ function computeRoutes(machine, labels) {
       )
         break;
     }
+    if (e.bend) best.unbent = structuredClone(best);
     applyBend(best, e, a, b);
     best.d = `M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;
     routes[i] = best;

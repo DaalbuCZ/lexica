@@ -572,10 +572,10 @@ export function createGraphCanvas(canvas, minimap) {
       mapCtx.fillRect(note.x, note.y, size.w, size.h);
     }
     mapCtx.fillStyle = c.mapFill;
-    mapCtx.fillRect(viewport.x, viewport.y, viewport.width, viewport.height);
     mapCtx.strokeStyle = c.mapStroke;
     mapCtx.lineWidth =
       2 / canvasTransform(mapView, minimap.clientWidth, minimap.clientHeight).scale;
+    mapCtx.fillRect(viewport.x, viewport.y, viewport.width, viewport.height);
     mapCtx.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
   }
   function hit(p) {
@@ -767,6 +767,12 @@ export function createGraphCanvas(canvas, minimap) {
     point,
     hit,
     hitClient: (event) => hit(point(event)),
+    edgeRoute: (index) => {
+      const position = scene?.machine.edges.findIndex(
+        (edge, i) => (edge.originalIndex ?? i) === index,
+      );
+      return position >= 0 ? scene.routes[position] : undefined;
+    },
     selectionBox,
     bounds: () =>
       scene

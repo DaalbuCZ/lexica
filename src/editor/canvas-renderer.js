@@ -7,7 +7,7 @@ import { routeEdges } from '../core/layout.js';
 import { graphView, groupFor } from '../core/groups.js';
 import { tokenColorClass } from '../core/token-colors.js';
 import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
-import { interactiveRoutes } from '../core/interactive-routes.js';
+import { dragEdgeRoute, interactiveRoutes } from '../core/interactive-routes.js';
 import { visualMachine } from '../core/start-views.js';
 import { createLiveRouting } from './live-routing.js';
 export function createCanvasRenderer(context) {
@@ -92,7 +92,10 @@ export function createCanvasRenderer(context) {
         ),
       );
     }
-    const dragging = context.drag?.moved || context.edgeDrag?.moved || context.portalDrag?.moved;
+    const edgeEdit = context.edgeDrag?.moved ? context.edgeDrag : null;
+    const portalEdit = context.portalDrag?.moved ? context.portalDrag : null;
+    const manualEdit = edgeEdit ?? portalEdit;
+    const dragging = context.drag?.moved || manualEdit;
     const routing = dragging ? interactiveRoutes : routeEdges;
     const sameTopology =
       shownCache?.version === context.documentVersion && shownCache.group === context.openGroup;
@@ -158,32 +161,49 @@ export function createCanvasRenderer(context) {
           ? `${edge.originalIndices.length} transitions`
           : baseLabel(edge),
       liveSnapshot =
-        editorSettings.rerouteWhileDragging && (dragging || liveRouting.started)
+        !manualEdit &&
+        (dragging || routeSnapshot?.manualVersion !== context.documentVersion) &&
+        editorSettings.rerouteWhileDragging &&
+        (dragging || liveRouting.started)
           ? liveRouting.snapshot(shown, editorSettings.simplified)
           : null,
-      shownRoutes = liveSnapshot
-        ? interactiveRoutes(shown, label, liveSnapshot)
-        : dragging
-          ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
-          : editorSettings.rerouteWhileDragging &&
-              liveRouting.started &&
-              routeSnapshot?.group === context.openGroup
-            ? interactiveRoutes(shown, label, routeSnapshot)
-            : routeSnapshot?.version === context.documentVersion &&
-                routeSnapshot.group === context.openGroup &&
-                routeSnapshot.simple === editorSettings.simplified &&
-                visualMachine(shown).states.every((state) => {
-                  const old = routeSnapshot.nodes.get(state.id);
-                  return old?.x === state.x && old?.y === state.y;
-                })
-              ? routeSnapshot.routes
-              : routeEdges(shown, label);
-    if (!dragging)
+      shownRoutes =
+        manualEdit && routeSnapshot
+          ? routeSnapshot.routes.map((route, i) => {
+              const edge = shown.edges[i];
+              if ((edge.originalIndex ?? i) !== manualEdit.index) return route;
+              if (edgeEdit) return dragEdgeRoute(edgeEdit);
+              return interactiveRoutes(
+                { ...shown, edges: [{ ...edge, portalOffset: portalEdit.item.portalOffset }] },
+                label,
+              )[0];
+            })
+          : liveSnapshot
+            ? interactiveRoutes(shown, label, liveSnapshot)
+            : dragging
+              ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+              : editorSettings.rerouteWhileDragging &&
+                  liveRouting.started &&
+                  routeSnapshot?.group === context.openGroup
+                ? interactiveRoutes(shown, label, routeSnapshot)
+                : routeSnapshot?.version === context.documentVersion &&
+                    routeSnapshot.group === context.openGroup &&
+                    routeSnapshot.simple === editorSettings.simplified &&
+                    visualMachine(shown).states.every((state) => {
+                      const old = routeSnapshot.nodes.get(state.id);
+                      return old?.x === state.x && old?.y === state.y;
+                    })
+                  ? routeSnapshot.routes
+                  : routeEdges(shown, label);
+    if (!dragging || manualEdit?.committing)
       routeSnapshot = {
         routes: shownRoutes,
         version: context.documentVersion,
         group: context.openGroup,
         simple: editorSettings.simplified,
+        manualVersion: manualEdit?.committing
+          ? context.documentVersion
+          : routeSnapshot?.manualVersion,
         nodes: new Map(
           visualMachine(shown).states.map((state) => [state.id, { x: state.x, y: state.y }]),
         ),
@@ -217,10 +237,12 @@ export function createCanvasRenderer(context) {
         simple: editorSettings.simplified,
       };
       context.overviewGraph.setView(context.overviewView);
-      const panelMoved = context.positionGroupPanel(
-        overview.states.find((state) => state.id === context.openGroup),
-        graphBounds(shown, shownRoutes),
-      );
+      const panelMoved =
+        (!manualEdit || manualEdit.committing) &&
+        context.positionGroupPanel(
+          overview.states.find((state) => state.id === context.openGroup),
+          graphBounds(shown, shownRoutes),
+        );
       if (!dragging || !reuse)
         context.overviewGraph.draw({
           machine: overview,

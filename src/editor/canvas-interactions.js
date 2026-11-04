@@ -1,8 +1,7 @@
 import { createBendReset } from '../core/reset-bend.js';
 import { setupCanvasGestures } from '../core/canvas-gestures.js';
 import { canvasTransform } from '../core/canvas-graph.js';
-import { editorSettings, simpleTransitionLabel } from '../core/editor-settings.js';
-import { transitionLabel } from '../core/labels.js';
+import { editorSettings } from '../core/editor-settings.js';
 import {
   commentLayout,
   commentAnchors,
@@ -360,17 +359,14 @@ export function createCanvasInteractions(context) {
             ? context.machine.edges[hit.index]
             : context.machine.states.find((s) => s.id === hit.id),
           state = isSource ? context.machine.states.find((s) => s.id === item.from) : item,
-          tip = isSource
-            ? routeEdges(
-                context.machine,
-                editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
-              )[hit.index].p3
-            : portalTip(statePortalBox(state));
+          route = isSource ? context.graph.edgeRoute(hit.index) : null,
+          tip = route?.p3 ?? portalTip(statePortalBox(state));
         context.choose(isSource ? 'edge' : 'state', isSource ? hit.index : hit.id);
         context.markSelection();
         context.properties();
         context.portalDrag = {
           item,
+          index: isSource ? hit.index : null,
           state,
           start: context.point(e),
           offset: {
@@ -421,10 +417,21 @@ export function createCanvasInteractions(context) {
           context.showProperties(false);
           context.markSelection();
           context.properties();
-          if (hit.type === 'edge') {
+          if (hit.type === 'edge' && context.graph.edgeRoute(hit.index)) {
             const edge = context.machine.edges[hit.index];
+            const route = context.graph.edgeRoute(hit.index);
+            const from = context.machine.states.find((state) => state.id === edge.from);
+            const to =
+              edge.portal == null
+                ? context.machine.states.find((state) => state.id === edge.to)
+                : null;
             context.edgeDrag = {
               edge,
+              index: hit.index,
+              route,
+              from,
+              to,
+              labelOffset: { x: 0, y: 0 },
               start: context.point(e),
               bend: {
                 ...(edge.bend ?? {
@@ -434,16 +441,20 @@ export function createCanvasInteractions(context) {
               },
               moved: false,
             };
+            const midpoint = (axis) =>
+              (route.p0[axis] + 3 * route.c1[axis] + 3 * route.c2[axis] + route.p3[axis]) / 8;
+            context.edgeDrag.labelOffset = {
+              x: route.label.x - midpoint('x'),
+              y: route.label.y - midpoint('y') + 13,
+            };
             if (edge.from === edge.to && edge.portal == null) {
-              const state = context.machine.states.find((s) => s.id === edge.from),
-                route = routeEdges(context.machine)[hit.index];
               context.edgeDrag.center = {
-                x: state.x,
-                y: state.y,
+                x: from.x,
+                y: from.y,
               };
               context.edgeDrag.apex = {
-                x: route.label.x,
-                y: route.label.y + 13,
+                x: midpoint('x'),
+                y: midpoint('y'),
               };
             }
           }
@@ -601,20 +612,22 @@ export function createCanvasInteractions(context) {
     context.listen(window, 'pointerup', (e) => {
       if (context.portalDrag) {
         const moved = context.portalDrag.moved;
-        context.portalDrag = null;
         if (moved) {
+          context.portalDrag.committing = true;
           context.save();
           context.render();
         }
+        context.portalDrag = null;
         return;
       }
       if (context.edgeDrag) {
         const moved = context.edgeDrag.moved;
-        context.edgeDrag = null;
         if (moved) {
+          context.edgeDrag.committing = true;
           context.save();
           context.render();
         }
+        context.edgeDrag = null;
         return;
       }
       if (context.marquee) {
