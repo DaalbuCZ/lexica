@@ -407,6 +407,12 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
 }
+.settings-stack {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
 .settings-section {
   min-width: 0;
   margin: 0;
@@ -454,6 +460,19 @@
 }
 .settings-theme h3 {
   margin: 0;
+}
+.group-navigation :is([data-overview], [data-current]) {
+  flex: none;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.group-navigation :is([data-overview], [data-current]):is(:hover, [aria-current='page']) {
+  color: var(--green);
+  text-decoration: underline;
+}
+.group-navigation .dock-grip {
+  flex: none;
 }
 .group-overlay {
   transform: none;

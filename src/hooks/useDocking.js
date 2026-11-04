@@ -68,7 +68,7 @@ export function useDockGrip(name) {
     clearPreviews();
     if (target.moved && !cancel) {
       const hit = pickTarget(target, event);
-      if (hit?.distance === 0) applyDock(name, hit.box.zone);
+      if (hit) applyDock(name, hit.box.zone);
     }
     if (event.currentTarget.hasPointerCapture(target.id))
       event.currentTarget.releasePointerCapture(target.id);
@@ -98,26 +98,27 @@ export function useDockGrip(name) {
         preview.dispatchEvent(new CustomEvent('measure-dock-targets', { detail }));
         target.targets = detail.targets;
         target.outlines = new Map();
-        for (const box of target.targets) {
-          const outline = document.createElement('div');
-          outline.className = 'dock-preview dock-outline';
-          setPreviewBounds(outline, box);
-          target.outlines.set(box, outline);
+        if (name === 'toolbar' || name === 'breadcrumbs') {
+          for (const box of target.targets) {
+            const outline = document.createElement('div');
+            outline.className = 'dock-preview dock-outline';
+            setPreviewBounds(outline, box);
+            target.outlines.set(box, outline);
+          }
+          document.getElementById('dock-outlines').replaceChildren(...target.outlines.values());
         }
-        document.getElementById('dock-outlines').replaceChildren(...target.outlines.values());
       }
       const hit = pickTarget(target, event);
       if (!hit) return;
-      const { box, distance } = hit;
-      const active = distance === 0 ? box : null;
+      const active = hit.box;
       if (target.active !== active) {
-        if (target.active) target.outlines.get(target.active).hidden = false;
+        const previousOutline = target.outlines.get(target.active);
+        if (previousOutline) previousOutline.hidden = false;
         target.active = active;
-        preview.hidden = !active;
-        if (active) {
-          target.outlines.get(active).hidden = true;
-          setPreviewBounds(preview, active);
-        }
+        const outline = target.outlines.get(active);
+        if (outline) outline.hidden = true;
+        setPreviewBounds(preview, active);
+        preview.hidden = false;
       }
       document.body.classList.add('docking');
     },

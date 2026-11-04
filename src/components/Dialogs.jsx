@@ -513,7 +513,7 @@ const shortcuts = {
     ['Insert an intermediary state', 'Ctrl + right-drag'],
     ['Move a connection bend or portal label', 'Drag'],
     ['Open a group', 'Click its node'],
-    ['Move toolbar, tester, or debugger to another edge', 'Drag grip / focus grip + arrow key'],
+    ['Move toolbar, breadcrumbs, tester, or debugger', 'Drag grip / focus grip + arrow key'],
     ['Move debugger toward either end of its edge', 'Focus debugger grip + Home / End'],
     ['Resize lexer tester', 'Drag divider / focus divider + arrow key'],
   ],

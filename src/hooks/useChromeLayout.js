@@ -90,24 +90,48 @@ export function useChromeLayout() {
         element.dataset.orientation = vertical ? 'vertical' : 'horizontal';
         if (dock === 'left')
           set(element, { maxHeight: Math.max(row, mapTop - gap - toolbarTop) + 'px' });
-        return { toolbarLeft, toolbarTop, stackedTop, vertical };
       };
-      const { toolbarLeft, toolbarTop, stackedTop, vertical } = positionToolbar(toolbar, dock);
-      let crumbLeft = vertical ? logo.right + gap : left,
-        crumbTop = vertical ? top : stackedTop ? toolbarTop + row + gap : logo.bottom + gap;
-      const crumbRight = dock === 'right' ? toolbarLeft - gap : right;
-      if (vertical && crumbRight - crumbLeft < 96) {
-        crumbLeft = left + (dock === 'left' ? row + gap : 0);
-        crumbTop = logo.bottom + gap;
-      }
-      set(crumbs, {
-        position: 'fixed',
-        height: row + 'px',
-        padding: '7px',
-        left: crumbLeft + 'px',
-        top: crumbTop + 'px',
-        maxWidth: Math.max(48, crumbRight - crumbLeft) + 'px',
-      });
+      positionToolbar(toolbar, dock);
+      const toolbarBox = toolbar.getBoundingClientRect();
+      const crumbDock = document.body.dataset.breadcrumbsDock || 'top';
+      const positionCrumbs = (element, edge) => {
+        const shared = edge === dock;
+        const vertical = edge === 'left' || edge === 'right';
+        let x = left;
+        let y = top;
+        let end = right;
+        if (edge === 'top') {
+          x = shared ? left : logo.right + gap;
+          if (shared) y = Math.max(logo.bottom, toolbarBox.bottom) + gap;
+          if (dock === 'right') end = toolbarBox.left - gap;
+        } else if (edge === 'bottom') {
+          x = map.getBoundingClientRect().right + gap;
+          y = (shared ? toolbarBox.top - gap : mapBottom) - row;
+        } else if (edge === 'left') {
+          x = shared ? toolbarBox.right + gap : left;
+          y = logo.bottom + gap;
+          end = Math.min(right, x + 160);
+        } else {
+          end = shared ? toolbarBox.left - gap : right;
+          x = Math.max(left, end - 160);
+          if (dock === 'top' && toolbarBox.right > x) y = toolbarBox.bottom + gap;
+        }
+        x = Math.max(left, Math.min(x, end - row));
+        y = Math.max(top, Math.min(y, bottom - row));
+        set(element, {
+          position: 'fixed',
+          inset: y + 'px auto auto ' + x + 'px',
+          width: 'max-content',
+          height: vertical ? 'auto' : row + 'px',
+          maxWidth: Math.max(row, end - x) + 'px',
+          maxHeight: Math.max(row, bottom - y) + 'px',
+          flexDirection: vertical ? 'column' : 'row',
+          overflowY: vertical ? 'auto' : 'hidden',
+          padding: '7px',
+        });
+        if (edge === 'right') set(element, { left: 'auto', right: innerWidth - end + 'px' });
+      };
+      positionCrumbs(crumbs, crumbDock);
       const panel = document.querySelector('.debugger-window');
       if (panel !== debuggerPanel) {
         if (debuggerPanel) resize.unobserve(debuggerPanel);
@@ -125,10 +149,20 @@ export function useChromeLayout() {
           .map((element) => element.getBoundingClientRect())
           .filter((rect) => rect.width > 0 && rect.height > 0);
         const size = { width: panel.offsetWidth, height: panel.offsetHeight };
-        debuggerBounds = (zone) => ({
-          ...placeDockedPanel(zone, size, area, obstacles, gap),
-          ...size,
-        });
+        const crumbBox = crumbs.getBoundingClientRect();
+        debuggerBounds = (zone) => {
+          const bounds = { ...area };
+          if (crumbBox.width && crumbBox.height && zone.split('-')[0] === crumbDock) {
+            if (crumbDock === 'top') bounds.top = crumbBox.bottom;
+            if (crumbDock === 'bottom') bounds.bottom = crumbBox.top;
+            if (crumbDock === 'left') bounds.left = crumbBox.right;
+            if (crumbDock === 'right') bounds.right = crumbBox.left;
+          }
+          const fits =
+            bounds.right - bounds.left >= size.width + 2 * gap &&
+            bounds.bottom - bounds.top >= size.height + 2 * gap;
+          return { ...placeDockedPanel(zone, size, fits ? bounds : area, obstacles, gap), ...size };
+        };
         const { x, y } = debuggerBounds(document.body.dataset.debuggerDock || 'top');
         set(panel, { left: x + 'px', top: y + 'px', translate: 'none' });
       }
@@ -139,7 +173,8 @@ export function useChromeLayout() {
             : [];
 
         // Measure the target orientation without moving the live controls.
-        const sample = (name === 'toolbar' ? toolbar : preview).cloneNode(name === 'toolbar');
+        const source = name === 'toolbar' ? toolbar : name === 'breadcrumbs' ? crumbs : preview;
+        const sample = source.cloneNode(source !== preview);
         sample.removeAttribute('id');
         sample.removeAttribute('style');
         sample.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
@@ -147,9 +182,10 @@ export function useChromeLayout() {
         sample.hidden = false;
         sample.style.visibility = 'hidden';
         sample.dataset.panel = name;
-        (name === 'toolbar' ? toolbar : preview).after(sample);
+        source.after(sample);
         const targets = dockSides.map((zone) => {
           if (name === 'toolbar') positionToolbar(sample, zone);
+          else if (name === 'breadcrumbs') positionCrumbs(sample, zone);
           else sample.dataset.side = zone;
           const { x, y, width, height } = sample.getBoundingClientRect();
           return { zone, x, y, width, height };
@@ -178,6 +214,7 @@ export function useChromeLayout() {
       attributeFilter: [
         'class',
         'data-toolbar-dock',
+        'data-breadcrumbs-dock',
         'data-tester-dock',
         'data-debugger-dock',
         'data-debugging',

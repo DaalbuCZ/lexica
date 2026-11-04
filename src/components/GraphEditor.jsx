@@ -1,6 +1,7 @@
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { GripVertical, Trash2, X } from 'lucide-react';
+import { useDockGrip } from '../hooks/useDocking.js';
 import { createEditorController } from '../editor/editor-controller.js';
 import { useStudio } from '../state/studio.js';
 import { IconButton, Field } from './ui.jsx';
@@ -15,6 +16,7 @@ export function GraphEditor({ children }) {
   const scene = useStudio((s) => s.scene),
     controller = useStudio((s) => s.controller);
   const group = scene.machine.groups?.find((g) => g.id === scene.openGroup);
+  const grip = useDockGrip('breadcrumbs');
   useLayoutEffect(() => {
     const state = useStudio.getState();
     const engine = createEditorController(
@@ -100,8 +102,16 @@ export function GraphEditor({ children }) {
         </div>
       </section>
       <nav className="group-navigation" ref={breadcrumbs} aria-label="Graph groups">
+        <IconButton
+          id="breadcrumbs-grip"
+          className="dock-grip"
+          icon={GripVertical}
+          label="Move breadcrumbs (drag or use arrow keys)"
+          {...grip}
+        />
         <Button
           data-overview
+          variant="ghost"
           aria-current={!group ? 'page' : undefined}
           onClick={() => controller?.closeGroup()}
         >
@@ -112,6 +122,7 @@ export function GraphEditor({ children }) {
             <span aria-hidden="true">›</span>
             <Button
               data-current
+              variant="ghost"
               aria-current="page"
               onClick={() => controller.openGroup(group.id)}
               onContextMenu={(e) => {

@@ -1126,13 +1126,13 @@
 
   /* Lift dark surfaces so the canvas feels softer while labels stay legible. */
   :root[data-theme='dark'] {
-    background: #2b3134;
+    background: #272d30;
     --line: #5b666c;
     --panel: #3e4549f5;
     scrollbar-color: #818d93 #394044;
   }
   [data-theme='dark'] .canvas-wrap {
-    background-color: #2f3539;
+    background-color: #2b3135;
     background-image: radial-gradient(#505b60 0.8px, transparent 0.8px);
   }
   [data-theme='dark'] .inspector,
@@ -1152,7 +1152,7 @@
     background: #2d3337;
   }
   [data-theme='dark'] .edge-text {
-    stroke: #2f3539;
+    stroke: #2b3135;
   }
   [data-theme='dark'] .edge-label-box {
     fill: #444d52;

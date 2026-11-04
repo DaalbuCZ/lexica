@@ -1,8 +1,8 @@
-import { Flex, RadioCards, Slider, useThemeContext } from '@radix-ui/themes';
+import { RadioCards, Slider, useThemeContext } from '@radix-ui/themes';
 import { Moon, Sun } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
 import { setTheme } from '../hooks/useTheme.js';
-import { Modal, Check, Select, Button } from './ui.jsx';
+import { Modal, Check, Select } from './ui.jsx';
 
 export function SettingsPanel({ dialog, onClose }) {
   const { appearance } = useThemeContext();
@@ -67,68 +67,68 @@ export function SettingsPanel({ dialog, onClose }) {
             }
           />
         </section>
-        <section className="settings-section">
-          <h3>Lexer output</h3>
-          <Check
-            id="show-skipped"
-            label="Show skipped tokens"
-            checked={showSkipped}
-            onChange={(showSkipped) => useStudio.setState({ showSkipped })}
-          />
-        </section>
-        <section className="settings-section settings-wide">
-          <h3>Navigation</h3>
-          <Check
-            id="follow-debug-state"
-            label="Follow current state while debugging"
-            checked={settings.followDebugState}
-            onChange={(followDebugState) => change({ followDebugState })}
-          />
-          <Select
-            id="group-presentation"
-            label="Open groups in"
-            value={settings.groupPresentation}
-            onChange={(groupPresentation) => change({ groupPresentation })}
-          >
-            <option value="canvas">Full canvas</option>
-            <option value="overlay">Floating window</option>
-          </Select>
-          <div className="settings-slider-label">
-            <label htmlFor="pinch-sensitivity">Pinch sensitivity</label>
-            <output>{settings.pinchSensitivity.toFixed(1)}×</output>
-          </div>
-          <Slider
-            id="pinch-sensitivity"
-            aria-label="Pinch sensitivity"
-            min={0.2}
-            max={2}
-            step={0.1}
-            value={[settings.pinchSensitivity]}
-            onValueChange={([pinchSensitivity]) => change({ pinchSensitivity })}
-          />
-        </section>
+        <div className="settings-stack">
+          <section className="settings-section">
+            <h3>Lexer output</h3>
+            <Check
+              id="show-skipped"
+              label="Show skipped tokens"
+              checked={showSkipped}
+              onChange={(showSkipped) => useStudio.setState({ showSkipped })}
+            />
+          </section>
+          <section className="settings-section">
+            <h3>Navigation</h3>
+            <Check
+              id="follow-debug-state"
+              label="Follow current state while debugging"
+              checked={settings.followDebugState}
+              onChange={(followDebugState) => change({ followDebugState })}
+            />
+            <Select
+              id="group-presentation"
+              label="Open groups in"
+              value={settings.groupPresentation}
+              onChange={(groupPresentation) => change({ groupPresentation })}
+            >
+              <option value="canvas">Full canvas</option>
+              <option value="overlay">Floating window</option>
+            </Select>
+            <div className="settings-slider-label">
+              <label htmlFor="pinch-sensitivity">Pinch sensitivity</label>
+              <output>{settings.pinchSensitivity.toFixed(1)}×</output>
+            </div>
+            <Slider
+              id="pinch-sensitivity"
+              aria-label="Pinch sensitivity"
+              min={0.2}
+              max={2}
+              step={0.1}
+              value={[settings.pinchSensitivity]}
+              onValueChange={([pinchSensitivity]) => change({ pinchSensitivity })}
+            />
+          </section>
+        </div>
         <section className="settings-section settings-wide settings-theme">
           <h3>Appearance</h3>
-          <Flex gap="2" wrap="wrap" role="group" aria-label="Color theme">
-            <Button
-              aria-pressed={appearance === 'light'}
-              variant={appearance === 'light' ? 'solid' : 'soft'}
-              color={appearance === 'light' ? undefined : 'gray'}
-              onClick={() => setTheme('light')}
-            >
+          <RadioCards.Root
+            className="machine-type-cards"
+            size="1"
+            columns="2"
+            gap="2"
+            value={appearance}
+            onValueChange={setTheme}
+            aria-label="Color theme"
+          >
+            <RadioCards.Item value="light">
               <Sun className="tool-icon" />
               Light mode
-            </Button>
-            <Button
-              aria-pressed={appearance === 'dark'}
-              variant={appearance === 'dark' ? 'solid' : 'soft'}
-              color={appearance === 'dark' ? undefined : 'gray'}
-              onClick={() => setTheme('dark')}
-            >
+            </RadioCards.Item>
+            <RadioCards.Item value="dark">
               <Moon className="tool-icon" />
               Dark mode
-            </Button>
-          </Flex>
+            </RadioCards.Item>
+          </RadioCards.Root>
         </section>
       </div>
     </Modal>

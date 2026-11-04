@@ -29,6 +29,7 @@ export function nearestDockZone(x, y, width, height) {
 export function dockSettings(value) {
   return {
     toolbar: dockSides.includes(value?.toolbar) ? value.toolbar : 'top',
+    breadcrumbs: dockSides.includes(value?.breadcrumbs) ? value.breadcrumbs : 'top',
     tester: dockSides.includes(value?.tester) ? value.tester : 'bottom',
     debugger: debuggerZones.includes(value?.debugger) ? value.debugger : 'top',
   };

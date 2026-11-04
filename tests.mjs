@@ -1372,11 +1372,13 @@ test('docking chooses the nearest edge and validates saved panel positions', asy
   assert.deepEqual(
     dockSettings({
       toolbar: 'right',
+      breadcrumbs: 'left',
       tester: 'left',
       debugger: 'bottom',
     }),
     {
       toolbar: 'right',
+      breadcrumbs: 'left',
       tester: 'left',
       debugger: 'bottom',
     },
@@ -1388,12 +1390,14 @@ test('docking chooses the nearest edge and validates saved panel positions', asy
     }),
     {
       toolbar: 'top',
+      breadcrumbs: 'top',
       tester: 'bottom',
       debugger: 'top',
     },
   );
   assert.deepEqual(dockSettings(null), {
     toolbar: 'top',
+    breadcrumbs: 'top',
     tester: 'bottom',
     debugger: 'top',
   });
