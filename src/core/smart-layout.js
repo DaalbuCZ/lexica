@@ -21,6 +21,7 @@ import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
 import { validateRouteSeparation } from './layout-validation.js';
 import { polishSubgroup } from './subgroup-aesthetics.js';
+import { polishRadialBranches } from './radial-aesthetics.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -996,6 +997,8 @@ export function solveLayout(topology, focus = null, options = {}) {
         { ...view, states: accepted },
         { preserveStartRing, radial: !id },
       );
+      if (!id && !machine.groups?.length)
+        accepted = polishRadialBranches({ ...view, states: accepted });
       const positions = new Map(accepted.map((s) => [s.id, s]));
       for (const s of view.states) {
         const p = positions.get(s.id);

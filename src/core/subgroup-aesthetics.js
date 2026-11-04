@@ -5,7 +5,10 @@ import { cycleAnalysis, insideCycle } from './cycle-aesthetics.js';
 
 // Compare complete small subgroup drawings. In particular, a separator flip
 // changes the embedding instead of trying to drag a branch through its cycle.
-export function polishSubgroup(machine) {
+export function polishSubgroup(
+  machine,
+  { fixedIds = [], maxRoutes = 24, acceptCandidate = () => true, radialOrigin = null } = {},
+) {
   if (
     machine.states.length > 24 ||
     machine.states.some((s) => s.group) ||
@@ -18,6 +21,7 @@ export function polishSubgroup(machine) {
     adjacency = analysis.neighbors,
     root = original.find((s) => s.outside) ?? nodes.get(machine.start);
   if (!root) return original;
+  const fixed = new Set(fixedIds);
   const depth = new Map([[root.id, 0]]),
     queue = [root.id];
   for (let i = 0; i < queue.length; i++)
@@ -41,7 +45,12 @@ export function polishSubgroup(machine) {
       if (!a || !b || a === b) continue;
       const d = Math.hypot(a.x - b.x, a.y - b.y),
         delta = depth.get(b.id) - depth.get(a.id),
-        advance = delta ? (b.x - a.x) * Math.sign(delta) : 0;
+        advance = delta
+          ? (radialOrigin
+              ? Math.hypot(b.x - radialOrigin.x, b.y - radialOrigin.y) -
+                Math.hypot(a.x - radialOrigin.x, a.y - radialOrigin.y)
+              : b.x - a.x) * Math.sign(delta)
+          : 0;
       // Entry-distance columns describe progress even when a directed return
       // transition runs backwards. Short same-column links are allowed.
       if (delta) cost += Math.max(0, 150 - advance) * 2;
@@ -58,7 +67,15 @@ export function polishSubgroup(machine) {
     checked = 0;
   const offer = (states) => {
     const next = score(states);
-    if (next >= bestCost - 0.1 || checked >= 24) return;
+    if (
+      next >= bestCost - 0.1 ||
+      checked >= maxRoutes ||
+      states.some((s) => {
+        const old = nodes.get(s.id);
+        return fixed.has(s.id) && (Math.abs(old.x - s.x) > 1e-6 || Math.abs(old.y - s.y) > 1e-6);
+      })
+    )
+      return;
     const c = drawingClearance(states, machine.edges);
     if (
       c.crossings ||
@@ -70,6 +87,7 @@ export function polishSubgroup(machine) {
     if (states.some((s) => s.outside && s.x > left - 140)) return;
     checked++;
     if (!corridorRoutes({ ...machine, states, comments: [] }, labels)) return;
+    if (!acceptCandidate(states)) return;
     best = states;
     bestCost = next;
   };
@@ -181,8 +199,9 @@ export function polishSubgroup(machine) {
       const ids = new Set(chunk),
         seed = best,
         anchor = seed.find((s) => s.id === cut.id);
-      for (let turn = 1; turn < 8; turn++) {
-        const angle = (turn * Math.PI) / 4,
+      const turns = radialOrigin ? 24 : 8;
+      for (let turn = 1; turn < turns; turn++) {
+        const angle = (turn * 2 * Math.PI) / turns,
           cos = Math.cos(angle),
           sin = Math.sin(angle);
         offer(

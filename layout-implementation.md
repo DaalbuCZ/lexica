@@ -73,6 +73,14 @@ The objective counts enclosed states across cycles, encourages progress from the
 
 Regression motifs cover caption room with a balanced fork, the string diamond with a horizontal exit, and an entry fan that releases its complete tail from enclosing cycles. The actual comparison, small string, identifier, and large string subgroups were rendered and inspected as well as checked for certified route separation.
 
+## Comments and ungrouped radial branches
+
+Attached comment candidates now score how much of their box lies inside graph cycles (center and corner samples). The enclosure term is bounded below the existing obstruction penalties, including for nested cycles, so open space is a preference after avoiding graph interference.
+
+Ungrouped radial drawings reuse the whole-subgroup candidate family in outward-facing local frames. Root-cut branches of up to 24 states are considered independently; larger branches expose small articulation-side regions. All boundary attachments, including the start's direct neighbors, stay fixed exactly. Progress is scored by distance from the global start rather than a global left-to-right direction. Local candidates must pass both local routing and complete-chart skeleton clearance and corridor routing checks. This prevents a locally tidy branch from crossing a neighboring sector. The search examines at most 64 regions with a shared budget of 32 whole-chart routing checks, and rejects candidates that expand the existing maximum radius by more than 2 percent.
+
+Regressions cover an attached comment choosing an open cycle face and an ungrouped 43-state radial drawing releasing an enclosed state while retaining its ring and already tidy neighboring branches. The 82-state real fixture was also checked in the running app with and without autogroups; the complete route sets remained certified clear.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

@@ -3,6 +3,7 @@ import { routeEdges } from './layout.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 import { curveAvoidsBox, mix } from './route-geometry.js';
 import { curveClearance } from './curve-clearance.js';
+import { cycleAnalysis, insideCycle } from './cycle-aesthetics.js';
 export function commentLayout(comment) {
   const lines = [];
   for (const paragraph of comment.text.split('\n')) {
@@ -86,6 +87,8 @@ export function positionComments(anchors) {
 export function placeCommentsAfterLayout(machine) {
   if (!machine.comments?.length) return;
   const routes = routeEdges({ ...machine, comments: [] }, simpleTransitionLabel);
+  const cycles = cycleAnalysis(machine).cycles,
+    cycleNodes = new Map(machine.states.map((s) => [s.id, s]));
   const states = new Map(machine.states.map((state) => [state.id, state])),
     placed = [];
   const segments = (machine.edges ?? []).flatMap((edge) => {
@@ -202,6 +205,22 @@ export function placeCommentsAfterLayout(machine) {
           y: box.y + h / 2,
         };
       let score = Math.hypot(mid.x - center.x, mid.y - center.y) * 0.15 + candidate.rank * 12;
+      // Prefer the open face of an attachment. Sample the whole comment box,
+      // not only its center, so a box straddling a cycle is not considered free.
+      let enclosure = 0;
+      for (const cycle of cycles) {
+        const samples = [
+          mid,
+          { x: box.x, y: box.y },
+          { x: box.x + w, y: box.y },
+          { x: box.x, y: box.y + h },
+          { x: box.x + w, y: box.y + h },
+        ];
+        enclosure +=
+          samples.filter((p) => insideCycle(p, cycle, cycleNodes)).length / samples.length;
+      }
+      // Stay below the smallest obstruction penalty, even for nested cycles.
+      score += (1000 * enclosure) / (1 + enclosure);
       for (const route of routes)
         if (
           !curveAvoidsBox(route, {

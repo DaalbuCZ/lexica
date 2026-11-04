@@ -24,6 +24,80 @@ import { interactiveRoutes } from '../src/core/interactive-routes.js';
 import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthetics.js';
 import { transitionBundles } from '../src/core/graph-bundles.js';
 import { polishSubgroup } from '../src/core/subgroup-aesthetics.js';
+import { polishRadialBranches } from '../src/core/radial-aesthetics.js';
+
+test('attached comments prefer an open face even when the cycle interior has the widest free sector', () => {
+  const m = {
+    states: [
+      ['a', 0, 0],
+      ['b', 600, -600],
+      ['c', 600, 600],
+      ['l', -300, 0],
+      ['u', -300, -300],
+      ['d', -300, 300],
+    ].map(([id, x, y]) => ({ id, x, y })),
+    edges: [
+      ['a', 'b'],
+      ['b', 'c'],
+      ['c', 'a'],
+      ['a', 'l'],
+      ['a', 'u'],
+      ['a', 'd'],
+    ].map(([from, to]) => ({ from, to, label: 'x' })),
+    comments: [{ id: 'note', nodeIds: ['a'], text: 'Keep this outside the cycle', x: 100, y: 0 }],
+  };
+  const before = structuredClone(m.states);
+  placeCommentsAfterLayout(m);
+  const note = m.comments[0],
+    { w, h } = commentLayout(note),
+    nodes = new Map(m.states.map((s) => [s.id, s]));
+  for (const x of [note.x, note.x + w / 2, note.x + w])
+    for (const y of [note.y, note.y + h / 2, note.y + h])
+      assert.equal(insideCycle({ x, y }, ['a', 'b', 'c'], nodes), false);
+  assert.deepEqual(m.states, before);
+});
+
+test('large ungrouped radial charts release enclosed branch nodes without changing the start ring or other branches', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: 0, y: 0 },
+      { id: 'a', x: 1000, y: 0 },
+      { id: 'b', x: 1400, y: -300 },
+      { id: 'c', x: 1400, y: 300 },
+      { id: 'leaf', x: 1250, y: 0 },
+    ],
+    edges: [
+      ['root', 'a'],
+      ['a', 'b'],
+      ['b', 'c'],
+      ['c', 'a'],
+      ['a', 'leaf'],
+    ].map(([from, to]) => ({ from, to, label: 'x' })),
+  };
+  // Add enough independent branches to exceed the subgroup size budget.
+  for (let i = 1; i < 20; i++) {
+    const angle = (i * Math.PI) / 10,
+      id = `ring${i}`,
+      tip = `tip${i}`;
+    m.states.push(
+      { id, x: 1000 * Math.cos(angle), y: 1000 * Math.sin(angle) },
+      { id: tip, x: 1200 * Math.cos(angle), y: 1200 * Math.sin(angle) },
+    );
+    m.edges.push({ from: 'root', to: id, label: 'x' }, { from: id, to: tip, label: 'x' });
+  }
+  const states = polishRadialBranches(m),
+    nodes = new Map(states.map((s) => [s.id, s]));
+  assert.equal(insideCycle(nodes.get('leaf'), ['a', 'b', 'c'], nodes), false);
+  for (const s of m.states.filter((s) => s.id !== 'leaf' && s.id !== 'b' && s.id !== 'c'))
+    assert.deepEqual(nodes.get(s.id), s);
+  const routes = corridorRoutes(
+    { ...m, states },
+    m.edges.map((e) => e.label),
+  );
+  assert.ok(routes);
+  assert.equal(validateRouteSeparation(routes, { maxDepth: 24, maxPairs: 4096 }).status, 'clear');
+});
 
 test('subgroup candidates give the entry caption room and shorten a balanced fork', () => {
   const m = {
