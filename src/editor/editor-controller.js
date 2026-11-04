@@ -21,7 +21,16 @@ import { editorSettings } from '../core/editor-settings.js';
 import { createLayoutTask } from './layout-task.js';
 export function createEditorController(
   elements,
-  { initialMachine, onChange, onUI, onDialog, notify, getTester, onRestoreTester },
+  {
+    initialMachine,
+    onChange,
+    onUI,
+    onDialog,
+    notify,
+    startLayoutProgress,
+    getTester,
+    onRestoreTester,
+  },
 ) {
   const context = {};
   context.elements = elements;
@@ -799,12 +808,13 @@ export function createEditorController(
     },
     async arrange(options) {
       const version = context.documentVersion;
+      const progress = startLayoutProgress?.();
       try {
         const {
           machine: next,
           groups,
           metrics,
-        } = await calculateLayout(context.machine, context.openGroup, options);
+        } = await calculateLayout(context.machine, context.openGroup, options, progress?.update);
         if (context.disposed) return;
         if (
           context.documentVersion !== version ||
@@ -828,6 +838,8 @@ export function createEditorController(
         );
       } catch (error) {
         if (error.name !== 'AbortError' && !context.disposed) toast(error.message);
+      } finally {
+        progress?.close();
       }
     },
     dispose() {

@@ -68,7 +68,22 @@ export function repairDraggedRoutes(machine, label, snapshot, { maxDirty = 64 } 
   if (!dirty.size) return { routes: snapshot.routes, status: 'unchanged', dirty: [] };
   if (dirty.size > maxDirty)
     return { routes, status: 'unverified', dirty: [...dirty], reason: 'region budget' };
-  const repaired = corridorRoutes(machine, machine.edges.map(label), { previous: routes, dirty });
+  const labels = machine.edges.map(label);
+  let repaired = corridorRoutes(machine, labels, { previous: routes, dirty });
+  if (!repaired) {
+    const expanded = new Set(dirty);
+    for (const i of dirty) for (const j of index.query(routeBounds(routes[i], 96))) expanded.add(j);
+    const pairs = new Set(
+      [...expanded].map((i) => JSON.stringify([machine.edges[i].from, machine.edges[i].to].sort())),
+    );
+    machine.edges.forEach((e, i) => {
+      if (pairs.has(JSON.stringify([e.from, e.to].sort()))) expanded.add(i);
+    });
+    if (expanded.size > dirty.size && expanded.size <= maxDirty) {
+      repaired = corridorRoutes(machine, labels, { previous: routes, dirty: expanded });
+      if (repaired) return { routes: repaired, status: 'repaired', dirty: [...expanded] };
+    }
+  }
   return {
     routes: repaired ?? routes,
     status: repaired ? 'repaired' : 'unverified',

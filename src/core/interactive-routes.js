@@ -14,7 +14,7 @@ export function dragEdgeRoute(drag) {
   return route;
 }
 /** Linear-time drag geometry. Full obstacle routing runs again after release. */
-export function interactiveRoutes(machine, label, snapshot) {
+export function interactiveRoutes(machine, label, snapshot, { reflow = true } = {}) {
   machine = visualMachine(machine);
   if (
     snapshot &&
@@ -95,7 +95,7 @@ export function interactiveRoutes(machine, label, snapshot) {
       }
       return finishRoute(next);
     });
-    return reflowRouteLabels(machine, routes, changed);
+    return reflow ? reflowRouteLabels(machine, routes, changed) : routes;
   }
   const nodes = new Map(machine.states.map((s) => [s.id, s])),
     directions = new Set(machine.edges.map((e) => e.from + '\0' + e.to)),

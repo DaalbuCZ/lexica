@@ -33,6 +33,7 @@ export function createCanvasRenderer(context) {
   let mapScene = null;
   let shownCache = null;
   let routeSnapshot = null;
+  let lastLiveRepair = null;
   const viewSnapshots = new Map();
   const viewKey = (group, simple) => JSON.stringify([group ?? null, simple]);
   context.settleRoutes = () => {
@@ -46,7 +47,13 @@ export function createCanvasRenderer(context) {
       !shown.states.every((s) => routeSnapshot.nodes.has(s.id))
     )
       return;
-    const repair = repairDraggedRoutes(shown, label, routeSnapshot);
+    const preview = lastLiveRepair?.base === routeSnapshot ? lastLiveRepair.snapshot : null;
+    lastLiveRepair = null;
+    let repair = repairDraggedRoutes(shown, label, preview ?? routeSnapshot);
+    if (preview && repair.status === 'unverified') {
+      const retry = repairDraggedRoutes(shown, label, routeSnapshot);
+      if (retry.status !== 'unverified') repair = retry;
+    }
     storeDrawingRoutes(
       context.machine,
       shown,
@@ -54,6 +61,15 @@ export function createCanvasRenderer(context) {
       repair.routes,
       `${context.openGroup ?? 'main'}:${editorSettings.simplified}`,
     );
+    routeSnapshot = {
+      ...routeSnapshot,
+      routes: repair.routes,
+      nodes: new Map(shown.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+      comments: structuredClone(shown.comments ?? []),
+      signature: drawingRouteKey(shown, shown.edges.map(label)),
+    };
+    viewSnapshots.set(viewKey(context.openGroup, editorSettings.simplified), routeSnapshot);
+    liveRouting.reset();
   };
   let overviewCache = null;
   let viewportMetrics, viewportVersion;
@@ -207,10 +223,7 @@ export function createCanvasRenderer(context) {
           : baseLabel(edge),
       signature = drawingRouteKey(visualMachine(shown), shown.edges.map(label)),
       liveSnapshot =
-        !manualEdit &&
-        (dragging || routeSnapshot?.manualVersion !== context.documentVersion) &&
-        editorSettings.rerouteWhileDragging &&
-        (dragging || liveRouting.started)
+        !manualEdit && dragging && editorSettings.rerouteWhileDragging && routeSnapshot
           ? liveRouting.snapshot(shown, editorSettings.simplified, routeSnapshot)
           : null,
       shownRoutes =
@@ -225,12 +238,15 @@ export function createCanvasRenderer(context) {
               )[0];
             })
           : liveSnapshot
-            ? interactiveRoutes(shown, label, liveSnapshot)
+            ? interactiveRoutes(shown, label, liveSnapshot, { reflow: false })
             : dragging
-              ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+              ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null, {
+                  reflow: !editorSettings.rerouteWhileDragging,
+                })
               : routeSnapshot?.signature === signature
                 ? routeSnapshot.routes
                 : routeEdges(shown, label);
+    if (liveSnapshot) lastLiveRepair = { base: routeSnapshot, snapshot: liveSnapshot };
     if (!dragging || manualEdit?.committing) {
       routeSnapshot = {
         routes: shownRoutes,
@@ -239,9 +255,6 @@ export function createCanvasRenderer(context) {
         group: context.openGroup,
         simple: editorSettings.simplified,
         signature,
-        manualVersion: manualEdit?.committing
-          ? context.documentVersion
-          : routeSnapshot?.manualVersion,
         nodes: new Map(
           visualMachine(shown).states.map((state) => [state.id, { x: state.x, y: state.y }]),
         ),

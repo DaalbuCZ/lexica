@@ -10,7 +10,7 @@ export function createLayoutTask(context) {
     active = null;
   };
   context.scope.signal.addEventListener('abort', cancel, { once: true });
-  return (machine, focus, options) =>
+  return (machine, focus, options, onProgress) =>
     new Promise((resolve, reject) => {
       cancel();
       const original = structuredClone(machine);
@@ -32,7 +32,10 @@ export function createLayoutTask(context) {
           }
         }
       };
-      worker.onmessage = ({ data }) => finish(data);
+      worker.onmessage = ({ data }) => {
+        if (data.progress) onProgress?.(data.progress);
+        else finish(data);
+      };
       worker.onerror = () => finish({ error: 'Could not calculate the layout.' });
       worker.postMessage({
         topology: layoutTopology(original, options.disregardGroups),

@@ -723,7 +723,7 @@ export function routeEdges(machine, labelFor = transitionLabel) {
   const labels = machine.edges.map(labelFor);
   const key = drawingRouteKey(machine, labels);
   const saved = savedRoutes(machine, key);
-  if (saved) return clearNodeLabels(machine, saved);
+  if (saved) return saved;
   if (routeCache.has(key)) return routeCache.get(key);
   const routes =
     (machine.states.length > 12 ||

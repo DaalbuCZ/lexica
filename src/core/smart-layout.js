@@ -829,9 +829,9 @@ export function smartArrange(machine, focus = null, options = {}) {
   return result.groups;
 }
 
-export function solveLayout(topology, focus = null, options = {}) {
+export function solveLayout(topology, focus = null, options = {}, progress = () => {}) {
   if (!focus) {
-    const components = solveComponents(topology, options, solveLayout);
+    const components = solveComponents(topology, options, solveLayout, progress);
     if (components) return components;
   }
   const started = performance.now(),
@@ -845,7 +845,9 @@ export function solveLayout(topology, focus = null, options = {}) {
     edges: topology.edges.map((edge) => ({ ...edge })),
     routingPolicy: (options.mode ?? 'circle') === 'circle' ? 'corridor' : undefined,
   };
+  progress(0.08, 'Placing states');
   const count = arrangeTopology(machine, focus, options);
+  progress(0.38, 'Refining the layout');
   metrics.placementMs = performance.now() - started;
   const refineStarted = performance.now();
   if (
@@ -973,6 +975,7 @@ export function solveLayout(topology, focus = null, options = {}) {
   }
   metrics.refinementMs = performance.now() - refineStarted;
   const routingStarted = performance.now();
+  progress(0.58, 'Checking transition routes');
   if ((options.mode ?? 'circle') === 'circle') {
     const certify = (id) => {
       const view = graphView(machine, id),
@@ -1046,7 +1049,8 @@ export function solveLayout(topology, focus = null, options = {}) {
       const view = graphView(machine, id),
         candidate = { ...view };
       if (options.mode === 'tree' && cycleAnalysis(view).cycles.length) {
-        const states = compactAesthetics(view, {
+        const seed = id ? view : { ...view, states: polishSubgroup(view) };
+        const states = compactAesthetics(seed, {
           fixedIds: view.states.filter((s) => s.outside || s.group).map((s) => s.id),
         });
         if (
@@ -1077,6 +1081,7 @@ export function solveLayout(topology, focus = null, options = {}) {
     }
   }
   const commentsStarted = performance.now();
+  progress(0.9, 'Placing comments');
   placeCommentsAfterLayout(graphView(machine));
   for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {
     const shown = graphView(machine, group.id);

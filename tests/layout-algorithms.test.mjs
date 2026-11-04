@@ -761,6 +761,21 @@ test('drag repair preserves every route outside the geometric dirty region exact
     [...base.nodes.values()].slice(0, -1),
   );
 });
+test('drag repair detours a wire when a state moves onto its centerline', () => {
+  const m = {
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 600, y: 0 },
+      { id: 'obstacle', x: 300, y: 180 },
+    ],
+    edges: [{ from: 'a', to: 'b', label: 'x' }],
+  };
+  const base = snapshot(m, corridorRoutes(m, ['x']));
+  m.states[2].y = 0;
+  const repaired = repairDraggedRoutes(m, (e) => e.label, base);
+  assert.equal(repaired.status, 'repaired');
+  assert.ok(curveAvoidsBox(repaired.routes[0], { left: 254, right: 346, top: -46, bottom: 46 }));
+});
 test('drag region budget preserves the user edit and reports unverified geometry', () => {
   const m = machine(),
     routes = corridorRoutes(
@@ -860,6 +875,18 @@ test('live routing rejects stale geometry and sends patches after its baseline',
       },
     });
     assert.ok(routing.snapshot(m, false, base));
+    m.states[0].y += 20;
+    const lastGood = routing.snapshot(m, false, base);
+    assert.ok(lastGood);
+    const blocked = worker.messages[2];
+    worker.onmessage({
+      data: {
+        key: blocked.key,
+        topology: blocked.topology,
+        status: 'unverified',
+      },
+    });
+    assert.equal(routing.snapshot(m, false, base), lastGood);
     routing.dispose();
     assert.ok(worker.terminated);
   } finally {

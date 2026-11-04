@@ -4,6 +4,7 @@ import { useDockGrip } from '../hooks/useDocking.js';
 import { createEditorController } from '../editor/editor-controller.js';
 import { useStudio } from '../state/studio.js';
 import { IconButton, Field } from './ui.jsx';
+import { toast } from 'sonner';
 export function GraphEditor({ children }) {
   const wrap = useRef(null),
     surface = useRef(null),
@@ -41,6 +42,20 @@ export function GraphEditor({ children }) {
             dialog,
           }),
         notify: (message) => useStudio.getState().notify(message),
+        startLayoutProgress: () => {
+          const content = (phase, fraction) => (
+            <div>
+              <div>{phase}</div>
+              <progress aria-label="Arrange graph progress" value={fraction} max={1} />
+            </div>
+          );
+          const id = toast(content('Starting layout', 0), { duration: Infinity });
+          return {
+            update: ({ phase, fraction }) =>
+              toast(content(phase, fraction), { id, duration: Infinity }),
+            close: () => toast.dismiss(id),
+          };
+        },
         getTester: () => {
           const { input, showSkipped } = useStudio.getState();
           return {

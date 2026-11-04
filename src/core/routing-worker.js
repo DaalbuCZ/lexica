@@ -6,11 +6,15 @@ import { repairDraggedRoutes } from './incremental-layout.js';
 
 let previous;
 let current;
+let baseline;
 
 self.onmessage = ({ data }) => {
   try {
-    if (data.machine) current = data.machine;
-    else {
+    if (data.machine) {
+      current = data.machine;
+      previous = null;
+      baseline = data.snapshot ? { ...data.snapshot, nodes: new Map(data.snapshot.nodes) } : null;
+    } else {
       if (!current) throw Error('Routing session has no baseline');
       const positions = new Map(data.patch.states.map((s) => [s.id, s]));
       for (const state of current.states)
@@ -25,26 +29,18 @@ self.onmessage = ({ data }) => {
         : data.simple
           ? simpleTransitionLabel(edge)
           : transitionLabel(edge);
-    const snapshot =
-      previous?.topology === data.topology
-        ? previous
-        : data.snapshot
-          ? {
-              routes: data.snapshot.routes,
-              nodes: new Map(data.snapshot.nodes),
-              comments: data.snapshot.comments,
-            }
-          : null;
+    const snapshot = previous ?? baseline;
     const repair = snapshot
       ? repairDraggedRoutes(data.machine, label, snapshot)
       : { routes: routeEdges(data.machine, label), status: 'initial', dirty: [] };
     const nodes = visualMachine(data.machine).states.map(({ id, x, y }) => [id, { x, y }]);
-    previous = {
-      routes: repair.routes,
-      nodes: new Map(nodes),
-      topology: data.topology,
-      comments: structuredClone(data.machine.comments ?? []),
-    };
+    if (repair.status !== 'unverified')
+      previous = {
+        routes: repair.routes,
+        nodes: new Map(nodes),
+        topology: data.topology,
+        comments: structuredClone(data.machine.comments ?? []),
+      };
     self.postMessage({
       key: data.key,
       topology: data.topology,
@@ -52,6 +48,7 @@ self.onmessage = ({ data }) => {
       status: repair.status,
       dirty: repair.dirty,
       nodes,
+      comments: current.comments,
     });
   } catch {
     self.postMessage({ error: true });

@@ -1,7 +1,6 @@
 import { curveClearance } from './curve-clearance.js';
 import { SpatialIndex } from './spatial-index.js';
 import { mix, curvePoint, finishRoute, curveAvoidsBox, routeBounds } from './route-geometry.js';
-import { commentLayout } from './comments.js';
 import { renderedLabelBox, reflowRouteLabels } from './label-clearance.js';
 import { bundleLanes, transitionBundles } from './graph-bundles.js';
 
@@ -70,13 +69,17 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           (dx / len) * along * forward - (dy / len) * sign * port,
         );
         if (!rings.has(s.id)) rings.set(s.id, []);
-        const base=(Math.atan2(dy*forward,dx*forward)+Math.PI*2)%(Math.PI*2);
-        rings.get(s.id).push({ key,base,angle:base+Math.atan2(Math.sin(angle-base),Math.cos(angle-base)) });
+        const base = (Math.atan2(dy * forward, dx * forward) + Math.PI * 2) % (Math.PI * 2);
+        rings.get(s.id).push({
+          key,
+          base,
+          angle: base + Math.atan2(Math.sin(angle - base), Math.cos(angle - base)),
+        });
       }
     });
   }
   for (const [id, ring] of rings) {
-    ring.sort((a, b) => a.base-b.base || a.angle - b.angle || compare(a.key, b.key));
+    ring.sort((a, b) => a.base - b.base || a.angle - b.angle || compare(a.key, b.key));
     const gap = Math.min(0.16, (Math.PI * 2) / (ring.length + 1));
     for (let pass = 0; pass < 64; pass++)
       for (let i = 0; i < ring.length; i++) {
@@ -137,8 +140,17 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           // Directed bands occupy opposite sides, clockwise in screen space.
           sign = compare(e.from, e.to) <= 0 ? 1 : -1,
           offset = lanes.get(i).offset;
-        for (const extra of laneScale === 1 ? [0, 8, 16] : [16, 8, 0]) {
-          const shift = offset === 0 ? 0 : offset + Math.sign(offset) * extra;
+        const extras = laneScale === 1 ? [0, 8, 16] : [16, 8, 0];
+        const shifts = extras.map((extra) =>
+          offset === 0 ? 0 : offset + Math.sign(offset) * extra,
+        );
+        // During drag, try wider detours before asking neighboring routes to move.
+        if (previous)
+          for (const width of [48, 96, 160, 240]) {
+            shifts.push(offset + (Math.sign(offset) || 1) * width);
+            if (!offset) shifts.push(-width);
+          }
+        for (const [attempt, shift] of shifts.entries()) {
           const nx = (-dy / len) * sign,
             ny = (dx / len) * sign,
             port = lanes.get(i).port,
@@ -158,7 +170,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           c2.x += nx * shift;
           c2.y += ny * shift;
           const r = { p0: ports.get(`${i}:a`) ?? p0, p3: ports.get(`${i}:b`) ?? p3, c1, c2 };
-          if (extra === 0) {
+          if (extras[attempt] === 0) {
             const reach = Math.min(100, len / 3);
             r.c1 = {
               x: r.p0.x + ((r.p0.x - a.x) / 37) * reach,
@@ -226,62 +238,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
       index.set(i, routeBounds(chosen, 2));
     }
   }
-  // Labels move independently from wires. Deterministic bounded candidates.
-  const labelIndex = new SpatialIndex();
-  if (previous)
-    for (const i of frozen)
-      if (dirty?.has(i)) routes[i] = { ...routes[i], label: { ...routes[i].label } };
-  for (const [i, c] of (machine.comments ?? []).entries()) {
-    const size = commentLayout(c);
-    labelIndex.set(`comment:${i}`, {
-      left: c.x,
-      right: c.x + size.w,
-      top: c.y,
-      bottom: c.y + size.h,
-    });
-  }
-  for (const s of machine.states)
-    if (s.token && s.accepting !== false) {
-      const w = (s.token.length + (s.skip ? 7 : 0)) * 5.5 + 8;
-      labelIndex.set(`caption:${s.id}`, {
-        left: s.x - w / 2,
-        right: s.x + w / 2,
-        top: s.y + 46,
-        bottom: s.y + 60,
-      });
-    }
-  if (previous)
-    routes.forEach((r, i) => {
-      if (!dirty?.has(i)) labelIndex.set(i, labelBox(r.label));
-    });
-  for (let i = 0; i < routes.length; i++) {
-    if (previous && !dirty?.has(i)) continue;
-    const r = routes[i];
-    let best = r.label,
-      bestScore = Infinity,
-      bestNodeHits = Infinity;
-    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8])
-      for (const dy of [-13, 18, -30, 35, -64, 64, -96, 96]) {
-        const p = curvePoint(r, t),
-          label = { ...r.label, x: p.x, y: p.y + dy },
-          box = labelBox(label);
-        const nodeHits = obstacles.query(box).length;
-        const score =
-          labelIndex.query(box).length * 500 +
-          index.query(box).filter((j) => j !== i && !curveAvoidsBox(routes[j], box)).length * 100 +
-          Math.abs(t - 0.5) +
-          Math.abs(dy + 13) * 0.01;
-        if (nodeHits < bestNodeHits || (nodeHits === bestNodeHits && score < bestScore)) {
-          best = label;
-          bestScore = score;
-          bestNodeHits = nodeHits;
-        }
-        if (score === 0 && nodeHits === 0) break;
-      }
-    r.label = best;
-    labelIndex.set(i, labelBox(best));
-  }
-  return previous ? reflowRouteLabels(machine, routes, dirty ?? new Set()) : routes;
+  return previous ? reflowRouteLabels(machine, routes, dirty) : routes;
 }
 export function labelBox(l) {
   return renderedLabelBox(l);

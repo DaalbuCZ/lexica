@@ -4,7 +4,7 @@ import { graphView } from './groups.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 // Solve weak components independently so an unrelated island cannot change
 // the seed, radius, candidate budget or grouping policy of the main graph.
-export function solveComponents(topology, options, solve) {
+export function solveComponents(topology, options, solve, progress) {
   const adjacency = new Map(topology.states.map((s) => [s.id, new Set()]));
   const link = (a, b) => {
     if (adjacency.has(a) && adjacency.has(b)) {
@@ -34,6 +34,7 @@ export function solveComponents(topology, options, solve) {
     count = 0,
     main;
   const metrics = { components: components.length, totalMs: 0 };
+  let completed = 0;
   for (const ids of components) {
     const indices = topology.edges.flatMap((e, i) => (ids.has(e.from) ? [i] : [])),
       local = {
@@ -46,7 +47,9 @@ export function solveComponents(topology, options, solve) {
           (c.nodeIds ?? [c.nodeId]).some((id) => ids.has(id)),
         ),
       };
-    const result = solve(local, null, options),
+    const result = solve(local, null, options, (fraction, phase) =>
+        progress((completed + fraction * ids.size) / topology.states.length, phase),
+      ),
       m = result.machine;
     if (!main) main = m;
     const shown = graphView(m),
@@ -78,6 +81,7 @@ export function solveComponents(topology, options, solve) {
     }
     right = Math.max(right, bounds.x + bounds.width + dx);
     count += result.groups;
+    completed += ids.size;
     for (const [key, value] of Object.entries(result.metrics ?? {}))
       if (typeof value === 'number') metrics[key] = (metrics[key] ?? 0) + value;
   }

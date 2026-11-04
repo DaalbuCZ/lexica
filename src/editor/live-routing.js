@@ -32,9 +32,6 @@ export function createLiveRouting(context) {
     sentNodes = nodes;
   };
   return {
-    get started() {
-      return !!worker;
-    },
     snapshot(shown, simple, base) {
       if (!worker) {
         worker = new Worker(new URL('../core/routing-worker.js', import.meta.url), {
@@ -42,7 +39,12 @@ export function createLiveRouting(context) {
         });
         worker.onmessage = ({ data }) => {
           busy = false;
-          if (!data.error && data.key === requested)
+          if (
+            !data.error &&
+            data.status !== 'unverified' &&
+            data.topology === sentTopology &&
+            (data.key === requested || data.status === 'repaired')
+          )
             result = { ...data, nodes: new Map(data.nodes) };
           if (queued) {
             const next = queued;
@@ -89,7 +91,13 @@ export function createLiveRouting(context) {
         if (busy) queued = request;
         else send(request);
       }
-      return result?.topology === topology && result.key === key ? result : null;
+      return result?.topology === topology ? result : null;
+    },
+    reset() {
+      worker?.terminate();
+      worker = queued = result = requested = sentTopology = null;
+      busy = false;
+      sentNodes.clear();
     },
     dispose() {
       worker?.terminate();
