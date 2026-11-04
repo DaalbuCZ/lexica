@@ -70,10 +70,29 @@ export function GraphEditor({ children }) {
               </div>
             </div>
           );
-          const id = toast(content('Starting layout', 0), options);
+          let phase = 'Starting layout';
+          let confirmed = 0;
+          let displayed = 0;
+          const id = toast(content(phase, displayed), options);
+          const publish = () => toast(content(phase, displayed), { ...options, id });
+          const timer = window.setInterval(() => {
+            // Leave room for the next real update. The estimate advances more
+            // slowly as it approaches its ceiling.
+            const ceiling = confirmed + (1 - confirmed) * 0.24;
+            displayed += (ceiling - displayed) * 0.025;
+            publish();
+          }, 250);
           return {
-            update: ({ phase, fraction }) => toast(content(phase, fraction), { ...options, id }),
-            close: () => toast.dismiss(id),
+            update: ({ phase: nextPhase, fraction }) => {
+              phase = nextPhase;
+              confirmed = Math.max(confirmed, fraction);
+              displayed = Math.max(displayed, confirmed);
+              publish();
+            },
+            close: () => {
+              window.clearInterval(timer);
+              toast.dismiss(id);
+            },
           };
         },
         getTester: () => {
