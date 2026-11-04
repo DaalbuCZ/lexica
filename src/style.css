@@ -2016,7 +2016,7 @@
   }
   .dock-preview {
     position: fixed;
-    z-index: 20;
+    z-index: 10000;
     pointer-events: none;
     background: color-mix(in srgb, var(--green) 20%, transparent);
     border: 2px solid var(--green);
@@ -4075,7 +4075,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
-    overflow-x: auto;
+    overflow: hidden;
     white-space: nowrap;
   }
   .group-navigation button {

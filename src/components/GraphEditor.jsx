@@ -123,6 +123,7 @@ export function GraphEditor({ children }) {
               type="button"
               data-current
               aria-current="page"
+              title={group.name}
               onClick={() => controller.openGroup(group.id)}
               onContextMenu={(e) => {
                 e.preventDefault();

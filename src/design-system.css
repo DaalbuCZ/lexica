@@ -470,8 +470,14 @@
   background: transparent;
   box-shadow: none;
 }
+.group-navigation [data-current] {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .group-navigation :is([data-overview], [data-current]):is(:hover, [aria-current='page']) {
-  color: var(--green);
+  color: inherit;
   text-decoration: underline;
 }
 .group-navigation .dock-grip {
