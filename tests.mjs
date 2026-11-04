@@ -194,7 +194,7 @@ test('angular refinement spreads neighbors without changing their cyclic order o
   assert.equal(crossingPairs(m).length, 0);
   assert.deepEqual([m.comments[0].x, m.comments[0].y], [40, 50]);
 });
-test('incoming and outgoing ports use equal angular slots when topology permits', () => {
+test('a small radial star uses equal angular slots without bending its spokes', () => {
   const m = {
     start: 'hub',
     states: [
@@ -207,6 +207,7 @@ test('incoming and outgoing ports use equal angular slots when topology permits'
       { from: 'hub', to: 'n2', label: 'c' },
     ],
   };
+  regularizeAngles(m);
   const routes = routeEdges(m),
     angles = routes
       .map((r, i) => {
@@ -224,6 +225,11 @@ test('incoming and outgoing ports use equal angular slots when topology permits'
       ) < 1e-6,
     );
   assert.equal(crossingPairs(m, true).length, 0);
+  for (const { p0, p3, c1, c2 } of routes)
+    for (const control of [c1, c2])
+      assert.ok(
+        Math.abs((p3.x - p0.x) * (control.y - p0.y) - (p3.y - p0.y) * (control.x - p0.x)) < 1e-6,
+      );
 });
 test('reciprocal curves stay on opposite physical sides even with an obstacle', () => {
   const m = {

@@ -156,7 +156,6 @@ function place(machine, focus, options) {
       };
       const projected = graphView(positioned, focus);
       projected.comments = [];
-      projected.routingPreview = true;
       const clearance = drawingClearance(projected.states, projected.edges);
       const left = Math.min(...projected.states.filter((s) => !s.outside).map((s) => s.x));
       for (const outside of projected.states.filter((s) => s.outside))
@@ -655,7 +654,25 @@ export function smartArrange(machine, focus = null, options = {}) {
     const original = graphView(machine, id),
       next = structuredClone(original);
     next.comments = [];
-    if (options.mode !== 'tree') regularizeAngles(next, { forward: !!id });
+    if (id) {
+      const left = Math.min(
+        ...next.states.filter((state) => !state.outside).map((state) => state.x),
+      );
+      const outside = next.states.filter((state) => state.outside && state.x >= left);
+      for (const state of outside) {
+        const oldX = state.x;
+        const baseline = crossingPairs(next, true, simpleTransitionLabel).length;
+        state.x = left - 175;
+        const clearance = drawingClearance(next.states, next.edges);
+        if (
+          clearance.node < 160 ||
+          clearance.wire < 65 ||
+          crossingPairs(next, true, simpleTransitionLabel).length > baseline
+        )
+          state.x = oldX;
+      }
+    }
+    if (options.mode !== 'tree') regularizeAngles(next);
     const baseline = crossingPairs(
       { ...original, comments: [] },
       true,

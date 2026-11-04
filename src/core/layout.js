@@ -11,7 +11,6 @@ import {
 } from './comments.js';
 import { destination, statePortalBox, enablePortal, portalBoxAtTip } from './portals.js';
 import { loopSlots } from './angular-space.js';
-import { spaceEdgePorts } from './edge-ports.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -696,13 +695,7 @@ const routeCache = new Map();
 export function routeEdges(machine, labelFor = transitionLabel) {
   machine = visualMachine(machine);
   const labels = machine.edges.map(labelFor);
-  const key = JSON.stringify([
-    machine.states,
-    machine.edges,
-    machine.comments,
-    labels,
-    machine.routingPreview,
-  ]);
+  const key = JSON.stringify([machine.states, machine.edges, machine.comments, labels]);
   if (routeCache.has(key)) return routeCache.get(key);
   const routes = computeRoutes(machine, labels);
   routeCache.set(key, routes);
@@ -1136,7 +1129,6 @@ function computeRoutes(machine, labels) {
     };
     routes[i] = route;
   }
-  if (!machine.routingPreview) spaceEdgePorts(machine, routes);
   const paths = routes.map((route) => {
     const points = Array.from(
         {
