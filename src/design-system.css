@@ -722,6 +722,20 @@ details > summary::before {
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
   flex: none;
+  transition: transform 140ms ease;
+}
+.simple-memory > summary {
+  flex-direction: row;
+  justify-content: space-between;
+}
+.react-dialog:not(.tool-panel) {
+  transform: none;
+  translate: -50% -50%;
+  transform-origin: center;
+}
+.debugger-window {
+  transform: none;
+  translate: -50% 0;
 }
 details[open] > summary::before {
   transform: rotate(45deg);

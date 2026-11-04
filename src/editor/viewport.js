@@ -18,7 +18,15 @@ export function createViewport(context) {
       document.querySelector('.tester'),
       document.querySelector('.debugger-window'),
     ]
-      .filter((el) => el && el !== exclude && !el.hidden && getComputedStyle(el).display !== 'none')
+      .filter(
+        (el) =>
+          el &&
+          el !== exclude &&
+          !el.hidden &&
+          el.getAttribute('aria-hidden') !== 'true' &&
+          el.dataset.state !== 'closed' &&
+          getComputedStyle(el).display !== 'none',
+      )
       .map((el) => el.getBoundingClientRect());
   }
   function showProperties(show, event) {
@@ -127,24 +135,56 @@ export function createViewport(context) {
     const start = view(),
       surface = context.overviewView ? context.overviewCanvas : context.elements.canvas,
       visible = visibleViewport(start, surface),
-      offset = context.overviewView ? context.groupWindowOffset : { x: 0, y: 0 },
-      target = {
-        ...start,
-        x: state.x + offset.x - visible.width / 2 - (visible.x - start.x),
-        y: state.y + offset.y - visible.height / 2 - (visible.y - start.y),
-      };
-    const scale = Math.min(surface.clientWidth / start.width, surface.clientHeight / start.height);
+      offset = context.overviewView ? context.groupWindowOffset : { x: 0, y: 0 };
+    const area = surface.getBoundingClientRect(),
+      transform = canvasTransform(start, area.width, area.height),
+      scale = transform.scale,
+      obstacles = floatingObstacles(context.groupPanel),
+      screen = {
+        x: area.left + transform.x + (state.x + offset.x) * scale,
+        y: area.top + transform.y + (state.y + offset.y) * scale,
+      },
+      size = { width: 110 * scale, height: 144 * scale },
+      covered = obstacles.some(
+        (box) =>
+          screen.x + size.width / 2 + 12 > box.left &&
+          screen.x - size.width / 2 - 12 < box.right &&
+          screen.y + size.height / 2 + 12 > box.top &&
+          screen.y - size.height / 2 - 12 < box.bottom,
+      );
     // Keep nearby steps still; pan only when the active node leaves the comfortable viewing area.
     const x = state.x + offset.x,
       y = state.y + offset.y,
       margin = Math.min(130 / scale, visible.width / 4, visible.height / 4);
     if (
+      !covered &&
       x >= visible.x + margin &&
       x <= visible.x + visible.width - margin &&
       y >= visible.y + margin &&
       y <= visible.y + visible.height - margin
     )
       return;
+    const available = {
+      left: area.left + transform.x + visible.x * scale,
+      top: area.top + transform.y + visible.y * scale,
+      right: area.left + transform.x + (visible.x + visible.width) * scale,
+      bottom: area.top + transform.y + (visible.y + visible.height) * scale,
+    };
+    const placed = placeFloatingRect(
+      {
+        x: (available.left + available.right - size.width) / 2,
+        y: (available.top + available.bottom - size.height) / 2,
+      },
+      size,
+      available,
+      obstacles,
+      12,
+    );
+    const target = {
+      ...start,
+      x: start.x + (screen.x - placed.x - size.width / 2) / scale,
+      y: start.y + (screen.y - placed.y - size.height / 2) / scale,
+    };
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setView(target);
       return;

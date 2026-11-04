@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Trash2, X, ArrowRight, ExternalLink } from 'lucide-react';
-import { SegmentedControl, Badge } from '@radix-ui/themes';
+import { Badge } from '@radix-ui/themes';
 import { useStudio, machineType } from '../state/studio.js';
 import {
   destination,
@@ -204,9 +204,7 @@ function StateProperties({ state, machine, controller, simple }) {
               }
             />
           </>
-        ) : (
-          <p className="prop-note">Enable token output when this state completes a match.</p>
-        )}
+        ) : null}
       </Section>
       {!simple && (
         <Section title={`Connections · ${outgoing.length}`}>
@@ -282,20 +280,16 @@ export function destinationName(machine, edge) {
   }
 }
 function EdgeProperties({ edge, index, machine, controller, simple }) {
-  const [mode, setMode] = useState(() =>
-    simple && simpleCharacterClass(edge?.label ?? '', edge?.invert) ? 'set' : 'regex',
-  );
   if (!edge) return null;
   const edit = (change) => controller.update((next) => change(next.edges[index], next));
   const characters = simpleCharacterClass(edge.label, edge.invert);
   const issue = transitionError(machine, edge) || singleCharacterError(edge.label, edge.invert);
-  const sourceName = machine.states.find((s) => s.id === edge.from)?.name ?? '?';
-  const options = machine.states.map((s) => (
-    <option key={s.id} value={s.id}>
-      {s.name}
+  const options = machine.states.map((state) => (
+    <option key={state.id} value={state.id}>
+      {state.name}
     </option>
   ));
-  const setCharacters = (body, inverted = !!edge.invert) =>
+  const setCharacters = (body, inverted = characters?.inverted ?? !!edge.invert) =>
     edit((e) => {
       if (!body) throw Error('Enter a character or range.');
       if (body.startsWith('^')) throw Error('Use the invert switch instead of a leading ^.');
@@ -303,23 +297,33 @@ function EdgeProperties({ edge, index, machine, controller, simple }) {
       e.invert = inverted;
       matcher(e.label, e.invert);
     });
+  const renameLinkedPortal = (name) =>
+    edit((e, next) => {
+      name = name.trim();
+      if (!name) throw Error('Portal name cannot be empty.');
+      const target = destination(next, e);
+      if (next.states.some((state) => state !== target && state.portal === name))
+        throw Error('That portal name is already in use.');
+      renamePortal(next, target, name);
+    });
+  const warning = issue && (
+    <p className="transition-rule-error" role="alert">
+      {issue}
+    </p>
+  );
   if (simple)
     return (
       <>
-        <div className="property-route">
-          <span>{sourceName}</span>
-          <ArrowRight className="tool-icon" />
-          <span>{destinationName(machine, edge)}</span>
-        </div>
         {characters ? (
           <>
             <Field
               id="simple-characters"
-              label="Characters and ranges"
+              label="Characters"
+              aria-label="Characters and ranges"
               value={characters.characters}
               spellCheck={false}
               placeholder="a-zA-Z0-9_"
-              onCommit={(body) => setCharacters(body, characters.inverted)}
+              onCommit={(body) => setCharacters(body)}
             />
             <Check
               id="invert-match"
@@ -329,33 +333,25 @@ function EdgeProperties({ edge, index, machine, controller, simple }) {
             />
           </>
         ) : (
-          <div className="advanced-expression">
-            <strong>Advanced expression</strong>
-            <p className="prop-note">This expression cannot be represented as a character set.</p>
-            <Button
-              onClick={() =>
-                useStudio.setState((s) => ({ settings: { ...s.settings, simplified: false } }))
-              }
-            >
-              Edit in normal view
-            </Button>
-          </div>
+          <Button
+            onClick={() =>
+              useStudio.setState((state) => ({
+                settings: { ...state.settings, simplified: false },
+              }))
+            }
+          >
+            Edit expression in normal view
+          </Button>
         )}
         {edge.portal != null && (
           <Field
             id="portal-rename"
             label="Portal name"
             value={edge.portal}
-            onCommit={(name) =>
-              edit((e, next) => renamePortal(next, destination(next, e), name.trim()))
-            }
+            onCommit={renameLinkedPortal}
           />
         )}
-        {issue && (
-          <p className="transition-rule-error" role="alert">
-            {issue}
-          </p>
-        )}
+        {warning}
         {machineType(machine) === 'extended' && (
           <MemoryRules edge={edge} index={index} edit={edit} machine={machine} simple />
         )}
@@ -363,179 +359,109 @@ function EdgeProperties({ edge, index, machine, controller, simple }) {
     );
   return (
     <>
-      <div className="property-route">
-        <span>{sourceName}</span>
-        <ArrowRight className="tool-icon" />
-        <span>{destinationName(machine, edge)}</span>
-      </div>
-      <Section title="Match one character">
-        <SegmentedControl.Root
-          size="1"
-          value={mode}
-          onValueChange={(value) => {
-            if (value === 'set' && !characters) {
-              useStudio
-                .getState()
-                .notify('This expression uses advanced regex syntax. Edit it in Regex mode.');
-              return;
+      {warning}
+      <Select
+        id="from"
+        label="From"
+        value={edge.from}
+        onChange={(from) =>
+          edit((e) => {
+            e.from = from;
+          })
+        }
+      >
+        {options}
+      </Select>
+      <Check
+        id="via-portal"
+        label="Connect via portal"
+        checked={edge.portal != null}
+        onChange={(enabled) =>
+          edit((e, next) => {
+            if (enabled) enablePortal(next, e);
+            else {
+              e.to = destination(next, e).id;
+              delete e.portal;
             }
-            setMode(value);
-          }}
-        >
-          <SegmentedControl.Item value="set">Character set</SegmentedControl.Item>
-          <SegmentedControl.Item value="regex">Regex</SegmentedControl.Item>
-        </SegmentedControl.Root>
-        {mode === 'set' ? (
-          <Field
-            id="simple-characters"
-            label="Characters and ranges"
-            aria-label="Characters and ranges"
-            value={characters?.characters ?? ''}
-            spellCheck={false}
-            placeholder="a-zA-Z0-9_"
-            onCommit={(body) => setCharacters(body)}
-          />
-        ) : (
-          <Field
-            id="edge-label"
-            label="Character expression"
-            value={edge.label}
-            spellCheck={false}
-            placeholder="[a-z] or \\s"
-            onCommit={(label) =>
-              edit((e) => {
-                if (label) matcher(label, e.invert);
-                e.label = label;
-              })
-            }
-          />
-        )}
-        <Check
-          id="invert-match"
-          label="Match everything except this rule"
-          checked={mode === 'set' ? (characters?.inverted ?? edge.invert) : edge.invert}
-          onChange={(value) =>
-            mode === 'set' && characters
-              ? setCharacters(characters.characters, value)
-              : edit((e) => {
-                  e.invert = value;
-                })
-          }
-        />
-        {issue ? (
-          <p className="transition-rule-error" role="alert">
-            {issue}
-          </p>
-        ) : (
-          <p className="prop-note">One character is consumed per transition.</p>
-        )}
-        <div className="rule-presets">
-          {[
-            ['Letters', '[a-zA-Z_]'],
-            ['Digits', '[0-9]'],
-            ['Space', '\\s'],
-          ].map(([title, label]) => (
-            <Button
-              key={title}
-              onClick={() => {
-                edit((e) => {
-                  e.label = label;
-                  e.invert = false;
-                });
-                if (label === '\\s') setMode('regex');
-              }}
-            >
-              {title}
-            </Button>
-          ))}
-        </div>
-      </Section>
-      <details className="property-details" open={!simple}>
-        <summary>Connection</summary>
+          })
+        }
+      />
+      {edge.portal == null ? (
         <Select
-          id="from"
-          label="From state"
-          value={edge.from}
-          onChange={(from) =>
+          id="to"
+          label="To"
+          value={edge.to}
+          onChange={(to) =>
             edit((e) => {
-              e.from = from;
+              e.to = to;
             })
           }
         >
           {options}
         </Select>
-        <Check
-          id="via-portal"
-          label="Connect through a portal"
-          checked={edge.portal != null}
-          onChange={(enabled) =>
-            edit((e, next) => {
-              if (enabled) enablePortal(next, e);
-              else {
-                e.to = destination(next, e).id;
-                delete e.portal;
-              }
-            })
-          }
-        />
-        {edge.portal == null ? (
-          <Select
-            id="to"
-            label="To state"
-            value={edge.to}
-            onChange={(to) =>
+      ) : (
+        <>
+          <Field
+            id="portal-target"
+            label="Destination portal"
+            value={edge.portal}
+            onCommit={(name) =>
               edit((e) => {
-                e.to = to;
+                e.portal = name.trim();
               })
             }
+          />
+          <Field
+            id="portal-rename"
+            label="Rename linked portal"
+            value={edge.portal}
+            onCommit={renameLinkedPortal}
+          />
+          <Button
+            id="goto-portal"
+            onClick={() => {
+              try {
+                controller.select('state', destination(machine, edge).id);
+              } catch (error) {
+                useStudio.getState().notify(error.message);
+              }
+            }}
           >
-            {options}
-          </Select>
-        ) : (
-          <>
-            <Field
-              id="portal-target"
-              label="Destination portal"
-              value={edge.portal}
-              onCommit={(name) =>
-                edit((e) => {
-                  e.portal = name.trim();
-                })
-              }
-            />
-            <Button
-              onClick={() => {
-                try {
-                  controller.select('state', destination(machine, edge).id);
-                } catch (error) {
-                  useStudio.getState().notify(error.message);
-                }
-              }}
-            >
-              <ExternalLink className="tool-icon" />
-              View destination
-            </Button>
-            <Field
-              id="portal-rename"
-              label="Rename linked portal"
-              value={edge.portal}
-              onCommit={(name) =>
-                edit((e, next) => {
-                  name = name.trim();
-                  if (!name) throw Error('Portal name cannot be empty.');
-                  const target = destination(next, e);
-                  if (next.states.some((s) => s !== target && s.portal === name))
-                    throw Error('That portal name is already in use.');
-                  renamePortal(next, target, name);
-                })
-              }
-            />
-          </>
-        )}
-      </details>
+            <ExternalLink className="tool-icon" />
+            Go to destination
+          </Button>
+        </>
+      )}
+      <Field
+        id="edge-label"
+        label="Match expression"
+        value={edge.label}
+        spellCheck={false}
+        onCommit={(label) =>
+          edit((e) => {
+            if (label) matcher(label, e.invert);
+            e.label = label;
+          })
+        }
+      />
+      <Check
+        id="invert-match"
+        label="Invert match"
+        checked={edge.invert}
+        onChange={(value) =>
+          edit((e) => {
+            e.invert = value;
+          })
+        }
+      />
       {machineType(machine) === 'extended' && (
         <MemoryRules edge={edge} index={index} edit={edit} machine={machine} />
       )}
+      <p className="prop-note">
+        One character per transition. Examples: [a-z], [0-9], \s, \+
+        <br />
+        Overlapping transitions are reported when testing.
+      </p>
     </>
   );
 }
