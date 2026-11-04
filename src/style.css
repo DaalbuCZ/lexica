@@ -2023,7 +2023,8 @@
     border-radius: 8px;
   }
   .dock-preview[data-outside] {
-    opacity: 0.45;
+    background: transparent;
+    border-style: dashed;
   }
   .dock-preview[data-panel='tester'] {
     width: auto;
