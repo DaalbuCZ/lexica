@@ -1,37 +1,41 @@
 import { createPortal } from 'react-dom';
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect } from 'react';
 import { Theme } from '@radix-ui/themes';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  GripVertical,
+  X,
+} from 'lucide-react';
 import { IconButton } from './ui.jsx';
+import { useDockGrip } from '../hooks/useDocking.js';
 
 export function DebuggerWindow({ open, frame, canPrevious, canNext, onMove, onStop }) {
-  const ref = useRef(null);
+  const grip = useDockGrip('debugger');
   useLayoutEffect(() => {
     document.body.dataset.debugging = 'true';
-    const place = () =>
-      document.body.style.setProperty(
-        '--debugger-bottom',
-        ref.current.offsetTop + ref.current.offsetHeight + 12 + 'px',
-      );
-    place();
-    const observer = new ResizeObserver(place);
-    observer.observe(ref.current);
     return () => {
-      observer.disconnect();
       delete document.body.dataset.debugging;
-      document.body.style.removeProperty('--debugger-bottom');
     };
   }, []);
   return createPortal(
     <Theme asChild>
       <section
-        ref={ref}
         data-state={open ? 'open' : 'closed'}
         className="debugger-window animated-window"
         role="dialog"
         aria-label="Lexer debugger"
       >
         <div className="window-heading">
+          <IconButton
+            id="debugger-grip"
+            className="dock-grip"
+            icon={GripVertical}
+            label="Move debugger (drag or use arrow keys)"
+            {...grip}
+          />
           <h2>Lexer debugger</h2>
           <IconButton icon={X} label="Stop debugging" onClick={onStop} />
         </div>

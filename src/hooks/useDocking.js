@@ -12,9 +12,9 @@ export function useDockGrip(name) {
   const drag = useRef(null);
   useEffect(() => {
     const settings = dockSettings(readStorage('lexica-docks', {}));
-    for (const key of ['toolbar', 'tester']) document.body.dataset[key + 'Dock'] = settings[key];
+    document.body.dataset[name + 'Dock'] = settings[name];
     return () => document.body.classList.remove('docking');
-  }, []);
+  }, [name]);
   const finish = (event, cancel = false) => {
     const target = drag.current;
     if (!target) return;

@@ -1373,10 +1373,12 @@ test('docking chooses the nearest edge and validates saved panel positions', asy
     dockSettings({
       toolbar: 'right',
       tester: 'left',
+      debugger: 'bottom',
     }),
     {
       toolbar: 'right',
       tester: 'left',
+      debugger: 'bottom',
     },
   );
   assert.deepEqual(
@@ -1387,11 +1389,13 @@ test('docking chooses the nearest edge and validates saved panel positions', asy
     {
       toolbar: 'top',
       tester: 'bottom',
+      debugger: 'top',
     },
   );
   assert.deepEqual(dockSettings(null), {
     toolbar: 'top',
     tester: 'bottom',
+    debugger: 'top',
   });
 });
 test('self loops choose an unobstructed side and can use diagonal angle bisectors', () => {

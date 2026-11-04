@@ -1,4 +1,5 @@
 import { useLayoutEffect } from 'react';
+import { placeDockedPanel } from '../core/docking.js';
 
 /** Keep the fixed editor controls in the space left by the docked tester. */
 export function useChromeLayout() {
@@ -9,6 +10,7 @@ export function useChromeLayout() {
       crumbs = document.querySelector('.group-navigation'),
       map = document.querySelector('.minimap'),
       mapCanvas = document.querySelector('#minimap');
+    let debuggerPanel;
     let frame,
       collapsed = document.body.classList.contains('tester-collapsed');
     const set = (element, values) => {
@@ -99,24 +101,36 @@ export function useChromeLayout() {
       const mapTop = mapBottom - map.offsetHeight;
       if (dock === 'left')
         set(toolbar, { maxHeight: Math.max(row, mapTop - gap - toolbarTop) + 'px' });
-      const debugLeft = innerWidth / 2 - 200,
-        debugRight = innerWidth / 2 + 200;
-      const debugTop = Math.max(
-        top,
-        ...[brand, toolbar, crumbs].map((el) => {
-          const r = el.getBoundingClientRect();
-          return r.left < debugRight && r.right > debugLeft && r.top < top + row + gap
-            ? r.bottom + gap
-            : top;
-        }),
-      );
-      document.body.style.setProperty('--debugger-top', debugTop + 'px');
+      const panel = document.querySelector('.debugger-window');
+      if (panel !== debuggerPanel) {
+        if (debuggerPanel) resize.unobserve(debuggerPanel);
+        if (panel) resize.observe(panel);
+        debuggerPanel = panel;
+      }
+      if (panel) {
+        const area = { left: left - gap, right: right + gap, top: top - gap, bottom: bottom + gap };
+        set(panel, {
+          maxWidth: Math.max(1, right - left) + 'px',
+          maxHeight: Math.max(1, bottom - top) + 'px',
+        });
+        const obstacles = [brand, toolbar, crumbs, map, tester]
+          .map((element) => element.getBoundingClientRect())
+          .filter((rect) => rect.width > 0 && rect.height > 0);
+        const position = placeDockedPanel(
+          document.body.dataset.debuggerDock || 'top',
+          { width: panel.offsetWidth, height: panel.offsetHeight },
+          area,
+          obstacles,
+          gap,
+        );
+        set(panel, { left: position.x + 'px', top: position.y + 'px', translate: 'none' });
+      }
     };
     const schedule = () => {
       if (frame == null) frame = requestAnimationFrame(place);
     };
     const resize = new ResizeObserver(schedule);
-    for (const el of [brand, toolbar, tester, crumbs]) resize.observe(el);
+    for (const el of [brand, toolbar, tester, crumbs, map]) resize.observe(el);
     const mutation = new MutationObserver((records) => {
       const next = document.body.classList.contains('tester-collapsed');
       if (next !== collapsed || records.some((r) => r.attributeName !== 'class')) {
@@ -126,7 +140,13 @@ export function useChromeLayout() {
     });
     mutation.observe(document.body, {
       attributes: true,
-      attributeFilter: ['class', 'data-toolbar-dock', 'data-tester-dock'],
+      attributeFilter: [
+        'class',
+        'data-toolbar-dock',
+        'data-tester-dock',
+        'data-debugger-dock',
+        'data-debugging',
+      ],
     });
     window.addEventListener('resize', schedule);
     place();
