@@ -4453,3 +4453,4 @@ test('basic arrangement is deterministic, separates states, and preserves the le
   validate(m);
   assert.deepEqual(tokenize(m, 'hello 42'), before);
 });
+import './tests/curve-clearance.test.mjs';
