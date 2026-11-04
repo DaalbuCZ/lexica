@@ -4019,6 +4019,26 @@ test('Radial retains centered breadth-first rings even when planar embedding fin
   assert.ok(Math.min(...xs) < root.x && Math.max(...xs) > root.x);
   assert.ok(Math.min(...ys) < root.y && Math.max(...ys) > root.y);
 });
+test('Radial Compact gives the same drawing after moving nodes and bending edges', () => {
+  const first = example();
+  const group = createGroup(first, ['s1', 's2'], 'Tokens');
+  const moved = structuredClone(first);
+  moved.states.forEach((state, index) => {
+    state.x = 800 * index;
+    state.y = -300 * index;
+  });
+  moved.edges[0].bend = { x: 140, y: 200 };
+  moved.groups[0].x = 900;
+  moved.groups[0].contextPositions = { s0: { x: -500, y: -600 } };
+  const options = { mode: 'circle', spacing: 0.5, smartGroups: false };
+  smartArrange(first, group.id, options);
+  smartArrange(moved, group.id, options);
+  assert.deepEqual(graphView(first, group.id), graphView(moved, group.id));
+  smartArrange(first, null, options);
+  smartArrange(moved, null, options);
+  assert.deepEqual(graphView(first), graphView(moved));
+  assert.deepEqual(graphView(first, group.id), graphView(moved, group.id));
+});
 test('Tree remains a compact forward tree despite long labels and planar coordinate alternatives', () => {
   const m = {
     start: 'root',

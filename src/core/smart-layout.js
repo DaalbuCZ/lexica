@@ -11,6 +11,7 @@ import { linearLayout } from './linear-layout.js';
 import dagre from '@dagrejs/dagre';
 import { layeredLayout } from './layered-layout.js';
 import { regularizeAngles } from './angular-layout.js';
+import { applyLayout, layoutTopology } from './layout-topology.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -605,6 +606,7 @@ function arrangeTopology(machine, focus = null, options = {}) {
   )
     return 0;
   let count = 0;
+  let nextGroupId = 0;
   for (const ids of groupingCandidates(machine)) {
     const trial = structuredClone(machine),
       entry = machine.edges.find((e) => !ids.includes(e.from) && ids.includes(e.to));
@@ -616,7 +618,7 @@ function arrangeTopology(machine, focus = null, options = {}) {
       suffix = 2,
       base = name;
     while ((trial.groups ?? []).some((g) => g.name === name)) name = base + ' ' + suffix++;
-    const group = createGroup(trial, ids, name);
+    const group = createGroup(trial, ids, name, () => `auto-group-${++nextGroupId}`);
     group.automatic = true;
     place(trial, group.id, options);
     place(trial, null, options);
@@ -628,28 +630,113 @@ function arrangeTopology(machine, focus = null, options = {}) {
   }
   return count;
 }
-export function smartArrange(machine, focus = null, options = {}) {
-  const source = structuredClone(machine);
-  const count = arrangeTopology(machine, focus, options);
-  if (
-    !focus &&
-    !machine.groups?.length &&
-    crossingPairs(machine, true, simpleTransitionLabel).length &&
-    !crossingPairs(source, true, simpleTransitionLabel).length
-  ) {
-    const points = new Map(source.states.map((s) => [s.id, s]));
-    for (const state of machine.states) {
-      const old = points.get(state.id);
-      state.x = old.x;
-      state.y = old.y;
+function repairRadialCrossings(machine) {
+  let crossings = crossingPairs(machine, true, simpleTransitionLabel);
+  if (!crossings.length) return;
+  const nodes = new Map(machine.states.map((state) => [state.id, state]));
+  for (let pass = 0; crossings.length && pass < 6; pass++) {
+    const affected = new Set(
+      crossings.flatMap((pair) =>
+        pair.flatMap((index) => [machine.edges[index].from, machine.edges[index].to]),
+      ),
+    );
+    affected.delete(machine.start);
+    let improved = false;
+    for (const id of affected) {
+      const state = nodes.get(id);
+      const original = { x: state.x, y: state.y };
+      for (const distance of [80, 160, 280, 420, 600]) {
+        for (let i = 0; i < 12; i++) {
+          const angle = (i * Math.PI) / 6;
+          state.x = original.x + Math.cos(angle) * distance;
+          state.y = original.y + Math.sin(angle) * distance;
+          if (
+            machine.states.some(
+              (other) => other !== state && Math.hypot(state.x - other.x, state.y - other.y) < 145,
+            )
+          )
+            continue;
+          const next = crossingPairs(machine, true, simpleTransitionLabel);
+          if (next.length >= crossings.length) continue;
+          crossings = next;
+          improved = true;
+          break;
+        }
+        if (improved) break;
+      }
+      if (improved) break;
+      Object.assign(state, original);
     }
-    machine.edges.forEach((edge, index) => {
-      if (source.edges[index].bend) edge.bend = structuredClone(source.edges[index].bend);
-      else delete edge.bend;
-    });
-    if (source.startViews) machine.startViews = structuredClone(source.startViews);
-    else delete machine.startViews;
+    if (!improved) break;
   }
+}
+
+function shortenLocalBranches(view) {
+  const nodes = new Map(view.states.map((state) => [state.id, state]));
+  for (const state of view.states) {
+    if (state.outside || state.group || state.id === view.start) continue;
+    const neighbors = [
+      ...new Set(
+        view.edges.flatMap((edge) => {
+          if (edge.portal != null || edge.from === edge.to) return [];
+          return edge.from === state.id ? [edge.to] : edge.to === state.id ? [edge.from] : [];
+        }),
+      ),
+    ]
+      .map((id) => nodes.get(id))
+      .filter(Boolean);
+    const local = neighbors.filter((node) => !node.outside && node.id !== view.start);
+    if (!local.length || neighbors.length > 3) continue;
+    const length = () =>
+      neighbors.reduce((sum, node) => sum + Math.hypot(node.x - state.x, node.y - state.y), 0);
+    if (Math.max(...local.map((node) => Math.hypot(node.x - state.x, node.y - state.y))) < 350)
+      continue;
+    const origin = { x: state.x, y: state.y };
+    const center = {
+      x: local.reduce((sum, node) => sum + node.x, 0) / local.length,
+      y: local.reduce((sum, node) => sum + node.y, 0) / local.length,
+    };
+    const baseline = drawingClearance(view.states, view.edges);
+    const crossings = crossingPairs(view, true, simpleTransitionLabel).length;
+    let best = { ...origin, length: length() };
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      state.x = origin.x + (center.x - origin.x) * fraction;
+      state.y = origin.y + (center.y - origin.y) * fraction;
+      const candidateLength = length();
+      if (candidateLength > best.length - 15) continue;
+      const clearance = drawingClearance(view.states, view.edges);
+      if (
+        clearance.node < Math.min(160, baseline.node) ||
+        clearance.wire < Math.min(65, baseline.wire) ||
+        clearance.crossings > baseline.crossings ||
+        crossingPairs(view, true, simpleTransitionLabel).length > crossings
+      )
+        continue;
+      best = { x: state.x, y: state.y, length: candidateLength };
+    }
+    state.x = best.x;
+    state.y = best.y;
+  }
+}
+export function smartArrange(machine, focus = null, options = {}) {
+  if (options.disregardGroups) focus = null;
+  const result = solveLayout(layoutTopology(machine, options.disregardGroups), focus, options);
+  applyLayout(machine, result.machine, focus);
+  return result.groups;
+}
+
+export function solveLayout(topology, focus = null, options = {}) {
+  const atOrigin = (item) => ({ ...item, x: 0, y: 0 });
+  const machine = {
+    ...topology,
+    states: topology.states.map(atOrigin),
+    groups: topology.groups.map(atOrigin),
+    comments: topology.comments.map(atOrigin),
+    edges: topology.edges.map((edge) => ({ ...edge })),
+  };
+  const count = arrangeTopology(machine, focus, options);
+  if (!focus && !machine.groups?.length && options.mode !== 'tree' && !machine.startViews?.length)
+    repairRadialCrossings(machine);
   const improve = (id) => {
     const original = graphView(machine, id),
       next = structuredClone(original);
@@ -673,6 +760,59 @@ export function smartArrange(machine, focus = null, options = {}) {
       }
     }
     if (options.mode !== 'tree') regularizeAngles(next);
+    if (options.mode !== 'tree' && next.states.length > 5) {
+      shortenLocalBranches(next);
+    }
+    if (id && options.mode !== 'tree' && next.states.length > 4) {
+      const clearance = drawingClearance(next.states, next.edges);
+      const crossings = crossingPairs(next, true, simpleTransitionLabel).length;
+      for (const axis of ['x', 'y']) {
+        const values = next.states.map((state) => state[axis]);
+        const span = Math.max(...values) - Math.min(...values);
+        if (span < 800) continue;
+        const sorted = [...new Set(values)].sort((a, b) => a - b);
+        const gaps = sorted
+          .slice(1)
+          .map((end, i) => ({ end, width: end - sorted[i] }))
+          .sort((a, b) => b.width - a.width);
+        for (const { end, width } of gaps.slice(0, 3)) {
+          if (width < 260) continue;
+          const shift = Math.min(width / 2, width - 180);
+          next.states.forEach((state, i) => {
+            state[axis] = values[i] - (values[i] >= end ? shift : 0);
+          });
+          const compact = drawingClearance(next.states, next.edges);
+          if (
+            compact.node >= Math.min(160, clearance.node) &&
+            compact.wire >= Math.min(65, clearance.wire) &&
+            compact.crossings <= clearance.crossings &&
+            crossingPairs(next, true, simpleTransitionLabel).length <= crossings
+          )
+            break;
+          next.states.forEach((state, i) => {
+            state[axis] = values[i];
+          });
+        }
+        if (next.states.some((state, i) => state[axis] !== values[i])) continue;
+        const anchor = Math.min(...values);
+        for (const factor of [0.65, 0.8, 0.9]) {
+          next.states.forEach((state, i) => {
+            state[axis] = anchor + (values[i] - anchor) * factor;
+          });
+          const compact = drawingClearance(next.states, next.edges);
+          if (
+            compact.node >= Math.min(160, clearance.node) &&
+            compact.wire >= Math.min(65, clearance.wire) &&
+            compact.crossings <= clearance.crossings &&
+            crossingPairs(next, true, simpleTransitionLabel).length <= crossings
+          )
+            break;
+          next.states.forEach((state, i) => {
+            state[axis] = values[i];
+          });
+        }
+      }
+    }
     const baseline = crossingPairs(
       { ...original, comments: [] },
       true,
@@ -720,5 +860,5 @@ export function smartArrange(machine, focus = null, options = {}) {
     );
     placeCommentsAfterLayout(shown);
   }
-  return count;
+  return { machine, groups: count };
 }

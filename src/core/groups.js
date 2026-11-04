@@ -4,13 +4,14 @@ import { boundaryContext } from './boundary-layout.js';
 export function groupFor(machine, stateId) {
   return (machine.groups ?? []).find((group) => group.stateIds.includes(stateId));
 }
-export function createGroup(machine, ids, name) {
+export function createGroup(machine, ids, name, makeId = () => crypto.randomUUID()) {
   const members = [...new Set(ids)].filter((id) => machine.states.some((state) => state.id === id));
   if (!members.length) throw Error('Select at least one state to make a group.');
   if (members.some((id) => groupFor(machine, id))) throw Error('A state can belong to one group.');
   const used = new Set((machine.groups ?? []).map((group) => group.id));
-  let id = crypto.randomUUID();
-  while (used.has(id)) id = crypto.randomUUID();
+  for (const state of machine.states) used.add(state.id);
+  let id = makeId();
+  while (used.has(id)) id = makeId();
   const group = {
     id,
     name: name.trim() || 'New group',

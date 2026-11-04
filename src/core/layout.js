@@ -587,6 +587,19 @@ export function crossingPairs(machine, routed = false, labelFor = transitionLabe
           ]),
         )
       : null;
+  const boxes =
+    routes &&
+    routes.map((route) => {
+      const points = [route.p0, route.c1, route.c2, route.p3];
+      const xs = points.map((point) => point.x),
+        ys = points.map((point) => point.y);
+      return {
+        left: Math.min(...xs),
+        right: Math.max(...xs),
+        top: Math.min(...ys),
+        bottom: Math.max(...ys),
+      };
+    });
   for (let i = 0; i < segments.length; i++)
     for (let j = i + 1; j < segments.length; j++) {
       const a = segments[i],
@@ -594,6 +607,15 @@ export function crossingPairs(machine, routed = false, labelFor = transitionLabe
       if (a.a === b.a || a.a === b.b || a.b === b.a || a.b === b.b) continue;
       let crossing = false;
       if (paths) {
+        const first = boxes[a.i],
+          second = boxes[b.i];
+        if (
+          first.right < second.left ||
+          second.right < first.left ||
+          first.bottom < second.top ||
+          second.bottom < first.top
+        )
+          continue;
         const p = paths.get(a.i),
           q = paths.get(b.i);
         for (let u = 1; u < p.length && !crossing; u++)
@@ -861,7 +883,7 @@ function computeRoutes(machine, labels) {
       e,
       i,
     }))
-    .sort((a, b) => (a.e.from !== a.e.to) - (b.e.from !== b.e.to));
+    .sort((a, b) => (a.e.from === a.e.to) - (b.e.from === b.e.to));
   for (const { e, i } of ordered) {
     const a = machine.states.find((s) => s.id === e.from),
       b = machine.states.find((s) => s.id === e.to);
@@ -931,6 +953,13 @@ function computeRoutes(machine, labels) {
       bestScore = Infinity;
     const loop = a === b,
       angles = loop ? loopAngles(machine, a, i) : null;
+    const nearbyRoutes = loop
+      ? machine.edges.flatMap((edge, index) => {
+          if (edge.from === edge.to || (edge.from !== a.id && edge.to !== a.id) || !routes[index])
+            return [];
+          return [Array.from({ length: 17 }, (_, step) => sample(routes[index], step / 16))];
+        })
+      : [];
     for (let attempt = 0; attempt < (loop ? 64 : 61); attempt++) {
       let c;
       if (a === b) {
@@ -1064,6 +1093,10 @@ function computeRoutes(machine, labels) {
         for (let t = 0.1; t < 0.95 && score < bestScore; t += 0.05) {
           const p = sample(c, t);
           if ((p.x - a.x) ** 2 + (p.y - a.y) ** 2 < 48 ** 2) continue;
+          for (const points of nearbyRoutes) {
+            if (points.some((point) => (point.x - p.x) ** 2 + (point.y - p.y) ** 2 < 20 ** 2))
+              score += 700;
+          }
           for (const { from, dx, dy, length } of nearbySegments) {
             if (!length) continue;
             const u = Math.max(

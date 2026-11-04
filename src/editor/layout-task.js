@@ -1,3 +1,5 @@
+import { applyLayout, layoutTopology } from '../core/layout-topology.js';
+
 /** Run layout outside the input/render thread and cancel it when the editor unmounts. */
 export function createLayoutTask(context) {
   let active;
@@ -11,6 +13,8 @@ export function createLayoutTask(context) {
   return (machine, focus, options) =>
     new Promise((resolve, reject) => {
       cancel();
+      const original = structuredClone(machine);
+      if (options.disregardGroups) focus = null;
       const worker = new Worker(new URL('../core/layout-worker.js', import.meta.url), {
         type: 'module',
       });
@@ -19,10 +23,21 @@ export function createLayoutTask(context) {
         worker.terminate();
         if (active?.worker === worker) active = null;
         if (data.error) reject(Error(data.error));
-        else resolve(data);
+        else {
+          try {
+            applyLayout(original, data.machine, focus);
+            resolve({ machine: original, groups: data.groups });
+          } catch (error) {
+            reject(error);
+          }
+        }
       };
       worker.onmessage = ({ data }) => finish(data);
       worker.onerror = () => finish({ error: 'Could not calculate the layout.' });
-      worker.postMessage({ machine, focus, options });
+      worker.postMessage({
+        topology: layoutTopology(original, options.disregardGroups),
+        focus,
+        options,
+      });
     });
 }
