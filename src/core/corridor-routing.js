@@ -3,6 +3,7 @@ import { SpatialIndex } from './spatial-index.js';
 import { mix, curvePoint, finishRoute, curveAvoidsBox, routeBounds } from './route-geometry.js';
 import { commentLayout } from './comments.js';
 import { renderedLabelBox, reflowRouteLabels } from './label-clearance.js';
+import { bundleLanes, transitionBundles } from './graph-bundles.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
@@ -32,15 +33,15 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
       frozen.add(i);
       continue;
     }
-    const key = JSON.stringify([e.from, e.to].sort(compare));
-    if (!bundles.has(key)) bundles.set(key, []);
-    bundles.get(key).push(i);
   }
+  for (const bundle of transitionBundles(machine, (_, i) => !frozen.has(i)))
+    bundles.set(JSON.stringify([bundle.a, bundle.b]), bundle.indices);
   if (previous)
     for (let i = 0; i < previous.length; i++)
       if (!dirty?.has(i) || frozen.has(i)) index.set(i, routeBounds(previous[i], 2));
   const ports = new Map(),
-    rings = new Map();
+    rings = new Map(),
+    lanes = new Map();
   for (const members of bundles.values()) {
     members.sort(
       (a, b) =>
@@ -48,7 +49,8 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
         compare(machine.edges[a].label, machine.edges[b].label) ||
         a - b,
     );
-    members.forEach((i, lane) => {
+    for (const [i, lane] of bundleLanes(machine, members, laneScale)) lanes.set(i, lane);
+    members.forEach((i) => {
       const e = machine.edges[i],
         a = nodes.get(e.from),
         b = nodes.get(e.to);
@@ -57,7 +59,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
         dy = b.y - a.y,
         len = Math.hypot(dx, dy) || 1,
         sign = compare(e.from, e.to) <= 0 ? 1 : -1,
-        port = Math.max(-30, Math.min(30, (lane - (members.length - 1) / 2) * 7 * laneScale)),
+        port = lanes.get(i).port,
         along = Math.sqrt(37 * 37 - port * port);
       for (const [s, forward, key] of [
         [a, 1, `${i}:a`],
@@ -68,12 +70,13 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           (dx / len) * along * forward - (dy / len) * sign * port,
         );
         if (!rings.has(s.id)) rings.set(s.id, []);
-        rings.get(s.id).push({ key, angle });
+        const base=(Math.atan2(dy*forward,dx*forward)+Math.PI*2)%(Math.PI*2);
+        rings.get(s.id).push({ key,base,angle:base+Math.atan2(Math.sin(angle-base),Math.cos(angle-base)) });
       }
     });
   }
   for (const [id, ring] of rings) {
-    ring.sort((a, b) => a.angle - b.angle || compare(a.key, b.key));
+    ring.sort((a, b) => a.base-b.base || a.angle - b.angle || compare(a.key, b.key));
     const gap = Math.min(0.16, (Math.PI * 2) / (ring.length + 1));
     for (let pass = 0; pass < 64; pass++)
       for (let i = 0; i < ring.length; i++) {
@@ -131,14 +134,14 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
         const dx = b.x - a.x,
           dy = b.y - a.y,
           len = Math.hypot(dx, dy) || 1,
-          // Canonical physical normal keeps lane assignments stable on reversal.
+          // Directed bands occupy opposite sides, clockwise in screen space.
           sign = compare(e.from, e.to) <= 0 ? 1 : -1,
-          offset = (lane - (members.length - 1) / 2) * 14 * laneScale;
+          offset = lanes.get(i).offset;
         for (const extra of laneScale === 1 ? [0, 8, 16] : [16, 8, 0]) {
           const shift = offset === 0 ? 0 : offset + Math.sign(offset) * extra;
           const nx = (-dy / len) * sign,
             ny = (dx / len) * sign,
-            port = Math.max(-30, Math.min(30, offset * 0.5)),
+            port = lanes.get(i).port,
             along = Math.sqrt(37 * 37 - port * port);
           const p0 = {
               x: a.x + (dx / len) * along + nx * port,

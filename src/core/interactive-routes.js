@@ -138,7 +138,7 @@ export function interactiveRoutes(machine, label, snapshot) {
       const dx = b.x - a.x,
         dy = b.y - a.y,
         length = Math.hypot(dx, dy) || 1,
-        bend = directions.has(edge.to + '\0' + edge.from) ? 90 : 0,
+        bend = directions.has(edge.to + '\0' + edge.from) ? -90 : 0,
         mid = {
           x: (a.x + b.x) / 2 - (dy / length) * bend,
           y: (a.y + b.y) / 2 + (dx / length) * bend,

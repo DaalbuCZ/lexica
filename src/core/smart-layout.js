@@ -1,5 +1,5 @@
 import { simpleTransitionLabel } from './editor-settings.js';
-import { autoLayout, crossingPairs } from './layout.js';
+import { autoLayout, crossingPairs, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
 import { destination } from './portals.js';
 import { commentAnchors, positionComments, placeCommentsAfterLayout } from './comments.js';
@@ -18,6 +18,8 @@ import { compactAesthetics } from './aesthetic-layout.js';
 import { circularStartRing } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
+import { cycleAnalysis } from './cycle-aesthetics.js';
+import { validateRouteSeparation } from './layout-validation.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -1031,10 +1033,26 @@ export function solveLayout(topology, focus = null, options = {}) {
   if (options.mode === 'tree' || machine.groups?.length || focus) {
     const align = (id) => {
       const view = graphView(machine, id),
-        states = alignHorizontal(view),
+        candidate = { ...view };
+      if (options.mode === 'tree' && cycleAnalysis(view).cycles.length) {
+        const states = compactAesthetics(view, {
+          fixedIds: view.states.filter((s) => s.outside || s.group).map((s) => s.id),
+        });
+        if (
+          validateRouteSeparation(routeEdges({ ...view, states }, simpleTransitionLabel), {
+            maxDepth: 24,
+            maxPairs: 512,
+          }).status === 'clear'
+        )
+          candidate.states = states;
+      }
+      const states = alignHorizontal(candidate),
         positions = new Map(states.map((s) => [s.id, s]));
       for (const state of view.states)
-        if (!state.outside && !state.group) state.y = positions.get(state.id).y;
+        if (!state.outside && !state.group) {
+          state.x = positions.get(state.id).x;
+          state.y = positions.get(state.id).y;
+        }
     };
     if (focus) align(focus);
     else {

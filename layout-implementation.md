@@ -51,6 +51,14 @@ The first-ring search now includes a constructive branch candidate: direct neigh
 
 Interactive automatic connections rotate their attachment frame with moved endpoints, and their captions search around the current curve immediately, including when live worker routing is disabled. Worker repair can freeze individual manual/portal routes rather than letting one such edge disable repair for the entire view. Unaffected route objects remain unchanged. These changes have dedicated preview and mixed-manual/automatic regression tests.
 
+## Cycle and directional refinements
+
+Analysis bundles parallel/reciprocal rules into a simple skeleton while retaining original transition indices and execution order. Simple biconnected cycles have no length cutoff; overlapping short chordless cycles use a bounded search (length eight, 64 retained cycles, 20,000 visits). Cycle costs prefer similar edge lengths and penalize dangling branches inside the polygon. Regular-polygon candidates respect label length requirements, and rigid branch rotations try the exterior. A weak directional score separates incoming and outgoing neighbor sectors, with a tolerance band for already opposed directions. Every accepted change still requires clearance and full route feasibility. Tree views additionally validate their actual rendered router before applying a cycle candidate; horizontal cleanup may not materially worsen the motif score.
+
+Reciprocal bundles allocate an independent lane band to each direction, including unequal rule counts. Attachment fans preserve each bundle's contiguous order around the node. The convention is clockwise in screen coordinates: for a horizontal pair, left-to-right lanes run above the centerline and right-to-left lanes below it. Small drawings and the legacy/interactive fallback follow the same convention. Same-direction bundles remain adjacent; FSM rule arrays are never reordered or merged semantically.
+
+The regression suite contains 155 passing domain tests, including cycle balance, a dangling state leaving a cycle, long-cycle detection, multiplicity-independent analysis, weak flow scoring, and unequal clockwise bundles. Seven targeted browser workflows pass. Both private fixture overviews and all eight group views remain clear under adaptive curve separation checks, including incident wires and loops.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

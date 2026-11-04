@@ -14,6 +14,7 @@ import { loopSlots } from './angular-space.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { drawingRouteKey, savedRoutes } from './drawing-routes.js';
 import { clearNodeLabels } from './label-clearance.js';
+import { transitionBundles } from './graph-bundles.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -725,7 +726,11 @@ export function routeEdges(machine, labelFor = transitionLabel) {
   if (saved) return clearNodeLabels(machine, saved);
   if (routeCache.has(key)) return routeCache.get(key);
   const routes =
-    (machine.states.length > 12 || machine.routingPolicy === 'corridor'
+    (machine.states.length > 12 ||
+    machine.routingPolicy === 'corridor' ||
+    transitionBundles(machine, (e) => e.portal == null && e.from !== e.to).some(
+      (b) => b.indices.length > 1,
+    )
       ? corridorRoutes(machine, labels)
       : null) ?? computeRoutes(machine, labels);
   clearNodeLabels(machine, routes);
@@ -996,7 +1001,7 @@ function computeRoutes(machine, labels) {
         // Reversing the endpoints reverses the normal: keep the same signed bend
         // for both directions so reciprocal arrows occupy opposite physical sides.
         const bend = reverse
-          ? 90 + Math.ceil(attempt / 2) * 22
+          ? -(90 + Math.ceil(attempt / 2) * 22)
           : attempt === 0
             ? 0
             : Math.ceil(attempt / 2) * 42 * (attempt % 2 ? 1 : -1);

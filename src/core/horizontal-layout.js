@@ -2,11 +2,14 @@ import { drawingClearance } from './planar-layout.js';
 import { routeEdges } from './layout.js';
 import { validateRouteSeparation } from './layout-validation.js';
 import { simpleTransitionLabel } from './editor-settings.js';
+import { cycleAnalysis, cycleScore } from './cycle-aesthetics.js';
 
 export function alignHorizontal(machine) {
   const states = machine.states.map((s) => ({ ...s })),
     nodes = new Map(states.map((s) => [s.id, s])),
-    baseline = drawingClearance(states, machine.edges);
+    baseline = drawingClearance(states, machine.edges),
+    motifs = cycleAnalysis(machine),
+    motifCost = cycleScore(motifs, nodes);
   if (baseline.crossings) return states;
   let checked = 0;
   for (const e of machine.edges) {
@@ -27,7 +30,8 @@ export function alignHorizontal(machine) {
       if (
         c.node >= Math.min(160, baseline.node) - 1e-6 &&
         c.wire >= Math.min(65, baseline.wire) - 1e-6 &&
-        !c.crossings
+        !c.crossings &&
+        cycleScore(motifs, nodes) <= motifCost + 1
       ) {
         checked++;
         const routes = routeEdges({ ...machine, states, comments: [] }, simpleTransitionLabel);

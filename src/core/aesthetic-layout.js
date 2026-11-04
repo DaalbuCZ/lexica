@@ -1,12 +1,13 @@
 import { drawingClearance } from './planar-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
+import { cycleAnalysis, cycleScore, cycleProposals } from './cycle-aesthetics.js';
 
 // Improve an already routed planar drawing. Aesthetic scores never buy a
 // crossing: each accepted candidate must have a complete feasible route set.
 export function compactAesthetics(
   machine,
-  { sweeps = 3, maxRoutes = 48, preserveStartRing = false, radial = false } = {},
+  { sweeps = 3, maxRoutes = 48, preserveStartRing = false, radial = false, fixedIds = [] } = {},
 ) {
   const states = machine.states.map((s) => ({ ...s })),
     nodes = new Map(states.map((s) => [s.id, s])),
@@ -24,6 +25,7 @@ export function compactAesthetics(
   }
   const root = nodes.get(machine.start),
     edges = [...links.values()];
+  const motifs = cycleAnalysis(machine);
   const depth = new Map(root ? [[root.id, 0]] : []),
     queue = root ? [root.id] : [];
   for (let i = 0; i < queue.length; i++)
@@ -34,11 +36,12 @@ export function compactAesthetics(
       }
   const radius = (id) =>
     root ? Math.hypot(nodes.get(id).x - root.x, nodes.get(id).y - root.y) : 0;
-  const pinned = new Set(
-    preserveStartRing
+  const pinned = new Set([
+    ...fixedIds,
+    ...(preserveStartRing
       ? machine.edges.filter((e) => e.from === machine.start && e.portal == null).map((e) => e.to)
-      : [],
-  );
+      : []),
+  ]);
   if (
     root &&
     neighbors.get(root.id).size === states.length - 1 &&
@@ -77,7 +80,7 @@ export function compactAesthetics(
     }
     const w = Math.max(...states.map((s) => s.x)) - Math.min(...states.map((s) => s.x)),
       h = Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y));
-    return cost + 0.15 * (w + h);
+    return cost + 0.15 * (w + h) + cycleScore(motifs, nodes);
   };
   const chunks = new Map();
   const offer = (ids) => {
@@ -111,6 +114,11 @@ export function compactAesthetics(
   for (let sweep = 0; sweep < sweeps && routeChecks < maxRoutes; sweep++) {
     let changed = false;
     const proposals = [];
+    proposals.push(
+      ...cycleProposals(motifs, nodes, chunks.values()).filter(
+        (p) => !p.ids.has(machine.start) && ![...p.ids].some((id) => pinned.has(id)),
+      ),
+    );
     for (const ids of chunks.values())
       for (const e of edges) {
         if (ids.has(e.a) === ids.has(e.b)) continue;
@@ -151,8 +159,9 @@ export function compactAesthetics(
       for (const fraction of [1, 0.5, 0.25]) {
         if (routeChecks >= maxRoutes) break;
         members.forEach((s, i) => {
-          s.x = old[i].x + p.dx * fraction;
-          s.y = old[i].y + p.dy * fraction;
+          const target = p.targets?.get(s.id);
+          s.x = old[i].x + (target ? target.x - old[i].x : p.dx) * fraction;
+          s.y = old[i].y + (target ? target.y - old[i].y : p.dy) * fraction;
         });
         const next = score(),
           c = next < best - 0.01 ? drawingClearance(states, machine.edges) : null;

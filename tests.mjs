@@ -162,7 +162,7 @@ test('reciprocal connections take distinct sides with separate labels', () => {
     ],
   };
   const [forward, back] = routeEdges(machine);
-  assert.ok(forward.label.y > 35 && back.label.y < -35);
+  assert.ok(forward.label.y < 0 && back.label.y > 0);
   assert.ok(Math.abs(forward.label.y - back.label.y) > 70);
 });
 import { statePortalBox } from './src/core/portals.js';

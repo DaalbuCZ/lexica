@@ -21,6 +21,8 @@ import { layoutTopology } from '../src/core/layout-topology.js';
 import { alignHorizontal } from '../src/core/horizontal-layout.js';
 import { renderedLabelBox } from '../src/core/label-clearance.js';
 import { interactiveRoutes } from '../src/core/interactive-routes.js';
+import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthetics.js';
+import { transitionBundles } from '../src/core/graph-bundles.js';
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({
@@ -36,6 +38,147 @@ const machine = () => ({
 const snapshot = (m, routes) => ({
   routes,
   nodes: new Map(m.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+});
+
+test('cycle balancing improves edge equality while preserving routed feasibility', () => {
+  const m = {
+    start: 'entry',
+    states: [
+      { id: 'entry', x: -500, y: 0 },
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 300, y: -200 },
+      { id: 'c', x: 300, y: 200 },
+    ],
+    edges: [
+      { from: 'entry', to: 'a', label: 'entry' },
+      { from: 'a', to: 'b', label: 'a' },
+      { from: 'b', to: 'c', label: 'b' },
+      { from: 'c', to: 'a', label: 'c' },
+    ],
+  };
+  const variation = (states) => {
+    const n = new Map(states.map((s) => [s.id, s])),
+      lengths = [
+        ['a', 'b'],
+        ['b', 'c'],
+        ['c', 'a'],
+      ].map(([a, b]) => Math.hypot(n.get(a).x - n.get(b).x, n.get(a).y - n.get(b).y));
+    return (Math.max(...lengths) - Math.min(...lengths)) / (lengths.reduce((a, b) => a + b, 0) / 3);
+  };
+  const result = compactAesthetics(m);
+  assert.ok(variation(result) < variation(m.states));
+  assert.ok(
+    corridorRoutes(
+      { ...m, states: result },
+      m.edges.map((e) => e.label),
+    ),
+  );
+});
+
+test('long simple cycles and their analysis are independent of parallel transition multiplicity', () => {
+  const m = {
+    states: Array.from({ length: 12 }, (_, i) => ({
+      id: `v${String(i).padStart(2, '0')}`,
+      x: Math.cos((i * Math.PI) / 6) * 400,
+      y: Math.sin((i * Math.PI) / 6) * 400,
+    })),
+    edges: [],
+  };
+  m.states.forEach((s, i) =>
+    m.edges.push({ from: s.id, to: m.states[(i + 1) % 12].id, label: 'a' }),
+  );
+  const cycles = cycleAnalysis(m).cycles;
+  assert.equal(cycles.length, 1);
+  assert.equal(cycles[0].length, 12);
+  m.edges.push({ ...m.edges[0], label: 'b' }, { ...m.edges[0], label: 'c' });
+  assert.deepEqual(cycleAnalysis(m).cycles, cycles);
+});
+
+test('flow separation is a weak score and already opposed directions have no penalty', () => {
+  const m = {
+      states: [
+        { id: 'in', x: -200, y: 0 },
+        { id: 'middle', x: 0, y: 0 },
+        { id: 'out', x: -200, y: 100 },
+      ],
+      edges: [
+        { from: 'in', to: 'middle', label: 'a' },
+        { from: 'middle', to: 'out', label: 'b' },
+      ],
+    },
+    analysis = cycleAnalysis(m);
+  const cramped = cycleScore(analysis, new Map(m.states.map((s) => [s.id, s])));
+  const opposed = cycleScore(
+    analysis,
+    new Map(m.states.map((s) => [s.id, s.id === 'out' ? { ...s, x: 200, y: 0 } : s])),
+  );
+  assert.ok(cramped > opposed);
+  assert.ok(cramped <= 12);
+  assert.equal(opposed, 0);
+});
+
+test('a dangling state can move out of a cycle without adding crossings', () => {
+  const m = {
+      start: 'a',
+      states: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 600, y: 0 },
+        { id: 'c', x: 300, y: 600 },
+        { id: 'leaf', x: 300, y: 350 },
+      ],
+      edges: [
+        { from: 'a', to: 'b', label: 'a' },
+        { from: 'b', to: 'c', label: 'b' },
+        { from: 'c', to: 'a', label: 'c' },
+        { from: 'c', to: 'leaf', label: 'exit' },
+      ],
+    },
+    cycle = cycleAnalysis(m).cycles[0];
+  assert.ok(insideCycle(m.states[3], cycle, new Map(m.states.map((s) => [s.id, s]))));
+  const states = compactAesthetics(m),
+    nodes = new Map(states.map((s) => [s.id, s]));
+  assert.equal(insideCycle(nodes.get('leaf'), cycle, nodes), false);
+  assert.ok(
+    corridorRoutes(
+      { ...m, states },
+      m.edges.map((e) => e.label),
+    ),
+  );
+});
+
+test('unequal reciprocal bundles keep all lanes in clockwise directional bands', () => {
+  for (const [a, b] of [
+    ['a', 'b'],
+    ['z', 'a'],
+  ]) {
+    const m = {
+        states: [
+          { id: a, x: 0, y: 0 },
+          { id: b, x: 400, y: 0 },
+        ],
+        edges: [
+          { from: a, to: b, label: '1' },
+          { from: a, to: b, label: '2' },
+          { from: b, to: a, label: 'back' },
+          { from: a, to: b, label: '3' },
+        ],
+      },
+      before = JSON.stringify(m.edges),
+      routes = corridorRoutes(
+        m,
+        m.edges.map((e) => e.label),
+      );
+    assert.ok(routes);
+    assert.equal(transitionBundles(m).length, 1);
+    for (const [i, e] of m.edges.entries()) {
+      const from = m.states.find((s) => s.id === e.from),
+        to = m.states.find((s) => s.id === e.to),
+        p = curvePoint(routes[i], 0.5);
+      assert.ok((to.x - from.x) * (p.y - from.y) - (to.y - from.y) * (p.x - from.x) < 0);
+    }
+    assert.equal(validateRouteSeparation(routes, { maxDepth: 24 }).status, 'clear');
+    assert.equal(JSON.stringify(m.edges), before);
+  }
 });
 
 test('circle construction can move a whole branch even when the old area cutoff would reject it', () => {
