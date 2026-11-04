@@ -13,6 +13,17 @@ import { createLiveRouting } from './live-routing.js';
 import { repairDraggedRoutes } from '../core/incremental-layout.js';
 import { storeDrawingRoutes } from '../core/drawing-routes.js';
 export function createCanvasRenderer(context) {
+  const syncGroupPositions = (shown) => {
+    const groups = new Map((context.machine.groups ?? []).map((group) => [group.id, group]));
+    for (const state of shown.states)
+      if (state.group) {
+        const group = groups.get(state.id);
+        if (group) {
+          state.x = group.x;
+          state.y = group.y;
+        }
+      }
+  };
   const liveRouting = createLiveRouting(context);
   context.disposeRouting = () => {
     liveRouting.dispose();
@@ -125,6 +136,7 @@ export function createCanvasRenderer(context) {
     const sameTopology =
       shownCache?.version === context.documentVersion && shownCache.group === context.openGroup;
     const shown = sameTopology ? shownCache.machine : graphView(context.machine, context.openGroup);
+    if (sameTopology) syncGroupPositions(shown);
     if (sameTopology && context.openGroup) {
       const positions = context.machine.groups.find(
         (group) => group.id === context.openGroup,
@@ -264,6 +276,7 @@ export function createCanvasRenderer(context) {
         version: context.documentVersion,
         simple: editorSettings.simplified,
       };
+      if (reuse) syncGroupPositions(overview);
       context.overviewGraph.setView(context.overviewView);
       const panelMoved =
         (!manualEdit || manualEdit.committing) &&

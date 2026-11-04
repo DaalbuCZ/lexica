@@ -41,9 +41,28 @@ for (const presentation of ['canvas', 'overlay'])
     await expect(page.locator('.group-navigation [data-current]')).toHaveCount(0);
     const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')));
     const before = await read();
+    const scale = await page.locator('#canvas').evaluate((c) => {
+      const ctx = c.getContext('2d'),
+        roundRect = ctx.roundRect.bind(ctx);
+      window.lastGroupPaint = null;
+      ctx.roundRect = (...args) => {
+        if (args[2] === 88 && args[3] === 72)
+          window.lastGroupPaint = { x: args[0] + 44, y: args[1] + 36 };
+        return roundRect(...args);
+      };
+      return ctx.getTransform().a;
+    });
     await page.mouse.move(p.x, p.y);
     await page.mouse.down();
     await page.mouse.move(p.x + 70, p.y + 40, { steps: 5 });
+    // Assert the painted proxy follows the pointer before release, rather than
+    // checking only the committed document after pointerup.
+    await expect
+      .poll(() => page.evaluate(() => window.lastGroupPaint?.x))
+      .toBeCloseTo(before.groups[0].x + Math.round(70 / scale), 3);
+    await expect
+      .poll(() => page.evaluate(() => window.lastGroupPaint?.y))
+      .toBeCloseTo(before.groups[0].y + Math.round(40 / scale), 3);
     await page.mouse.up();
     await expect.poll(async () => (await read()).groups[0].x).not.toBe(before.groups[0].x);
     const moved = await read(),
