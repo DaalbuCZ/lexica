@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { dockSettings, nearestDock } from '../core/docking.js';
+import { dockSettings, nearestDock, nearestDockZone } from '../core/docking.js';
 import { readStorage, writeStorage } from '../state/studio.js';
 function applyDock(name, side) {
   const settings = dockSettings(readStorage('lexica-docks', {}));
   settings[name] = side;
   writeStorage('lexica-docks', settings);
   document.body.dataset[name + 'Dock'] = side;
-  window.dispatchEvent(new Event('resize'));
+  if (name !== 'debugger') window.dispatchEvent(new Event('resize'));
 }
 export function useDockGrip(name) {
   const drag = useRef(null);
@@ -45,9 +45,12 @@ export function useDockGrip(name) {
       event.stopPropagation();
       if (Math.hypot(event.clientX - target.x, event.clientY - target.y) > 5) target.moved = true;
       if (!target.moved) return;
-      target.side = nearestDock(event.clientX, event.clientY, innerWidth, innerHeight);
+      const getDock = name === 'debugger' ? nearestDockZone : nearestDock;
+      target.side = getDock(event.clientX, event.clientY, innerWidth, innerHeight);
+      const [side, segment = 'center'] = target.side.split('-');
       const preview = document.getElementById('dock-preview');
-      preview.dataset.side = target.side;
+      preview.dataset.side = side;
+      preview.dataset.segment = segment;
       preview.dataset.panel = name;
       preview.hidden = false;
       document.body.classList.add('docking');
@@ -66,6 +69,11 @@ export function useDockGrip(name) {
         event.preventDefault();
         event.stopPropagation();
         applyDock(name, side);
+      } else if (name === 'debugger' && (event.key === 'Home' || event.key === 'End')) {
+        event.preventDefault();
+        event.stopPropagation();
+        const [edge] = (document.body.dataset.debuggerDock || 'top').split('-');
+        applyDock(name, edge + (event.key === 'Home' ? '-start' : '-end'));
       } else if (event.key === 'Escape') finish(event, true);
     },
   };

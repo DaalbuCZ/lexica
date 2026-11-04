@@ -2038,6 +2038,38 @@
     inset: 0 0 0 auto;
     width: 80px;
   }
+  .dock-preview[data-panel='debugger']:is([data-side='top'], [data-side='bottom']) {
+    right: auto;
+    width: calc(100% / 3);
+  }
+  .dock-preview[data-panel='debugger']:is([data-side='left'], [data-side='right']) {
+    bottom: auto;
+    height: calc(100% / 3);
+  }
+  .dock-preview[data-panel='debugger']:is(
+      [data-side='top'],
+      [data-side='bottom']
+    )[data-segment='center'] {
+    left: calc(100% / 3);
+  }
+  .dock-preview[data-panel='debugger']:is(
+      [data-side='top'],
+      [data-side='bottom']
+    )[data-segment='end'] {
+    left: calc(200% / 3);
+  }
+  .dock-preview[data-panel='debugger']:is(
+      [data-side='left'],
+      [data-side='right']
+    )[data-segment='center'] {
+    top: calc(100% / 3);
+  }
+  .dock-preview[data-panel='debugger']:is(
+      [data-side='left'],
+      [data-side='right']
+    )[data-segment='end'] {
+    top: calc(200% / 3);
+  }
   .dock-preview[data-panel='tester']:is([data-side='top'], [data-side='bottom']) {
     height: var(--tester-height, 190px);
   }
