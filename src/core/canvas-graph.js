@@ -261,7 +261,7 @@ export function createGraphCanvas(canvas, minimap) {
         r = routes[i],
         index = e.originalIndex ?? i,
         bad =
-          !!transitionError(machine, e) ||
+          (scene.invalidEdges ? scene.invalidEdges.has(index) : !!transitionError(machine, e)) ||
           failureEdges.has(index) ||
           (trace?.token === 'ERROR' && traceEdges.has(index)),
         active = currentEdge === index;
@@ -403,7 +403,7 @@ export function createGraphCanvas(canvas, minimap) {
         r = routes[i],
         index = e.originalIndex ?? i,
         bad =
-          !!transitionError(machine, e) ||
+          (scene.invalidEdges ? scene.invalidEdges.has(index) : !!transitionError(machine, e)) ||
           failureEdges.has(index) ||
           (trace?.token === 'ERROR' && traceEdges.has(index)),
         color = bad
@@ -513,15 +513,15 @@ export function createGraphCanvas(canvas, minimap) {
       ctx.strokeRect(x, y, w, h);
     }
   }
-  function drawMap() {
-    if (!scene) return;
-    const routes = scene.routes,
-      machine = visualMachine(scene.machine),
+  function drawMap(viewport = view, mapScene = scene) {
+    if (!mapScene) return;
+    const routes = mapScene.routes,
+      machine = visualMachine(mapScene.machine),
       bounds = graphBounds(machine, routes),
-      left = Math.min(bounds.x, view.x) - 100,
-      top = Math.min(bounds.y, view.y) - 100;
-    let width = Math.max(bounds.x + bounds.width, view.x + view.width) - left + 100,
-      height = Math.max(bounds.y + bounds.height, view.y + view.height) - top + 100,
+      left = Math.min(bounds.x, viewport.x) - 100,
+      top = Math.min(bounds.y, viewport.y) - 100;
+    let width = Math.max(bounds.x + bounds.width, viewport.x + viewport.width) - left + 100,
+      height = Math.max(bounds.y + bounds.height, viewport.y + viewport.height) - top + 100,
       x = left,
       y = top;
     const ratio = minimap.clientWidth / minimap.clientHeight;
@@ -560,11 +560,11 @@ export function createGraphCanvas(canvas, minimap) {
       mapCtx.fillRect(note.x, note.y, size.w, size.h);
     }
     mapCtx.fillStyle = c.mapFill;
-    mapCtx.fillRect(view.x, view.y, view.width, view.height);
+    mapCtx.fillRect(viewport.x, viewport.y, viewport.width, viewport.height);
     mapCtx.strokeStyle = c.mapStroke;
     mapCtx.lineWidth =
       2 / canvasTransform(mapView, minimap.clientWidth, minimap.clientHeight).scale;
-    mapCtx.strokeRect(view.x, view.y, view.width, view.height);
+    mapCtx.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
   }
   function hit(p) {
     if (!scene) return null;

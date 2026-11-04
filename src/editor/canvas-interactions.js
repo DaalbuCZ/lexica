@@ -254,7 +254,9 @@ export function createCanvasInteractions(context) {
         if (
           (context.source || context.commentSource) &&
           e.button === 2 &&
-          !['state', 'comment'].includes(hit?.type)
+          !['state', 'outside-state', 'group', 'comment', 'portal-target', 'start-view'].includes(
+            hit?.type,
+          )
         ) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -289,7 +291,24 @@ export function createCanvasInteractions(context) {
         startPan(e);
         return;
       }
+      if (
+        ['portal-target', 'start-view'].includes(hit?.type) &&
+        (e.button === 0 || e.button === 2) &&
+        (context.commentSource || context.source)
+      ) {
+        e.preventDefault();
+        const id = hit.type === 'start-view' ? context.machine.start : hit.id;
+        if (context.commentSource) context.connectComment(context.commentSource, id);
+        else context.connectTo(id);
+        return;
+      }
       if (hit?.type === 'outside-state') {
+        if ((e.button === 0 || e.button === 2) && (context.commentSource || context.source)) {
+          e.preventDefault();
+          if (context.commentSource) context.connectComment(context.commentSource, hit.id);
+          else context.connectTo(hit.id);
+          return;
+        }
         if (e.button === 0 && !e.ctrlKey) {
           const group = context.machine.groups.find((group) => group.id === context.openGroup),
             point = group?.contextPositions?.[hit.id];
@@ -311,7 +330,8 @@ export function createCanvasInteractions(context) {
       if (hit?.type === 'group') {
         e.preventDefault();
         e.stopPropagation();
-        if (context.source && (e.button === 0 || e.button === 2)) context.connectToGroup(hit.id);
+        if ((context.source || context.commentSource) && (e.button === 0 || e.button === 2))
+          context.connectToGroup(hit.id);
         else if (e.button === 0) context.openGroupById(hit.id);
         return;
       }
@@ -475,12 +495,13 @@ export function createCanvasInteractions(context) {
       resetBendOnRightClick(e);
     };
     context.$('canvas').onpointercancel = () => {
-      if (context.edgeDrag?.moved || context.portalDrag?.moved) {
+      const moved = context.edgeDrag?.moved || context.portalDrag?.moved;
+      context.edgeDrag = null;
+      context.portalDrag = null;
+      if (moved) {
         context.save();
         context.render();
       }
-      context.edgeDrag = null;
-      context.portalDrag = null;
       context.cancelConnect();
       context.drag = null;
       context.pan = null;
@@ -570,19 +591,21 @@ export function createCanvasInteractions(context) {
     });
     context.listen(window, 'pointerup', (e) => {
       if (context.portalDrag) {
-        if (context.portalDrag.moved) {
+        const moved = context.portalDrag.moved;
+        context.portalDrag = null;
+        if (moved) {
           context.save();
           context.render();
         }
-        context.portalDrag = null;
         return;
       }
       if (context.edgeDrag) {
-        if (context.edgeDrag.moved) {
+        const moved = context.edgeDrag.moved;
+        context.edgeDrag = null;
+        if (moved) {
           context.save();
           context.render();
         }
-        context.edgeDrag = null;
         return;
       }
       if (context.marquee) {
@@ -630,17 +653,18 @@ export function createCanvasInteractions(context) {
         Math.hypot(e.clientX - context.rightStart.x, e.clientY - context.rightStart.y) > 6
       ) {
         const hit = context.graph.hitClient(e);
-        if (hit?.type === 'outside-state') {
-          context.cancelConnect();
-          return;
-        }
         if (hit?.type === 'group') {
-          if (context.source) context.connectToGroup(hit.id);
+          if (context.source || context.commentSource) context.connectToGroup(hit.id);
           else context.cancelConnect();
           return;
         }
         const note = hit?.type === 'comment' ? hit.id : null,
-          node = hit?.type === 'state' ? hit.id : null;
+          node =
+            hit?.type === 'start-view'
+              ? context.machine.start
+              : ['state', 'outside-state', 'portal-target'].includes(hit?.type)
+                ? hit.id
+                : null;
         if (context.rightStart.commentId) {
           const id = context.rightStart.commentId;
           if (node) context.connectComment(id, node);
@@ -658,12 +682,13 @@ export function createCanvasInteractions(context) {
       }
       context.rightStart = null;
       const moved = !!context.drag?.moved;
+      context.drag = null;
       if (moved) {
         context.save();
         context.render();
       }
       context.drag = null;
-      if (moved && context.overviewView) {
+      if (moved) {
         context.groupPanelBounds = null;
         context.queueDraw();
       }
@@ -703,7 +728,9 @@ export function createCanvasInteractions(context) {
     context.$('minimap').onpointerdown = (e) => {
       e.preventDefault();
       context.mapDragging = true;
-      context.mapTransform = context.graph.mapTransform();
+      context.mapTransform = (
+        context.overviewView ? context.overviewGraph : context.graph
+      ).mapTransform();
       context.$('minimap').setPointerCapture(e.pointerId);
       context.navigateMap(e);
     };

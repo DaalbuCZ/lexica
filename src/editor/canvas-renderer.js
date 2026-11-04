@@ -6,9 +6,26 @@ import { transitionError } from '../core/lexer.js';
 import { routeEdges } from '../core/layout.js';
 import { graphView, groupFor } from '../core/groups.js';
 import { tokenColorClass } from '../core/token-colors.js';
+import { visibleViewport } from './visible-viewport.js';
+import { interactiveRoutes } from '../core/interactive-routes.js';
+import { visualMachine } from '../core/start-views.js';
 export function createCanvasRenderer(context) {
+  let mapScene = null;
+  let routeSnapshot = null;
+  let overviewCache = null,
+    mapDrawTime = 0;
+  let validationVersion = -1,
+    invalidEdges = new Set();
   function drawMap() {
-    context.graph.drawMap();
+    const now = performance.now();
+    if (context.drag?.moved && now - mapDrawTime < 80) return;
+    mapDrawTime = now;
+    const view = context.view(),
+      surface = context.overviewView ? context.overviewCanvas : context.elements.canvas;
+    (context.overviewView ? context.overviewGraph : context.graph).drawMap(
+      visibleViewport(view, surface),
+      mapScene ?? undefined,
+    );
   }
   function queueDraw() {
     if (context.disposed || context.drawFrame !== null) return;
@@ -35,6 +52,16 @@ export function createCanvasRenderer(context) {
     return `M ${a.x} ${a.y} L ${p.x} ${p.y}`;
   }
   function draw() {
+    if (validationVersion !== context.documentVersion) {
+      validationVersion = context.documentVersion;
+      invalidEdges = new Set(
+        context.machine.edges.flatMap((edge, index) =>
+          transitionError(context.machine, edge) ? [index] : [],
+        ),
+      );
+    }
+    const dragging = context.drag?.moved || context.edgeDrag?.moved || context.portalDrag?.moved;
+    const routing = dragging ? interactiveRoutes : routeEdges;
     const shown = graphView(context.machine, context.openGroup),
       project = (id) => (context.openGroup ? id : (groupFor(context.machine, id)?.id ?? id)),
       failedGroups = new Set(),
@@ -51,7 +78,7 @@ export function createCanvasRenderer(context) {
     if (context.graphTrace?.token === 'ERROR')
       for (const id of context.graphTrace.traceStates ?? []) markGroup(id);
     context.machine.edges.forEach((edge, index) => {
-      const invalid = !!transitionError(context.machine, edge);
+      const invalid = invalidEdges.has(index);
       invalidGraph ||= invalid;
       if (invalid || failureEdges.has(index) || traceErrorEdges.has(index)) {
         markGroup(edge.from);
@@ -84,7 +111,16 @@ export function createCanvasRenderer(context) {
         edge.originalIndices?.length > 1
           ? `${edge.originalIndices.length} transitions`
           : baseLabel(edge),
-      shownRoutes = routeEdges(shown, label);
+      shownRoutes = dragging
+        ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+        : routeEdges(shown, label);
+    if (!dragging)
+      routeSnapshot = {
+        routes: shownRoutes,
+        nodes: new Map(
+          visualMachine(shown).states.map((state) => [state.id, { x: state.x, y: state.y }]),
+        ),
+      };
     if (context.openGroup) {
       const group = context.machine.groups.find((group) => group.id === context.openGroup);
       if (group) {
@@ -100,30 +136,57 @@ export function createCanvasRenderer(context) {
       }
     }
     if (context.overviewView) {
-      const overview = graphView(context.machine);
+      const reuse = dragging && overviewCache,
+        overview = reuse ? overviewCache.machine : graphView(context.machine),
+        overviewRoutes = reuse ? overviewCache.routes : routing(overview, label);
+      overviewCache = { machine: overview, routes: overviewRoutes };
       context.overviewGraph.setView(context.overviewView);
       context.positionGroupPanel(
         overview.states.find((state) => state.id === context.openGroup),
         graphBounds(shown, shownRoutes),
       );
-      context.overviewGraph.draw({
-        machine: overview,
-        routes: routeEdges(overview, label),
-        label,
-        tokenColor,
-        selectedStates: new Set(),
-        selectedComments: new Set(),
-        selectedCommentLinks: new Set(),
-        edgeSelected: () => false,
-        failures: {
-          states: [...failedGroups],
-          edges: context.graphFailures.edges,
+      if (!reuse)
+        context.overviewGraph.draw({
+          machine: overview,
+          routes: overviewRoutes,
+          invalidEdges,
+          label,
+          tokenColor,
+          selectedStates: new Set(),
+          selectedComments: new Set(),
+          selectedCommentLinks: new Set(),
+          edgeSelected: () => false,
+          failures: {
+            states: [...failedGroups],
+            edges: context.graphFailures.edges,
+          },
+        });
+      const offset = context.groupWindowOffset,
+        move = (point) => ({ ...point, x: point.x + offset.x, y: point.y + offset.y });
+      mapScene = {
+        machine: {
+          states: [...overview.states, ...shown.states.map(move)],
+          edges: [],
+          comments: [...(overview.comments ?? []), ...(shown.comments ?? []).map(move)],
         },
-      });
-    }
+        routes: [
+          ...overviewRoutes,
+          ...shownRoutes.map((route) => ({
+            ...route,
+            p0: move(route.p0),
+            p3: move(route.p3),
+            c1: move(route.c1),
+            c2: move(route.c2),
+            label: move(route.label),
+            portalBox: route.portalBox ? move(route.portalBox) : undefined,
+          })),
+        ],
+      };
+    } else mapScene = { machine: shown, routes: shownRoutes };
     context.graph.draw({
       machine: shown,
       routes: shownRoutes,
+      invalidEdges,
       tokenColor,
       selectedStates: context.selectedStates,
       selectedComments: context.selectedComments,

@@ -3,9 +3,9 @@ import { canvasTransform } from '../core/canvas-graph.js';
 import { editorSettings } from '../core/editor-settings.js';
 import { placeFloatingRect } from '../core/floating-placement.js';
 import { createGroupWindow } from './group-window.js';
+import { visibleViewport } from './visible-viewport.js';
 export function createViewport(context) {
-  const { positionGroupPanel, installWindow } = createGroupWindow(context);
-  context.installGroupWindow = installWindow;
+  const { positionGroupPanel } = createGroupWindow(context);
   function floatingObstacles(exclude) {
     return [
       document.querySelector('.brand'),
@@ -278,16 +278,17 @@ export function createViewport(context) {
     setView(next);
   }
   function navigateMap(e) {
-    const p = context.graph.mapPoint(e, context.mapTransform ?? context.graph.mapTransform()),
+    const map = context.overviewView ? context.overviewGraph : context.graph;
+    const p = map.mapPoint(e, context.mapTransform ?? map.mapTransform()),
       v = view();
-    if (context.overviewView && context.groupWindowOffset) {
-      p.x += context.groupWindowOffset.x;
-      p.y += context.groupWindowOffset.y;
-    }
+    const visible = visibleViewport(
+      v,
+      context.overviewView ? context.overviewCanvas : context.elements.canvas,
+    );
     setView({
       ...v,
-      x: p.x - v.width / 2,
-      y: p.y - v.height / 2,
+      x: p.x - visible.width / 2 - (visible.x - v.x),
+      y: p.y - visible.height / 2 - (visible.y - v.y),
     });
   }
   return {

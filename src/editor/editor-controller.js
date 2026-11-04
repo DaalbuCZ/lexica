@@ -332,6 +332,18 @@ export function createEditorController(
     context.placementPoint = null;
     document.body.classList.remove('placing-comment');
     const c = makeComment(context.machine, position);
+    if (context.openGroup) {
+      const members =
+          context.machine.groups.find((g) => g.id === context.openGroup)?.stateIds ?? [],
+        state = context.machine.states
+          .filter((s) => members.includes(s.id))
+          .sort(
+            (a, b) =>
+              Math.hypot(a.x - position.x, a.y - position.y) -
+              Math.hypot(b.x - position.x, b.y - position.y),
+          )[0];
+      c.nodeIds = state ? [state.id] : [];
+    }
     checkpoint();
     (context.machine.comments ??= []).push(c);
     choose('comment', c.id);
@@ -552,13 +564,14 @@ export function createEditorController(
     showProperties(true);
   }
   installInteractions();
-  context.installGroupWindow();
   const observer = new ResizeObserver(() => {
     resizeCanvas();
     queueDraw();
   });
   observer.observe(elements.canvas);
   observer.observe(canvasWrap);
+  const testerPanel = document.querySelector('.tester');
+  if (testerPanel) observer.observe(testerPanel);
   const themeObserver = new MutationObserver(() => queueDraw());
   themeObserver.observe(document.documentElement, {
     attributes: true,
@@ -663,6 +676,12 @@ export function createEditorController(
     setTrace(trace, failures) {
       context.graphTrace = trace;
       if (failures) context.graphFailures = failures;
+      if (trace?.kind) {
+        const id = trace.state ?? trace.traceStates?.at(-1),
+          group = context.machine.groups?.find((g) => g.stateIds.includes(id));
+        if (group && group.id !== context.openGroup) openGroupById(group.id, false);
+        else if (id && !group && context.openGroup) closeGroup(true, false);
+      }
       queueDraw();
     },
     replace(next) {
@@ -679,6 +698,7 @@ export function createEditorController(
       context.source = from;
       connectTo(to);
     },
+    attachComment: connectComment,
     ungroup(id) {
       update((next) => dissolveGroup(next, id));
       if (context.openGroup === id) closeGroup();
@@ -746,6 +766,7 @@ export function createEditorController(
     },
     dispose() {
       context.disposed = true;
+      context.groupAnimation?.cancel();
       scope.dispose();
       observer.disconnect();
       themeObserver.disconnect();

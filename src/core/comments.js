@@ -1,3 +1,4 @@
+import { emptyAngles, loopSlots } from './angular-space.js';
 export function commentLayout(comment) {
   const lines = [];
   for (const paragraph of comment.text.split('\n')) {
@@ -115,21 +116,50 @@ export function placeCommentsAfterLayout(machine) {
         x: attached.reduce((sum, s) => sum + s.x, 0) / attached.length,
         y: attached.reduce((sum, s) => sum + s.y, 0) / attached.length,
       };
+    const ids = new Set(attached.map((state) => state.id));
+    const directions = machine.edges.flatMap((edge) => {
+      const other =
+        ids.has(edge.from) && !ids.has(edge.to)
+          ? states.get(edge.to)
+          : ids.has(edge.to) && !ids.has(edge.from)
+            ? states.get(edge.from)
+            : null;
+      return other ? [Math.atan2(other.y - center.y, other.x - center.x)] : [];
+    });
+    const loopBoxes = [];
+    for (const state of attached)
+      for (const angle of loopSlots(machine, state).values()) {
+        const x = state.x + Math.cos(angle) * 105,
+          y = state.y + Math.sin(angle) * 105;
+        directions.push(Math.atan2(y - center.y, x - center.x));
+        loopBoxes.push({ x: x - 70, y: y - 65, w: 140, h: 130 });
+      }
+    directions.push(
+      ...placed.map((box) =>
+        Math.atan2(box.y + box.h / 2 - center.y, box.x + box.w / 2 - center.x),
+      ),
+    );
+    const angles = emptyAngles(directions),
+      base = Math.max(95, w / 2 + 65, h / 2 + 65);
     const candidates = [
-      {
-        x: comment.x,
-        y: comment.y,
-      },
       ...Array.from(
         {
           length: 3 * 24,
         },
         (_, i) => {
-          const radius = 85 + Math.floor(i / 24) * 70,
-            angle = ((i % 24) * Math.PI) / 12;
+          const radius = base + Math.floor(i / 24) * 70,
+            angle =
+              angles[i % angles.length] +
+              (i % 24 >= angles.length
+                ? ((Math.floor((i % 24) / angles.length) % 2 ? 1 : -1) *
+                    Math.ceil(Math.floor((i % 24) / angles.length) / 2) *
+                    Math.PI) /
+                  12
+                : 0);
           return {
             x: center.x + Math.cos(angle) * radius - w / 2,
             y: center.y + Math.sin(angle) * radius - h / 2,
+            rank: i % 24,
           };
         },
       ),
@@ -145,9 +175,7 @@ export function placeCommentsAfterLayout(machine) {
           x: box.x + w / 2,
           y: box.y + h / 2,
         };
-      let score =
-        Math.hypot(mid.x - center.x, mid.y - center.y) * 0.15 +
-        Math.hypot(candidate.x - comment.x, candidate.y - comment.y) * 2;
+      let score = Math.hypot(mid.x - center.x, mid.y - center.y) * 0.15 + candidate.rank * 12;
       for (const state of machine.states) {
         const dx = Math.max(box.x - state.x, 0, state.x - box.x - w),
           dy = Math.max(box.y - state.y, 0, state.y - box.y - h);
@@ -163,7 +191,7 @@ export function placeCommentsAfterLayout(machine) {
           })
         )
           score += 1200;
-      for (const other of placed)
+      for (const other of [...placed, ...loopBoxes])
         if (
           box.x < other.x + other.w + 12 &&
           box.x + w + 12 > other.x &&

@@ -1,6 +1,5 @@
 import { canvasTransform } from '../core/canvas-graph.js';
 
-/** Project a growing world-space frame at exactly the overview's scale. */
 export function createGroupWindow(context) {
   const panel = context.groupPanel,
     wrap = context.canvasWrap;
@@ -8,34 +7,30 @@ export function createGroupWindow(context) {
   function positionGroupPanel(group, bounds) {
     if (!group || !bounds || !context.overviewView) return;
     const next = padded(bounds),
-      size = { width: wrap.clientWidth, height: wrap.clientHeight };
-    const t = canvasTransform(context.overviewView, size.width, size.height);
-    if (context.groupPanelBoundsId !== group.id || !context.groupWindowBounds) {
+      t = canvasTransform(context.overviewView, wrap.clientWidth, wrap.clientHeight),
+      heading = panel.querySelector('.group-overlay-heading').offsetHeight || 48;
+    const opening = context.groupPanelBoundsId !== group.id || !context.groupWindowInitialBounds;
+    if (opening) {
       context.groupPanelBoundsId = group.id;
-      context.groupWindowBounds = next;
+      context.groupWindowInitialBounds = next;
       context.groupWindowOffset = {
-        x: group.x - (next.x + next.width / 2),
-        y: group.y - next.height - 68 - next.y,
-      };
-    } else {
-      const old = context.groupWindowBounds,
-        x = Math.min(old.x, next.x),
-        y = Math.min(old.y, next.y);
-      context.groupWindowBounds = {
-        x,
-        y,
-        width: Math.max(old.x + old.width, next.x + next.width) - x,
-        height: Math.max(old.y + old.height, next.y + next.height) - y,
+        x: group.x - next.x - next.width / 2 - 1 / t.scale,
+        y: group.y - next.y - next.height / 2 + heading / (2 * t.scale) - 1 / t.scale,
       };
     }
-    const box = context.groupWindowBounds,
-      offset = context.groupWindowOffset;
-    const heading = panel.querySelector('.group-overlay-heading').offsetHeight || 48;
-    const left = t.x + (box.x + offset.x) * t.scale,
-      top = t.y + (box.y + offset.y) * t.scale - heading;
+    const initial = context.groupWindowInitialBounds,
+      x = Math.min(initial.x, next.x),
+      y = Math.min(initial.y, next.y);
+    const box = (context.groupWindowBounds = {
+      x,
+      y,
+      width: Math.max(initial.x + initial.width, next.x + next.width) - x,
+      height: Math.max(initial.y + initial.height, next.y + next.height) - y,
+    });
+    const offset = context.groupWindowOffset;
     Object.assign(panel.style, {
-      left: left + 'px',
-      top: top + 'px',
+      left: t.x + (box.x + offset.x) * t.scale + 'px',
+      top: t.y + (box.y + offset.y) * t.scale - heading + 'px',
       width: box.width * t.scale + 2 + 'px',
       height: box.height * t.scale + heading + 2 + 'px',
     });
@@ -55,56 +50,21 @@ export function createGroupWindow(context) {
       width: context.elements.canvas.clientWidth,
       height: context.elements.canvas.clientHeight,
     };
-  }
-  function installWindow() {
-    const grip = panel.querySelector('[data-group-grip]');
-    let drag = null;
-    context.listen(grip, 'pointerdown', (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      grip.setPointerCapture(event.pointerId);
-      drag = {
-        id: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        offset: { ...context.groupWindowOffset },
-        scale: canvasTransform(context.overviewView, wrap.clientWidth, wrap.clientHeight).scale,
-      };
-    });
-    context.listen(grip, 'pointermove', (event) => {
-      if (drag?.id !== event.pointerId) return;
-      context.groupWindowOffset = {
-        x: drag.offset.x + (event.clientX - drag.x) / drag.scale,
-        y: drag.offset.y + (event.clientY - drag.y) / drag.scale,
-      };
-      context.queueDraw();
-    });
-    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
-      context.listen(grip, type, () => {
-        drag = null;
+    if (opening && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      context.groupAnimation?.cancel();
+      panel.style.pointerEvents = 'none';
+      const animation = panel.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], {
+        duration: 170,
+        easing: 'cubic-bezier(.2,.8,.2,1)',
       });
-    context.listen(grip, 'keydown', (event) => {
-      const delta = {
-        ArrowLeft: [-20, 0],
-        ArrowRight: [20, 0],
-        ArrowUp: [0, -20],
-        ArrowDown: [0, 20],
-      }[event.key];
-      if (!delta || !context.overviewView) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const scale = canvasTransform(
-        context.overviewView,
-        wrap.clientWidth,
-        wrap.clientHeight,
-      ).scale;
-      context.groupWindowOffset = {
-        x: context.groupWindowOffset.x + delta[0] / scale,
-        y: context.groupWindowOffset.y + delta[1] / scale,
-      };
-      context.queueDraw();
-    });
+      context.groupAnimation = animation;
+      animation.finished
+        .then(() => {
+          if (context.groupAnimation === animation && !context.groupClosing)
+            panel.style.pointerEvents = '';
+        })
+        .catch(() => {});
+    }
   }
-  return { positionGroupPanel, installWindow };
+  return { positionGroupPanel };
 }

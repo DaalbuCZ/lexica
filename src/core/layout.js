@@ -10,6 +10,7 @@ import {
   placeCommentsAfterLayout,
 } from './comments.js';
 import { destination, statePortalBox, enablePortal, portalBoxAtTip } from './portals.js';
+import { loopSlots } from './angular-space.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -638,7 +639,18 @@ function segmentHitsBox(a, b, box) {
   }
   return true;
 }
-export function loopAngles(machine, state) {
+export function loopAngles(machine, state, index) {
+  const slots = loopSlots(machine, state);
+  if (index !== undefined && slots.has(index)) {
+    const main = slots.get(index);
+    return [
+      main,
+      ...Array.from(
+        { length: 15 },
+        (_, i) => main + ((i % 2 ? 1 : -1) * Math.ceil((i + 1) / 2) * Math.PI) / 8,
+      ),
+    ];
+  }
   const directions = machine.edges
     .flatMap((edge) => {
       if (edge.portal != null || edge.from === edge.to) return [];
@@ -711,7 +723,7 @@ export function loopDragBend(center, apex, initial, current, bend) {
     y: bend.y + Math.sin(startAngle + angle) * radius - v.y,
   };
 }
-function applyBend(route, edge, start, end) {
+export function applyBend(route, edge, start, end) {
   if (!edge.bend) return;
   if (start === end) {
     const apex = sample(route, 0.5),
@@ -918,7 +930,7 @@ function computeRoutes(machine, labels) {
     let best,
       bestScore = Infinity;
     const loop = a === b,
-      angles = loop ? loopAngles(machine, a) : null;
+      angles = loop ? loopAngles(machine, a, i) : null;
     for (let attempt = 0; attempt < (loop ? 64 : 61); attempt++) {
       let c;
       if (a === b) {

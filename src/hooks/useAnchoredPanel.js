@@ -8,20 +8,21 @@ export function useAnchoredPanel(panel, anchorId) {
     if (!panel || !anchor) return;
     const place = () => {
       const box = anchor.getBoundingClientRect(),
+        toolbar = anchor.closest('.toolbar')?.getBoundingClientRect() ?? box,
         dock = document.body.dataset.toolbarDock;
       panel.style.maxHeight = Math.max(160, innerHeight - 24) + 'px';
       const { width, height } = panel.getBoundingClientRect();
       let left = box.left,
-        top = box.bottom + 10;
+        top = toolbar.bottom + 14;
       if (dock === 'left') {
-        left = box.right + 10;
+        left = toolbar.right + 14;
         top = box.top;
       }
       if (dock === 'right') {
-        left = box.left - width - 10;
+        left = toolbar.left - width - 14;
         top = box.top;
       }
-      if (dock === 'bottom') top = box.top - height - 10;
+      if (dock === 'bottom') top = toolbar.top - height - 14;
       panel.style.left = Math.max(12, Math.min(left, innerWidth - width - 12)) + 'px';
       panel.style.top = Math.max(12, Math.min(top, innerHeight - height - 12)) + 'px';
     };

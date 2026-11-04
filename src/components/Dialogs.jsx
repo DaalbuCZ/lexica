@@ -407,15 +407,15 @@ function CombinedTransitionDialog({ dialog, onClose }) {
   );
 }
 function GroupTargetDialog({ dialog, onClose }) {
-  const ref = useRef(null),
-    previewRef = useRef(null),
+  const [canvas, setCanvas] = useState(null);
+  const previewRef = useRef(null),
     { machine } = useStudio((s) => s.scene),
     settings = useStudio((s) => s.settings),
     controller = useStudio((s) => s.controller);
   const group = machine.groups?.find((g) => g.id === dialog.groupId);
   useLayoutEffect(() => {
-    const canvas = ref.current,
-      preview = createGraphCanvas(canvas, document.createElement('canvas')),
+    if (!canvas) return;
+    const preview = createGraphCanvas(canvas, document.createElement('canvas')),
       shown = graphView(machine, dialog.groupId, false),
       label = settings.simplified ? simpleTransitionLabel : transitionLabel,
       routes = routeEdges(shown, label),
@@ -448,7 +448,7 @@ function GroupTargetDialog({ dialog, onClose }) {
         edges: [],
       },
     });
-  }, [machine, dialog.groupId, settings.simplified]);
+  }, [canvas, machine, dialog.groupId, settings.simplified]);
   return (
     <Modal
       title={`Choose a state in ${group?.name ?? 'group'}`}
@@ -456,13 +456,14 @@ function GroupTargetDialog({ dialog, onClose }) {
       className="group-dialog group-target-dialog"
     >
       <canvas
-        ref={ref}
+        ref={setCanvas}
         className="group-target-graph"
         aria-label="Choose a state from the group graph"
         onClick={(event) => {
-          const hit = previewRef.current.hitClient(event);
+          const hit = previewRef.current?.hitClient(event);
           if (hit?.type === 'state') {
-            controller.connect(dialog.from, hit.id);
+            if (dialog.commentId) controller.attachComment(dialog.commentId, hit.id);
+            else controller.connect(dialog.from, hit.id);
             onClose();
           }
         }}
@@ -472,7 +473,8 @@ function GroupTargetDialog({ dialog, onClose }) {
           <Button
             key={id}
             onClick={() => {
-              controller.connect(dialog.from, id);
+              if (dialog.commentId) controller.attachComment(dialog.commentId, id);
+              else controller.connect(dialog.from, id);
               onClose();
             }}
           >

@@ -70,7 +70,9 @@ export function graphView(machine, focus = null, includeOutside = true) {
       start: ids.has(machine.start) ? machine.start : null,
       ...context,
       comments: (machine.comments ?? []).filter((comment) =>
-        (comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some((id) => ids.has(id)),
+        (comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some((id) =>
+          context.states.some((state) => state.id === id),
+        ),
       ),
       labelBoxes: machine.labelBoxes,
     };

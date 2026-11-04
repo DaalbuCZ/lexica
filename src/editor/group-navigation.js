@@ -41,10 +41,39 @@ export function createGroupNavigation(context) {
     context.overviewCanvas.hidden = !active;
     context.elements.surface.hidden = active;
   }
-  function closeGroup(fromHistory = false) {
+  function closeGroup(fromHistory = false, animate = true) {
     if (!context.openGroup) return;
+    if (context.groupClosing) return;
+    if (
+      animate &&
+      context.overviewView &&
+      !matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      context.groupClosing = true;
+      context.groupAnimation?.cancel();
+      context.groupPanel.style.pointerEvents = 'none';
+      const animation = context.groupPanel.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(0)' }],
+        { duration: 140, easing: 'ease-in', fill: 'forwards' },
+      );
+      context.groupAnimation = animation;
+      animation.finished
+        .then(() => {
+          if (context.disposed) return;
+          context.groupClosing = false;
+          closeGroup(fromHistory, false);
+          animation.cancel();
+          context.groupPanel.style.pointerEvents = '';
+        })
+        .catch(() => {});
+      return;
+    }
     const returnView = context.overviewView ?? context.groupReturnView;
-    if (!fromHistory && window.history.state?.lexicaGroup === context.openGroup)
+    if (
+      !fromHistory &&
+      context.groupHistoryOwned !== false &&
+      window.history.state?.lexicaGroup === context.openGroup
+    )
       window.history.back();
     context.cancelConnect();
     context.openGroup = null;
@@ -52,23 +81,29 @@ export function createGroupNavigation(context) {
     context.groupPanelBoundsId = null;
     context.groupPanelViewInitialized = false;
     context.groupWindowBounds = null;
+    context.groupWindowInitialBounds = null;
     context.clearSelection();
     context.showProperties(false);
     context.render();
     if (returnView) context.setView(returnView);
     context.groupReturnView = null;
   }
-  function openGroupById(id) {
+  function openGroupById(id, recordHistory = true) {
     if (!context.machine.groups?.some((g) => g.id === id)) return;
+    context.groupClosing = false;
+    context.groupAnimation?.cancel();
+    context.groupPanel.style.pointerEvents = '';
+    context.groupHistoryOwned = recordHistory;
     if (!context.openGroup) {
       context.groupReturnView = context.view();
-      window.history.pushState(
-        {
-          ...window.history.state,
-          lexicaGroup: id,
-        },
-        '',
-      );
+      if (recordHistory)
+        window.history.pushState(
+          {
+            ...window.history.state,
+            lexicaGroup: id,
+          },
+          '',
+        );
     } else
       window.history.replaceState(
         {
@@ -82,10 +117,11 @@ export function createGroupNavigation(context) {
     context.groupPanelBoundsId = null;
     context.groupPanelViewInitialized = false;
     context.groupWindowBounds = null;
+    context.groupWindowInitialBounds = null;
     context.clearSelection();
     context.showProperties(false);
     context.render();
-    context.fit();
+    if (!context.overviewView) context.fit();
   }
   function renameGroup(group) {
     context.onDialog({
@@ -145,13 +181,15 @@ export function createGroupNavigation(context) {
       });
   }
   function connectToGroup(id) {
-    if (!context.source) return;
-    const from = context.source;
+    if (!context.source && !context.commentSource) return;
+    const from = context.source,
+      commentId = context.commentSource;
     context.cancelConnect();
     context.onDialog({
       type: 'group-target',
       groupId: id,
       from,
+      commentId,
     });
   }
   function chooseCombinedTransition(edge) {

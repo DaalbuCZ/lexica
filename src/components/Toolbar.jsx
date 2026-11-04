@@ -21,8 +21,17 @@ import {
 } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
 import { useDockGrip } from '../hooks/useDocking.js';
+import { useEffect, useState } from 'react';
 import { IconButton } from './ui.jsx';
 export function Toolbar() {
+  const [dock, setDock] = useState(() => document.body.dataset.toolbarDock || 'top');
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setDock(document.body.dataset.toolbarDock || 'top'),
+    );
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-toolbar-dock'] });
+    return () => observer.disconnect();
+  }, []);
   const controller = useStudio((s) => s.controller),
     scene = useStudio((s) => s.scene),
     simplified = useStudio((s) => s.settings.simplified),
@@ -61,7 +70,16 @@ export function Toolbar() {
           <Theme asChild>
             <DropdownMenu.Content
               className="layout-popover app-menu react-menu"
-              sideOffset={8}
+              side={
+                dock === 'left'
+                  ? 'right'
+                  : dock === 'right'
+                    ? 'left'
+                    : dock === 'bottom'
+                      ? 'top'
+                      : 'bottom'
+              }
+              sideOffset={24}
               collisionPadding={12}
             >
               <MenuItem icon={ArrowUpFromLine} onSelect={() => dialog('import')}>

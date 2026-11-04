@@ -621,3 +621,75 @@ body[data-debugging='true'][data-toolbar-dock='top'] .toolbar {
     gap: var(--space-3);
   }
 }
+
+.tester-collapsed .tester {
+  height: 48px;
+  padding: 7px 12px;
+}
+.tester-collapsed .tester .panel-title {
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  align-items: center;
+}
+#toggle-tester .tool-icon {
+  transform: none;
+}
+.tester-collapsed #toggle-tester .tool-icon {
+  transform: none;
+}
+.map-controls {
+  padding: 0;
+  gap: 0;
+}
+.map-controls .rt-BaseButton.app-icon-button {
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  flex: 1;
+  padding: 6px;
+  border-radius: 0;
+}
+#tips-panel {
+  display: none;
+}
+.canvas-status {
+  left: auto;
+  right: 18px;
+  bottom: 12px;
+}
+body[data-tester-dock='bottom'] .canvas-status {
+  bottom: calc(var(--tester) + 12px);
+}
+body[data-tester-dock='right'] .canvas-status {
+  right: calc(var(--tester-width, 320px) + 12px);
+}
+.rt-BaseButton.text-action {
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  box-shadow: none;
+  border: 0;
+  gap: 4px;
+  font-size: 11px;
+}
+.rt-BaseButton.text-action:hover {
+  text-decoration: underline;
+  background: none;
+}
+.app-icon-button[aria-label^='Delete'],
+.app-icon-button[data-delete-group] {
+  color: var(--error, #b73232);
+}
+[data-theme='dark'] .modal-backdrop {
+  background: #06090cbb;
+}
+
+#next-error.rt-BaseButton {
+  background: none;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+}

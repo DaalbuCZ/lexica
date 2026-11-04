@@ -173,6 +173,13 @@
   color: #48564b;
   box-shadow: inset 0 0 0 1px #dde5d9;
 }
+.rt-BaseButton.app-button.text-action,
+[data-theme='dark'] .rt-BaseButton.app-button.text-action {
+  background: none;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+}
 [data-theme='dark'] .rt-BaseButton.app-button:not(.primary):not(.danger) {
   background: #292f35;
   color: #e9eff5;

@@ -1,5 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, GripVertical, Play, ArrowDown } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
+  Play,
+  ArrowDown,
+} from 'lucide-react';
 import { useStudio, readStorage, writeStorage } from '../state/studio.js';
 import { useLexer } from '../hooks/useLexer.js';
 import { setupInputHighlights } from '../core/input-highlights.js';
@@ -8,7 +16,7 @@ import { tokensAtSelection } from '../core/token-output.js';
 import { nextErrorToken } from '../core/error-navigation.js';
 import { createDebugSession } from '../core/debug-session.js';
 import { TokenOutput } from './TokenOutput.jsx';
-import { IconButton } from './ui.jsx';
+import { IconButton, Button } from './ui.jsx';
 import { useDockGrip } from '../hooks/useDocking.js';
 import { useTesterResize } from '../hooks/useTesterResize.js';
 import { DebuggerWindow } from './DebuggerWindow.jsx';
@@ -39,6 +47,20 @@ export function Tester({ debuggerRef }) {
   );
   const grip = useDockGrip('tester'),
     resize = useTesterResize();
+  const [dock, setDock] = useState(() => document.body.dataset.testerDock || 'bottom');
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setDock(document.body.dataset.testerDock || 'bottom'),
+    );
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-tester-dock'] });
+    return () => observer.disconnect();
+  }, []);
+  const CollapseIcon = {
+    bottom: collapsed ? ChevronUp : ChevronDown,
+    top: collapsed ? ChevronDown : ChevronUp,
+    left: collapsed ? ChevronRight : ChevronLeft,
+    right: collapsed ? ChevronLeft : ChevronRight,
+  }[dock];
   const [canPrevious, setCanPrevious] = useState(false),
     [canNext, setCanNext] = useState(false);
   useLayoutEffect(() => {
@@ -102,9 +124,12 @@ export function Tester({ debuggerRef }) {
   useEffect(() => {
     document.body.classList.toggle('tester-collapsed', collapsed);
     writeStorage('lexica-tester-collapsed', collapsed);
-    const id = requestAnimationFrame(sync);
+    const id = requestAnimationFrame(() => {
+      sync();
+      controller?.refresh();
+    });
     return () => cancelAnimationFrame(id);
-  }, [collapsed]);
+  }, [collapsed, controller]);
   const reveal = (box) => {
     if (!box) return;
     const area = inputRef.current,
@@ -238,7 +263,7 @@ export function Tester({ debuggerRef }) {
           />
           <IconButton
             id="toggle-tester"
-            icon={ChevronDown}
+            icon={CollapseIcon}
             label={collapsed ? 'Expand tester' : 'Collapse tester'}
             aria-expanded={!collapsed}
             onClick={() => setCollapsed(!collapsed)}
@@ -324,9 +349,9 @@ export function Tester({ debuggerRef }) {
                 {analysis.error ? 1 : errors.length}{' '}
                 {errors.length === 1 || analysis.error ? 'error' : 'errors'}
               </span>
-              <IconButton
+              <Button
                 id="next-error"
-                icon={ArrowDown}
+                className="text-action"
                 label="Next error"
                 disabled={!errors.length || analysis.pending}
                 onClick={() => {
@@ -334,8 +359,9 @@ export function Tester({ debuggerRef }) {
                   if (token) selectToken(token);
                 }}
               >
+                <ArrowDown className="tool-icon" />
                 <span>Next error</span>
-              </IconButton>
+              </Button>
             </div>
           </div>
           <TokenOutput

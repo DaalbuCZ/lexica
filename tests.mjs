@@ -780,7 +780,16 @@ test('comments begin exactly at the cursor and attach to the nearest state', () 
     [],
   );
 });
-test('tree and radial layouts preserve note offsets and leave detached notes in place', () => {
+function assertCommentClearance(machine, comment) {
+  const { w, h } = commentLayout(comment);
+  assert.ok(Number.isFinite(comment.x) && Number.isFinite(comment.y));
+  for (const state of machine.states) {
+    const dx = Math.max(comment.x - state.x, 0, state.x - comment.x - w),
+      dy = Math.max(comment.y - state.y, 0, state.y - comment.y - h);
+    assert.ok(Math.hypot(dx, dy) >= 51.99);
+  }
+}
+test('tree and radial layouts place attached notes in free space and leave detached notes in place', () => {
   for (const mode of ['tree', 'circle'])
     for (const spacing of [0.35, 0.75, 1]) {
       const m = example(),
@@ -802,8 +811,7 @@ test('tree and radial layouts preserve note offsets and leave detached notes in 
         },
       ];
       autoLayout(m, mode, spacing);
-      assert.equal(m.comments[0].x - s.x, 80);
-      assert.equal(m.comments[0].y - s.y, -100);
+      assertCommentClearance(m, m.comments[0]);
       assert.equal(m.comments[1].x, -300);
       assert.equal(m.comments[1].y, -500);
       const first = JSON.stringify(m);
@@ -944,7 +952,7 @@ test('several states share one comment with toggleable dashed attachments and ce
   m.comments[0].nodeIds = ['s1', 's1'];
   assert.throws(() => validate(m), /attachment/);
 });
-test('many-state comment layouts preserve the centroid offset and copies remap only copied connections', () => {
+test('many-state comments avoid nodes and copies remap only copied connections', () => {
   for (const mode of ['tree', 'circle']) {
     const m = example();
     m.comments = [
@@ -956,17 +964,8 @@ test('many-state comment layouts preserve the centroid offset and copies remap o
         nodeIds: ['s0', 's1'],
       },
     ];
-    const center = () => ({
-      x: (m.states[0].x + m.states[1].x) / 2,
-      y: (m.states[0].y + m.states[1].y) / 2,
-    });
-    const c = center(),
-      dx = 700 - c.x,
-      dy = 50 - c.y;
     autoLayout(m, mode);
-    const after = center();
-    assert.ok(Math.abs(m.comments[0].x - after.x - dx) < 1e-8);
-    assert.ok(Math.abs(m.comments[0].y - after.y - dy) < 1e-8);
+    assertCommentClearance(m, m.comments[0]);
     const fragment = copySelection(m, new Set(['s1']), new Set(), new Set());
     assert.deepEqual(fragment.comments[0].nodeIds, ['s1']);
     let n = 0;
@@ -1584,7 +1583,7 @@ test('portals assign a usable generated name to an unnamed destination', () => {
   assert.equal(destination(m, m.edges[0]).id, 's1');
   validate(m);
 });
-test('spring layout separates states, preserves lexer semantics and comment offsets, and is deterministic from the same positions', () => {
+test('spring layout separates states and comments, preserves lexer semantics, and is deterministic from the same positions', () => {
   for (const spacing of [0.35, 0.5, 0.75, 1]) {
     const m = example();
     m.states.push({
@@ -1613,8 +1612,7 @@ test('spring layout separates states, preserves lexer semantics and comment offs
     for (let i = 0; i < m.states.length; i++)
       for (let j = i + 1; j < m.states.length; j++)
         assert.ok(Math.hypot(m.states[i].x - m.states[j].x, m.states[i].y - m.states[j].y) >= 88);
-    assert.ok(Math.abs(m.comments[0].x - m.states[1].x - 70) < 1e-6);
-    assert.ok(Math.abs(m.comments[0].y - m.states[1].y + 80) < 1e-6);
+    assertCommentClearance(m, m.comments[0]);
     const repeated = autoLayout(source, 'spring', spacing);
     assert.deepEqual(
       repeated.states.map((s) => [s.x, s.y]),
@@ -3805,7 +3803,7 @@ test('outside references choose an unobstructed side of a triangle with two entr
     assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 750);
   }
 });
-test('a string-like subgraph keeps cyclic blocks compact and terminal continuations aligned', () => {
+test('a string-like subgraph keeps its complete contextual graph compact and uncrossed', () => {
   const names = [
     'outside',
     'open',
@@ -3864,15 +3862,13 @@ test('a string-like subgraph keeps cyclic blocks compact and terminal continuati
   smartArrange(m, group.id, {
     mode: 'circle',
   });
-  const view = graphView(m, group.id, false),
-    get = (id) => view.states.find((s) => s.id === id);
+  const view = graphView(m, group.id, false);
   assert.equal(crossingPairs(view, true).length, 0);
   assert.ok(area(view.states) < area(baseline.states) * 0.6);
-  assert.ok(Math.abs(get('accepted').x - get('content').x) < 1e-6);
-  assert.ok(Math.abs(get('tripleAccepted').x - get('quote2').x) < 1e-6);
-  assert.ok(Math.abs(get('open').x - get('empty').x) < 1e-6);
-  assert.ok(Math.abs(get('empty').x - get('tripleEntry').x) < 1e-6);
-  assert.ok((get('body').x - get('tripleEntry').x) * (get('quote1').x - get('tripleEntry').x) < 0);
+  const contextual = graphView(m, group.id),
+    clearance = drawingClearance(contextual.states, contextual.edges);
+  assert.equal(crossingPairs(contextual, true).length, 0);
+  assert.ok(clearance.node >= 159.99 && clearance.wire >= 64.99);
   assert.equal(JSON.stringify(m.edges), edges);
   validate(m);
 });

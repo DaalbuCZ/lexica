@@ -7,6 +7,8 @@ import { planarCoordinates, drawingClearance } from './planar-layout.js';
 import { tidyTree, radialTree } from './tidy-tree.js';
 import { blockLayout } from './block-layout.js';
 import { compactPlanar } from './compact-planar.js';
+import { linearLayout } from './linear-layout.js';
+import dagre from '@dagrejs/dagre';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -37,6 +39,34 @@ function place(machine, focus, options) {
   const shown = graphView(machine, focus, false),
     copy = structuredClone(shown),
     anchors = commentAnchors(machine);
+  if (focus) {
+    const whole = structuredClone(graphView(machine, focus));
+    if (linearLayout(whole, options.spacing ?? 0.75)) {
+      const oldCenter =
+          shown.states.reduce((sum, s) => sum + s.x, 0) / Math.max(1, shown.states.length),
+        oldY = shown.states.reduce((sum, s) => sum + s.y, 0) / Math.max(1, shown.states.length),
+        members = new Set(shown.states.map((s) => s.id)),
+        inner = whole.states.filter((s) => members.has(s.id)),
+        dx = oldCenter - inner.reduce((sum, s) => sum + s.x, 0) / inner.length;
+      for (const state of whole.states) {
+        state.x += dx;
+        state.y += oldY;
+        if (members.has(state.id))
+          Object.assign(
+            machine.states.find((s) => s.id === state.id),
+            { x: state.x, y: state.y },
+          );
+      }
+      const group = machine.groups.find((g) => g.id === focus);
+      group.contextPositions = Object.fromEntries(
+        whole.states.filter((s) => s.outside).map((s) => [s.id, { x: s.x, y: s.y }]),
+      );
+      for (const edge of machine.edges) if (members.has(edge.from)) delete edge.bend;
+      positionComments(anchors);
+      placeCommentsAfterLayout(machine);
+      return;
+    }
+  }
   if (focus && !copy.start) {
     const members = new Set(copy.states.map((s) => s.id)),
       inbound = new Map();
@@ -69,7 +99,7 @@ function place(machine, focus, options) {
           Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y)),
         )
       : 0;
-  const preferFlow = focus && copy.states.length >= 11;
+  const preferFlow = focus && copy.states.length >= 11 && mode === 'tree';
   const directions = new Set(copy.edges.map((e) => JSON.stringify([e.from, e.to])));
   const forwardEdges = copy.edges.filter(
     (e) => e.from !== e.to && !directions.has(JSON.stringify([e.to, e.from])),
@@ -105,6 +135,16 @@ function place(machine, focus, options) {
       const positioned = {
         ...machine,
         states: machine.states.map((state) => nodes.get(state.id) ?? state),
+        groups: machine.groups?.map((group) =>
+          group.id === focus
+            ? {
+                ...group,
+                contextPositions: Object.fromEntries(
+                  candidate.states.filter((s) => s.outside).map((s) => [s.id, { x: s.x, y: s.y }]),
+                ),
+              }
+            : group,
+        ),
       };
       const projected = graphView(positioned, focus);
       const clearance = drawingClearance(projected.states, projected.edges);
@@ -181,12 +221,42 @@ function place(machine, focus, options) {
       }
     }
   }
+  if (focus && copy.states.length <= 60) {
+    for (const rankdir of ['LR', 'TB'])
+      for (const reverse of [false, true]) {
+        const candidate = structuredClone(copy),
+          graph = new dagre.graphlib.Graph({ multigraph: true });
+        graph.setGraph({
+          rankdir,
+          nodesep: Math.max(80, 120 * spacing),
+          ranksep: Math.max(80, 140 * spacing),
+          marginx: 0,
+          marginy: 0,
+          ranker: 'network-simplex',
+        });
+        graph.setDefaultEdgeLabel(() => ({}));
+        for (const state of candidate.states) graph.setNode(state.id, { width: 100, height: 100 });
+        const edges = reverse ? [...candidate.edges].reverse() : candidate.edges;
+        edges.forEach((edge, index) => {
+          if (edge.from !== edge.to)
+            graph.setEdge(edge.from, edge.to, { weight: 1 }, String(index));
+        });
+        dagre.layout(graph);
+        for (const state of candidate.states)
+          Object.assign(state, { x: graph.node(state.id).x, y: graph.node(state.id).y });
+        const next = cost(candidate);
+        if (next < best) {
+          best = next;
+          chosen = candidate.states;
+        }
+      }
+  }
   if (focus && !compactBranch && analytical.positions) {
     const clearance = drawingClearance(chosen, copy.edges);
     if (preferFlow || clearance.crossings || clearance.wire < 65 || clearance.node < 170) {
       const candidate = structuredClone(shown);
       candidate.start = copy.start;
-      const rotations = preferFlow
+      const rotations = focus
         ? [
             [1, 0],
             [0, 1],
@@ -226,6 +296,33 @@ function place(machine, focus, options) {
         }
       }
     }
+  }
+  if (focus && !compactBranch) {
+    const whole = structuredClone(graphView(machine, focus));
+    whole.start =
+      whole.states.find(
+        (state) => state.outside && whole.edges.some((edge) => edge.from === state.id),
+      )?.id ?? copy.start;
+    const planar = planarCoordinates(whole);
+    if (planar.positions)
+      for (const forward of [false, true])
+        for (const [cos, sin] of [
+          [1, 0],
+          [0, 1],
+        ]) {
+          const seed = new Map(
+            [...planar.positions].map(([id, p]) => [
+              id,
+              { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos },
+            ]),
+          );
+          const candidate = { ...whole, states: compactPlanar(whole, seed, forward) },
+            next = cost(candidate);
+          if (next < best) {
+            best = next;
+            chosen = candidate.states;
+          }
+        }
   }
   if (focus) {
     const candidate = { ...structuredClone(copy), states: structuredClone(chosen) };
@@ -292,13 +389,24 @@ function place(machine, focus, options) {
       }
     }
   }
+  if (focus && !compactBranch) {
+    const candidate = {
+        ...structuredClone(copy),
+        states: compactPlanar(copy, new Map(chosen.map((s) => [s.id, s])), false),
+      },
+      next = cost(candidate);
+    if (next < best) {
+      best = next;
+      chosen = candidate.states;
+    }
+  }
   if (focus && chosen.length) {
     const center = (states) => ({
         x: states.reduce((sum, s) => sum + s.x, 0) / states.length,
         y: states.reduce((sum, s) => sum + s.y, 0) / states.length,
       }),
       old = center(shown.states),
-      next = center(chosen);
+      next = center(chosen.filter((state) => !state.outside));
     chosen = chosen.map((state) => ({
       ...state,
       x: state.x + old.x - next.x,
@@ -340,6 +448,12 @@ function place(machine, focus, options) {
   placeCommentsAfterLayout(machine);
   if (focus) {
     const group = machine.groups?.find((group) => group.id === focus);
+    if (group && chosen.some((state) => state.outside))
+      group.contextPositions = Object.fromEntries(
+        chosen
+          .filter((state) => state.outside)
+          .map((state) => [state.id, { x: state.x, y: state.y }]),
+      );
     if (group)
       group.contextPositions = Object.fromEntries(
         graphView(machine, focus)

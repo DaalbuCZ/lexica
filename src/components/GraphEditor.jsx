@@ -1,6 +1,6 @@
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef } from 'react';
-import { Trash2, X, GripHorizontal } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { createEditorController } from '../editor/editor-controller.js';
 import { useStudio } from '../state/studio.js';
 import { IconButton, Field } from './ui.jsx';
@@ -80,12 +80,6 @@ export function GraphEditor({ children }) {
       </div>
       <section className="group-overlay" ref={groupPanel} hidden aria-label="Group editor">
         <div className="group-overlay-heading">
-          <IconButton
-            icon={GripHorizontal}
-            data-group-grip
-            label="Move group window"
-            title="Move group window · Arrow keys adjust position"
-          />
           <Field
             id="group-overlay-title"
             label=""
