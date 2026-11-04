@@ -102,6 +102,7 @@ export function validate(m) {
   for (const e of m.edges) {
     if (
       !validOffset(e.portalOffset) ||
+      !validOffset(e.groupBend) ||
       !ids.has(e.from) ||
       (e.portal == null && !ids.has(e.to)) ||
       typeof e.label !== 'string' ||
@@ -594,6 +595,7 @@ export function toTikz(m, standalone = true) {
     : body;
 }
 export const example = () => ({
+  labelBoxes: true,
   start: 's0',
   states: [
     {

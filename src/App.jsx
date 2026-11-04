@@ -46,9 +46,9 @@ export default function App() {
     useStudio.setState({ notice: '' });
   }, [notice]);
   useEffect(() => {
-    document.body.classList.add('app-ready');
+    if (!controller) return;
     return () => document.body.classList.remove('app-ready');
-  }, []);
+  }, [controller]);
   return (
     <>
       <header>
@@ -113,7 +113,6 @@ export default function App() {
       )}
       <Toaster
         position="bottom-center"
-        closeButton
         duration={3500}
         toastOptions={{ className: 'lexica-toast' }}
       />
@@ -129,6 +128,9 @@ export class AppErrorBoundary extends Component {
     return {
       error,
     };
+  }
+  componentDidCatch() {
+    document.body.classList.add('app-ready');
   }
   render() {
     return this.state.error ? (

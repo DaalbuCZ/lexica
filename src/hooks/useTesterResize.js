@@ -21,7 +21,7 @@ export function useTesterResize() {
     },
     ...readStorage(storageKey, {}),
   }));
-  const [side, setSide] = useState(() => document.body.dataset.testerDock || 'bottom');
+  const [side, setSide] = useState(() => document.body.dataset.testerDock || 'right');
   const current = useRef(sizes),
     drag = useRef(null),
     pending = useRef(null),
@@ -29,7 +29,7 @@ export function useTesterResize() {
   useEffect(() => {
     const resize = () => {
       apply(current.current);
-      setSide(document.body.dataset.testerDock || 'bottom');
+      setSide(document.body.dataset.testerDock || 'right');
     };
     resize();
     window.addEventListener('resize', resize);

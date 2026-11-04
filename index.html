@@ -9,19 +9,244 @@
     <script>
       try {
         const theme = localStorage.getItem('lexica-theme');
-        document.documentElement.dataset.theme =
-          theme === 'dark' ||
-          (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
-            ? 'dark'
-            : 'light';
+        document.documentElement.dataset.theme = theme !== 'light' ? 'dark' : 'light';
       } catch {
-        document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
+        document.documentElement.dataset.theme = 'dark';
       }
     </script>
+    <style>
+      .lexer-loading {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #f9fbf7;
+        color: #29382f;
+        --line: #60706b55;
+        --green: #83b69a;
+      }
+      [data-theme='dark'] .lexer-loading {
+        background: #343b3f;
+        color: #edf1f5;
+      }
+      .app-ready #app-loading {
+        display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-loading * {
+          animation: none !important;
+        }
+      } /* Recognize successive tokens, hold the result, then reset together. */
+      @property --recognized {
+        syntax: '<number>';
+        inherits: true;
+        initial-value: 0;
+      }
+      .lexer-loading {
+        gap: 0;
+        font-family: 'DM Sans', sans-serif;
+      }
+      .loading-scene {
+        width: min(360px, calc(100vw - 48px));
+      }
+      .loading-brand {
+        position: absolute;
+        top: clamp(24px, 6vh, 56px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        align-items: center;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: -1px;
+      }
+      .loading-brand > .logo {
+        width: 35px;
+        height: 37px;
+        border-radius: 8px;
+        font-size: 33px;
+      }
+      .loading-code {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        min-height: 78px;
+        padding-top: 14px;
+        font:
+          18px 'IBM Plex Mono',
+          monospace;
+      }
+      .loading-token {
+        --recognized: 0;
+        position: relative;
+        display: inline-block;
+        padding: 10px calc(5px + var(--recognized) * 3px);
+        margin-right: calc(var(--recognized) * 10px);
+        border: 1px solid hsl(var(--h) 50% 65% / calc(var(--recognized) * 0.6));
+        border-radius: 7px;
+        background: hsl(var(--h) 65% 70% / calc(var(--recognized) * 0.2));
+        animation: token-recognize-1 3.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+      }
+      .loading-token:last-child {
+        margin-right: 0;
+      }
+      .loading-token:nth-child(2) {
+        animation-name: token-recognize-2;
+      }
+      .loading-token:nth-child(3) {
+        animation-name: token-recognize-3;
+      }
+      .loading-token:nth-child(4) {
+        animation-name: token-recognize-4;
+      }
+      .loading-token b {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        transform: translateX(-50%);
+        font:
+          9px 'IBM Plex Mono',
+          monospace;
+        letter-spacing: 0.05em;
+        opacity: var(--recognized);
+        color: hsl(var(--h) 65% 42%);
+        translate: 0 calc((1 - var(--recognized)) * 5px);
+      }
+      .loading-track {
+        height: 3px;
+        margin: 24px 0 0;
+        overflow: hidden;
+        border-radius: 2px;
+        background: var(--line);
+      }
+      .loading-track i {
+        display: block;
+        width: 22%;
+        height: 100%;
+        margin: 0;
+        background: var(--green);
+        border-radius: 2px;
+        animation: token-scan 3.8s ease-in-out infinite;
+      }
+      @keyframes token-recognize-1 {
+        0%,
+        8%,
+        94%,
+        100% {
+          --recognized: 0;
+          transform: translateY(0) scale(1);
+        }
+        18% {
+          --recognized: 1;
+          transform: translateY(-8px) scale(1.08);
+        }
+        22% {
+          --recognized: 1;
+          transform: translateY(2px) scale(0.985);
+        }
+        26%,
+        88% {
+          --recognized: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes token-recognize-2 {
+        0%,
+        23%,
+        94%,
+        100% {
+          --recognized: 0;
+          transform: translateY(0) scale(1);
+        }
+        33% {
+          --recognized: 1;
+          transform: translateY(-8px) scale(1.08);
+        }
+        37% {
+          --recognized: 1;
+          transform: translateY(2px) scale(0.985);
+        }
+        41%,
+        88% {
+          --recognized: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes token-recognize-3 {
+        0%,
+        38%,
+        94%,
+        100% {
+          --recognized: 0;
+          transform: translateY(0) scale(1);
+        }
+        48% {
+          --recognized: 1;
+          transform: translateY(-8px) scale(1.08);
+        }
+        52% {
+          --recognized: 1;
+          transform: translateY(2px) scale(0.985);
+        }
+        56%,
+        88% {
+          --recognized: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes token-recognize-4 {
+        0%,
+        53%,
+        94%,
+        100% {
+          --recognized: 0;
+          transform: translateY(0) scale(1);
+        }
+        63% {
+          --recognized: 1;
+          transform: translateY(-8px) scale(1.08);
+        }
+        67% {
+          --recognized: 1;
+          transform: translateY(2px) scale(0.985);
+        }
+        71%,
+        88% {
+          --recognized: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes token-scan {
+        0%,
+        7% {
+          transform: translateX(-120%);
+        }
+        75%,
+        100% {
+          transform: translateX(460%);
+        }
+      }
+    </style>
   </head>
   <body class="properties-hidden">
+    <div id="app-loading" class="lexer-loading" role="status" aria-label="Loading Lexica">
+      <div class="loading-brand"><span class="logo" aria-hidden="true">λ</span> lexica</div>
+      <div class="loading-scene">
+        <div class="loading-code" aria-hidden="true">
+          <span class="loading-token" style="--h: 210"><b>IDENT</b>count</span
+          ><span class="loading-token" style="--h: 285"><b>OP</b>+=</span
+          ><span class="loading-token" style="--h: 40"><b>NUMBER</b>42</span
+          ><span class="loading-token" style="--h: 150"><b>PUNCT</b>;</span>
+        </div>
+        <div class="loading-track" aria-hidden="true"><i></i></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -182,16 +182,18 @@ export function createCanvasInteractions(context) {
     document.body.classList.add('panning');
   }
   function install() {
+    let resetBendKey = 'bend';
     const resetBendOnRightClick = createBendReset(
       (e) => {
         if (context.source || context.commentSource) return null;
         const hit = context.graph.hitClient(e);
-        return hit?.type === 'edge' ? context.machine.edges[hit.index] : null;
+        resetBendKey = hit?.type === 'group-edge' ? 'groupBend' : 'bend';
+        return ['edge', 'group-edge'].includes(hit?.type) ? context.machine.edges[hit.index] : null;
       },
       (edge) => {
-        if (!edge.bend) return;
+        if (!edge[resetBendKey]) return;
         context.checkpoint();
-        delete edge.bend;
+        delete edge[resetBendKey];
         context.changed();
         context.toast('Connection bend reset.');
       },
@@ -327,6 +329,7 @@ export function createCanvasInteractions(context) {
       true,
     );
     context.$('canvas').onpointerdown = (e) => {
+      context.$('canvas').focus({ preventScroll: true });
       if (e.button === 0 && e.shiftKey) {
         e.preventDefault();
         context.marquee = {
@@ -385,14 +388,8 @@ export function createCanvasInteractions(context) {
         else if (e.button === 0) startGroupDrag(e, 'group', hit.id);
         return;
       }
-      if (hit?.type === 'group-edge') {
-        if (e.button === 0) {
-          context.choose('edge', hit.index);
-          context.render();
-          context.showProperties(true, e);
-        }
-        return;
-      }
+      const groupEdge = hit?.type === 'group-edge';
+      if (groupEdge) hit.type = 'edge';
       if ((hit?.type === 'portal-source' || hit?.type === 'portal-target') && e.button === 0) {
         const isSource = hit.type === 'portal-source',
           item = isSource
@@ -460,13 +457,18 @@ export function createCanvasInteractions(context) {
           if (hit.type === 'edge' && context.graph.edgeRoute(hit.index)) {
             const edge = context.machine.edges[hit.index];
             const route = context.graph.edgeRoute(hit.index);
-            const from = context.machine.states.find((state) => state.id === edge.from);
+            const shown = groupEdge ? graphView(context.machine) : context.machine;
+            const displayedEdge = groupEdge
+              ? shown.edges.find((item) => item.originalIndex === hit.index)
+              : edge;
+            const from = shown.states.find((state) => state.id === displayedEdge.from);
             const to =
-              edge.portal == null
-                ? context.machine.states.find((state) => state.id === edge.to)
+              displayedEdge.portal == null
+                ? shown.states.find((state) => state.id === displayedEdge.to)
                 : null;
             context.edgeDrag = {
               edge,
+              bendKey: groupEdge ? 'groupBend' : 'bend',
               index: hit.index,
               route,
               from,
@@ -474,7 +476,7 @@ export function createCanvasInteractions(context) {
               labelOffset: { x: 0, y: 0 },
               start: context.point(e),
               bend: {
-                ...(edge.bend ?? {
+                ...(edge[groupEdge ? 'groupBend' : 'bend'] ?? {
                   x: 0,
                   y: 0,
                 }),
@@ -530,7 +532,7 @@ export function createCanvasInteractions(context) {
     };
     context.listen(
       context.$('canvas'),
-      'pointerdown',
+      'dblclick',
       (e) => {
         if (e.button !== 0) return;
         const hit = context.graph.hitClient(e);
@@ -598,7 +600,7 @@ export function createCanvasInteractions(context) {
           context.checkpoint();
           context.edgeDrag.moved = true;
         }
-        context.edgeDrag.edge.bend = context.edgeDrag.center
+        context.edgeDrag.edge[context.edgeDrag.bendKey] = context.edgeDrag.center
           ? loopDragBend(
               context.edgeDrag.center,
               context.edgeDrag.apex,
@@ -766,7 +768,7 @@ export function createCanvasInteractions(context) {
         context.openGroupById(hit.id);
         return;
       }
-      if (hit?.type === 'group-edge') return;
+      if (hit?.type === 'group-edge') hit.type = 'edge';
       if (hit) {
         const type =
           hit.type === 'start-view'

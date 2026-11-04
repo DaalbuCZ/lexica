@@ -15,28 +15,24 @@ import {
   Undo2,
   StickyNote,
   Settings,
-  PanelRight,
   Workflow,
   Layers,
-  Group,
 } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
 import { useDockGrip } from '../hooks/useDocking.js';
 import { useEffect, useState } from 'react';
 import { IconButton } from './ui.jsx';
 export function Toolbar() {
-  const [dock, setDock] = useState(() => document.body.dataset.toolbarDock || 'top');
+  const [dock, setDock] = useState(() => document.body.dataset.toolbarDock || 'left');
   useEffect(() => {
     const observer = new MutationObserver(() =>
-      setDock(document.body.dataset.toolbarDock || 'top'),
+      setDock(document.body.dataset.toolbarDock || 'left'),
     );
     observer.observe(document.body, { attributes: true, attributeFilter: ['data-toolbar-dock'] });
     return () => observer.disconnect();
   }, []);
   const controller = useStudio((s) => s.controller),
     scene = useStudio((s) => s.scene),
-    simplified = useStudio((s) => s.settings.simplified),
-    propertiesOpen = useStudio((s) => s.propertiesOpen),
     grip = useDockGrip('toolbar');
   const dialog = (type) =>
     useStudio.setState({
@@ -130,14 +126,6 @@ export function Toolbar() {
         title="Add comment · C"
         onClick={() => controller?.place('comment')}
       />
-      <IconButton
-        id="group-selection"
-        icon={Group}
-        label="Group selected states"
-        hidden={simplified}
-        disabled={!scene.selectedStates.size}
-        onClick={() => controller?.makeGroup()}
-      />
       <span className="separator" />
       <IconButton
         id="copy-selection"
@@ -182,14 +170,6 @@ export function Toolbar() {
         label="Manage memory cells"
         hidden={machineType(scene.machine) !== 'extended'}
         onClick={() => dialog('memory')}
-      />
-      <IconButton
-        id="toggle-properties"
-        icon={PanelRight}
-        label="Toggle properties"
-        hidden={simplified}
-        aria-expanded={propertiesOpen}
-        onClick={() => controller?.showProperties(!propertiesOpen)}
       />
     </nav>
   );

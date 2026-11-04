@@ -34,7 +34,7 @@ export function createViewport(context) {
     if (wasOpen !== !!show) {
       context.onUI({ propertiesOpen: !!show });
       document.body.classList.toggle('properties-hidden', !show);
-      context.$('toggle-properties').setAttribute('aria-expanded', String(show));
+      context.$('toggle-properties')?.setAttribute('aria-expanded', String(show));
     }
     if (!show) {
       if (context.propertiesFrame !== null) cancelAnimationFrame(context.propertiesFrame);
@@ -100,6 +100,7 @@ export function createViewport(context) {
       placed = placeFloatingRect(candidate, size, area, obstacles, 12);
     panel.style.left = placed.x - area.left + 'px';
     panel.style.top = placed.y - area.top + 'px';
+    panel.style.transformOrigin = `${anchor.x - placed.x}px ${anchor.y - placed.y}px`;
     const tester = document.querySelector('.tester'),
       bottom =
         document.body.dataset.testerDock === 'bottom' && tester

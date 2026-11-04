@@ -867,8 +867,9 @@ details > summary::before {
   color: var(--error);
 }
 .react-dialog:not(.tool-panel) {
-  transform: none;
-  translate: -50% -50%;
+  --window-position: translate(-50%, -50%);
+  transform: var(--window-position);
+  translate: none;
   transform-origin: center;
 }
 details[open] > summary::before {
@@ -954,18 +955,18 @@ summary,
 }
 @keyframes window-open {
   from {
-    scale: 0;
+    transform: var(--window-position, translate(0, 0)) scale(0);
   }
   to {
-    scale: 1;
+    transform: var(--window-position, translate(0, 0)) scale(1);
   }
 }
 @keyframes window-close {
   from {
-    scale: 1;
+    transform: var(--window-position, translate(0, 0)) scale(1);
   }
   to {
-    scale: 0;
+    transform: var(--window-position, translate(0, 0)) scale(0);
   }
 }
 .animated-window[data-state='open'] {
@@ -1044,5 +1045,33 @@ summary,
   }
   .animated-window[data-state] {
     animation-duration: 1ms;
+  }
+}
+
+/* The tester retains its edge while expanding into the canvas. */
+body:not(.resizing-tester) .tester {
+  transition:
+    width 180ms ease,
+    height 180ms ease;
+}
+body:not(.tester-collapsed) .tester .test-grid {
+  animation: tester-reveal 180ms ease-out;
+}
+@keyframes tester-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .tester {
+    transition: none;
+  }
+  body .tester .test-grid {
+    animation: none;
   }
 }

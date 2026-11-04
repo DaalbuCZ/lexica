@@ -803,7 +803,7 @@ test('layout density adjusts spacing in both modes without changing connections'
   }
 });
 test('transition label boxes round trip and toggle in TikZ without changing lexer behavior', () => {
-  const m = example(),
+  const m = { ...example(), labelBoxes: false },
     before = tokenize(m, 'hello 42'),
     plain = toTikz(m);
   assert.ok(!plain.includes('rounded corners=1pt'));
@@ -1389,16 +1389,16 @@ test('docking chooses the nearest edge and validates saved panel positions', asy
       tester: null,
     }),
     {
-      toolbar: 'top',
+      toolbar: 'left',
       breadcrumbs: 'top',
-      tester: 'bottom',
+      tester: 'right',
       debugger: 'top',
     },
   );
   assert.deepEqual(dockSettings(null), {
-    toolbar: 'top',
+    toolbar: 'left',
     breadcrumbs: 'top',
-    tester: 'bottom',
+    tester: 'right',
     debugger: 'top',
   });
 });
@@ -2319,7 +2319,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       getItem: () => '{"simplified":true,"pinchSensitivity":2}',
     }),
     {
-      groupPresentation: 'canvas',
+      groupPresentation: 'overlay',
       simplified: true,
       followDebugState: true,
       rerouteWhileDragging: false,
@@ -2331,8 +2331,8 @@ test('simplified settings restore safely without changing graph preferences', ()
       getItem: () => '{broken',
     }),
     {
-      groupPresentation: 'canvas',
-      simplified: false,
+      groupPresentation: 'overlay',
+      simplified: true,
       followDebugState: true,
       rerouteWhileDragging: false,
       pinchSensitivity: 1,
@@ -2345,8 +2345,8 @@ test('simplified settings restore safely without changing graph preferences', ()
       },
     }),
     {
-      groupPresentation: 'canvas',
-      simplified: false,
+      groupPresentation: 'overlay',
+      simplified: true,
       followDebugState: true,
       rerouteWhileDragging: false,
       pinchSensitivity: 1,
@@ -4504,3 +4504,78 @@ test('basic arrangement is deterministic, separates states, and preserves the le
 });
 import './tests/curve-clearance.test.mjs';
 import './tests/layout-algorithms.test.mjs';
+
+test('academic IFJ export expands characters, resolves portals and uses unique state names', async () => {
+  const { toAcademic } = await import('./src/core/academic-export.js');
+  const m = {
+    start: 'a',
+    states: [
+      { id: 'a', name: 'same', token: '', x: 0, y: 0 },
+      { id: 'b', name: 'same', token: 'OK', portal: 'target', x: 100, y: 0 },
+    ],
+    edges: [{ from: 'a', portal: 'target', label: '[a-c]' }],
+  };
+  const before = structuredClone(m);
+  const text = toAcademic(m);
+  assert.match(text, /M = \(Q, Σ, R, s, F\)/);
+  assert.match(text, /Q = \{q0, q1\}/);
+  assert.match(text, /Σ = \{"a"…"c"\}/);
+  assert.match(text, /q0 a → q1/);
+  assert.match(text, /s = q0/);
+  assert.match(text, /F = \{q1\}/);
+  assert.deepEqual(m, before);
+  m.edges[0].label = 'a';
+  m.edges[0].invert = true;
+  assert.match(toAcademic(m), /"b"…U\+10FFFF/);
+  m.start = null;
+  assert.throws(() => toAcademic(m), /start state/);
+});
+
+test('overview bends persist without changing internal transition bends', () => {
+  const m = example();
+  m.groups = [{ id: 'g', name: 'G', stateIds: ['s1'], x: 400, y: 145 }];
+  m.edges[0].bend = { x: 7, y: 9 };
+  m.edges[0].groupBend = { x: 30, y: 60 };
+  const restored = validate(JSON.parse(JSON.stringify(m)));
+  assert.deepEqual(graphView(restored).edges.find((e) => e.originalIndex === 0).bend, {
+    x: 30,
+    y: 60,
+  });
+  assert.deepEqual(restored.edges[0].bend, { x: 7, y: 9 });
+});
+
+test('Auto layout chooses tree below ten nodes and radial at ten, always compact', async () => {
+  const { createLayoutTask } = await import('./src/editor/layout-task.js');
+  const previous = globalThis.Worker;
+  const requests = [];
+  globalThis.Worker = class {
+    postMessage(request) {
+      requests.push(request);
+    }
+    terminate() {}
+  };
+  try {
+    for (const count of [9, 10]) {
+      const scope = new AbortController();
+      const run = createLayoutTask({ scope });
+      const machine = {
+        start: 's0',
+        states: Array.from({ length: count }, (_, i) => ({
+          id: `s${i}`,
+          name: `S${i}`,
+          token: '',
+          x: i * 100,
+          y: 0,
+        })),
+        edges: [],
+      };
+      const task = run(machine, null, { mode: 'auto', spacing: 1 });
+      assert.equal(requests.at(-1).options.mode, count < 10 ? 'tree' : 'circle');
+      assert.equal(requests.at(-1).options.spacing, 0.5);
+      scope.abort();
+      await assert.rejects(task, { name: 'AbortError' });
+    }
+  } finally {
+    globalThis.Worker = previous;
+  }
+});

@@ -5,16 +5,16 @@ export function readEditorSettings(storage) {
     const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(STORAGE_KEY) || '{}');
     const sensitivity = Number(saved.pinchSensitivity);
     return {
-      groupPresentation: saved.groupPresentation === 'overlay' ? 'overlay' : 'canvas',
-      simplified: saved.simplified === true,
+      groupPresentation: saved.groupPresentation === 'canvas' ? 'canvas' : 'overlay',
+      simplified: saved.simplified !== false,
       followDebugState: saved.followDebugState !== false,
       rerouteWhileDragging: saved.rerouteWhileDragging === true,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {
     return {
-      groupPresentation: 'canvas',
-      simplified: false,
+      groupPresentation: 'overlay',
+      simplified: true,
       followDebugState: true,
       rerouteWhileDragging: false,
       pinchSensitivity: 1,

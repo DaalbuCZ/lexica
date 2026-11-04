@@ -21,6 +21,13 @@ export function Tester({ debuggerRef }) {
     showSkipped = useStudio((s) => s.showSkipped),
     controller = useStudio((s) => s.controller);
   const analysis = useLexer(machine, input, version);
+  useEffect(() => {
+    if (!controller || analysis.pending) return;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => document.body.classList.add('app-ready'));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [controller, analysis.pending]);
   const inputRef = useRef(null),
     mirror = useRef(null),
     errorsRef = useRef(null),
@@ -42,10 +49,10 @@ export function Tester({ debuggerRef }) {
   );
   const grip = useDockGrip('tester'),
     resize = useTesterResize();
-  const [dock, setDock] = useState(() => document.body.dataset.testerDock || 'bottom');
+  const [dock, setDock] = useState(() => document.body.dataset.testerDock || 'right');
   useEffect(() => {
     const observer = new MutationObserver(() =>
-      setDock(document.body.dataset.testerDock || 'bottom'),
+      setDock(document.body.dataset.testerDock || 'right'),
     );
     observer.observe(document.body, { attributes: true, attributeFilter: ['data-tester-dock'] });
     return () => observer.disconnect();

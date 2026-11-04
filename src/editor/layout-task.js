@@ -14,6 +14,16 @@ export function createLayoutTask(context) {
     new Promise((resolve, reject) => {
       cancel();
       const original = structuredClone(machine);
+      const count =
+        focus && !options.disregardGroups
+          ? (machine.groups?.find((group) => group.id === focus)?.stateIds.length ??
+            machine.states.length)
+          : machine.states.length;
+      options = {
+        ...options,
+        mode: options.mode === 'auto' ? (count < 10 ? 'tree' : 'circle') : options.mode,
+        spacing: 0.5,
+      };
       if (options.disregardGroups) focus = null;
       const worker = new Worker(new URL('../core/layout-worker.js', import.meta.url), {
         type: 'module',

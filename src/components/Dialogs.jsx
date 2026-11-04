@@ -1,7 +1,8 @@
 import { Button } from './ui.jsx';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TextField, TextArea } from '@radix-ui/themes';
 import { useStudio, persistedMachine, readStorage, writeStorage } from '../state/studio.js';
+import { toAcademic } from '../core/academic-export.js';
 import { parseMachine, toTikz } from '../core/lexer.js';
 import { useSvgExport } from '../hooks/useSvgExport.js';
 import { graphView } from '../core/groups.js';
@@ -132,6 +133,15 @@ function ExportDialog({ onClose, dialog }) {
     simplified = useStudio((s) => s.settings.simplified);
   const svg = useSvgExport(source, simplified, format === 'svg');
   const svgFile = svg.files.find((file) => file.id === svgId) ?? svg.files[0];
+  const version = useStudio((s) => s.scene.version);
+  const academic = useMemo(() => {
+    if (format !== 'txt') return {};
+    try {
+      return { text: toAcademic(source) };
+    } catch (error) {
+      return { error: error.message };
+    }
+  }, [format, source, version]);
   const machine = persistedMachine();
   let text = '',
     error = '';
@@ -141,7 +151,10 @@ function ExportDialog({ onClose, dialog }) {
         ? JSON.stringify(machine, null, 2)
         : format === 'tex'
           ? toTikz(machine, standalone)
-          : (svgFile?.text ?? '');
+          : format === 'txt'
+            ? (academic.text ?? '')
+            : (svgFile?.text ?? '');
+    if (format === 'txt') error = academic.error ?? '';
     if (format === 'svg') error = svg.error;
   } catch (issue) {
     error = issue.message;
@@ -162,7 +175,9 @@ function ExportDialog({ onClose, dialog }) {
         ? 'image/svg+xml'
         : format === 'json'
           ? 'application/json'
-          : 'application/x-tex',
+          : format === 'txt'
+            ? 'text/plain;charset=utf-8'
+            : 'application/x-tex',
     );
   const pending = format === 'svg' && svg.pending;
   return (
@@ -177,6 +192,7 @@ function ExportDialog({ onClose, dialog }) {
           <option value="json">Editable machine (.json)</option>
           <option value="tex">LaTeX / TikZ (.tex)</option>
           <option value="svg">Vector diagram (.svg)</option>
+          <option value="txt">Academic FSM / IFJ (.txt)</option>
         </Select>
         {format === 'tex' && (
           <Check
@@ -252,13 +268,10 @@ function ExportDialog({ onClose, dialog }) {
 }
 function LayoutDialog({ onClose, dialog }) {
   const [mode, setMode] = useState(() => {
-    const value = readStorage('lexica-layout-mode', 'circle', false);
-    return ['tree', 'circle'].includes(value) ? value : 'circle';
+    const value = readStorage('lexica-layout-mode', 'auto', false);
+    return ['auto', 'tree', 'circle'].includes(value) ? value : 'auto';
   });
-  const [spacing, setSpacing] = useState(() => {
-    const value = readStorage('lexica-layout-density', '0.75', false);
-    return ['0.35', '0.5', '0.75', '1'].includes(value) ? value : '0.75';
-  });
+  const spacing = 0.5;
   const [smartGroups, setSmartGroups] = useState(() =>
       readStorage('lexica-layout-smart-groups', true),
     ),
@@ -294,14 +307,9 @@ function LayoutDialog({ onClose, dialog }) {
       anchorId={dialog.anchorId}
     >
       <Select id="layout-mode" label="Layout" value={mode} onChange={setMode}>
+        <option value="auto">Auto (tree below 10 nodes, otherwise radial)</option>
         <option value="tree">Tree</option>
         <option value="circle">Radial</option>
-      </Select>
-      <Select id="layout-density" label="Density" value={spacing} onChange={setSpacing}>
-        <option value="0.35">Extra compact</option>
-        <option value="0.5">Compact</option>
-        <option value="0.75">Normal</option>
-        <option value="1">Spacious</option>
       </Select>
       <Check
         id="layout-portals"

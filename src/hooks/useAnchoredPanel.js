@@ -26,6 +26,7 @@ export function useAnchoredPanel(panel, anchorId) {
       if (dock === 'bottom') top = toolbar.top - height - 14;
       panel.style.left = Math.max(12, Math.min(left, innerWidth - width - 12)) + 'px';
       panel.style.top = Math.max(12, Math.min(top, innerHeight - height - 12)) + 'px';
+      panel.style.transformOrigin = `${box.left + box.width / 2 - parseFloat(panel.style.left)}px ${box.top + box.height / 2 - parseFloat(panel.style.top)}px`;
     };
     place();
     const observer = new ResizeObserver(place);

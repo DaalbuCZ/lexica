@@ -149,7 +149,7 @@ export function graphView(machine, focus = null, includeOutside = true) {
       groupEdge: true,
       portal: undefined,
       portalOffset: undefined,
-      bend: undefined,
+      bend: edge.groupBend,
     };
     groupRoutes.set(key, route);
     edges.push(route);

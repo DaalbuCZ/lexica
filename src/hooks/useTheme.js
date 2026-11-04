@@ -5,8 +5,7 @@ export function useTheme() {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
       const preference = readStorage('lexica-theme', null, false);
-      document.documentElement.dataset.theme =
-        preference === 'dark' || (preference !== 'light' && media.matches) ? 'dark' : 'light';
+      document.documentElement.dataset.theme = preference !== 'light' ? 'dark' : 'light';
     };
     apply();
     media.addEventListener('change', apply);

@@ -7,7 +7,7 @@ export function dragEdgeRoute(drag) {
   const base = drag.route.unbent ?? drag.route;
   const route = structuredClone(base);
   route.unbent = base;
-  applyBend(route, drag.edge, drag.from, drag.to);
+  applyBend(route, { ...drag.edge, bend: drag.edge[drag.bendKey ?? 'bend'] }, drag.from, drag.to);
   route.label.x += drag.labelOffset.x;
   route.label.y += drag.labelOffset.y;
   route.d = `M ${route.p0.x} ${route.p0.y} C ${route.c1.x} ${route.c1.y} ${route.c2.x} ${route.c2.y} ${route.p3.x} ${route.p3.y}`;
