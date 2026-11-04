@@ -16,17 +16,58 @@ const machine = {
   groups: [{ id: 'g', name: 'Group', stateIds: ['a', 'b'], x: 80, y: 0 }],
   comments: [],
 };
-async function setup(page) {
-  await page.addInitScript((m) => {
-    localStorage.setItem('lexica-machine', JSON.stringify(m));
-    localStorage.setItem(
-      'lexica-editor-settings',
-      JSON.stringify({ groupPresentation: 'overlay' }),
-    );
-    localStorage.setItem('lexica-tester-collapsed', 'true');
-  }, machine);
+async function setup(page, presentation = 'overlay') {
+  await page.addInitScript(
+    ({ m, presentation }) => {
+      localStorage.setItem('lexica-machine', JSON.stringify(m));
+      localStorage.setItem(
+        'lexica-editor-settings',
+        JSON.stringify({ groupPresentation: presentation }),
+      );
+      localStorage.setItem('lexica-tester-collapsed', 'true');
+    },
+    { m: machine, presentation },
+  );
   await page.goto('/');
 }
+
+for (const presentation of ['canvas', 'overlay'])
+  test(`${presentation}: single click selects, dragging moves the group, double click opens`, async ({
+    page,
+  }) => {
+    await setup(page, presentation);
+    const p = await groupPoint(page);
+    await page.mouse.click(p.x, p.y);
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(0);
+    const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')));
+    const before = await read();
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(p.x + 70, p.y + 40, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(async () => (await read()).groups[0].x).not.toBe(before.groups[0].x);
+    const moved = await read(),
+      dx = moved.groups[0].x - before.groups[0].x,
+      dy = moved.groups[0].y - before.groups[0].y;
+    expect(dx).not.toBe(0);
+    expect(dy).not.toBe(0);
+    for (const id of ['a', 'b']) {
+      const a = before.states.find((s) => s.id === id),
+        b = moved.states.find((s) => s.id === id);
+      expect(b.x - a.x).toBe(dx);
+      expect(b.y - a.y).toBe(dy);
+    }
+    expect(moved.states.filter((s) => !['a', 'b'].includes(s.id))).toEqual(
+      before.states.filter((s) => !['a', 'b'].includes(s.id)),
+    );
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect.poll(async () => (await read()).groups[0].x).toBe(before.groups[0].x);
+    const restored = await groupPoint(page);
+    await page.mouse.dblclick(restored.x, restored.y);
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(1);
+    if (presentation === 'overlay') await expect(page.locator('.group-overlay')).toBeVisible();
+  });
 const transform = (page, selector) =>
   page.locator(selector).evaluate((c) => {
     const t = c.getContext('2d').getTransform();
@@ -54,7 +95,7 @@ async function backgroundPoint(page) {
 test('mouse wheel pans the background while a subgroup stays open', async ({ page }) => {
   await setup(page);
   const p = await groupPoint(page);
-  await page.mouse.click(p.x, p.y);
+  await page.mouse.dblclick(p.x, p.y);
   await expect(page.locator('.group-overlay')).toBeVisible();
   const outside = await backgroundPoint(page),
     before = await transform(page, '.group-overview-backdrop');
@@ -72,7 +113,7 @@ test('mouse wheel pans the background while a subgroup stays open', async ({ pag
 test('middle-button background pan moves the overview and its dots together', async ({ page }) => {
   await setup(page);
   const p = await groupPoint(page);
-  await page.mouse.click(p.x, p.y);
+  await page.mouse.dblclick(p.x, p.y);
   await expect(page.locator('.group-overlay')).toBeVisible();
   const outside = await backgroundPoint(page),
     before = await transform(page, '.group-overview-backdrop'),
@@ -110,6 +151,8 @@ test('touch opening, background panning and closing do not leave a phantom finge
     cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ id, x: p.x, y: p.y }] : [] });
   for (let cycle = 0; cycle < 2; cycle++) {
     const p = await groupPoint(page);
+    await touch('touchStart', p);
+    await touch('touchEnd');
     await touch('touchStart', p);
     await touch('touchEnd');
     await expect(page.locator('.group-overlay')).toBeVisible();

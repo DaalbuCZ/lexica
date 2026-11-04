@@ -40,7 +40,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   });
   await page
     .locator('#canvas')
-    .click({ position: point(diagram.states.find((state) => state.id === group.id)) });
+    .dblclick({ position: point(diagram.states.find((state) => state.id === group.id)) });
   await expect(page.locator('.group-overlay')).toBeVisible();
   await expect(page.locator('.group-overlay #canvas')).toHaveCount(1);
   await expect(page.locator('#group-overlay-title')).toHaveValue('Tokens');

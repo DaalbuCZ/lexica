@@ -55,6 +55,41 @@ export function createCanvasInteractions(context) {
       startPan(e);
       return;
     }
+    if (type === 'group') {
+      const group = context.machine.groups.find((g) => g.id === key);
+      if (!group?.stateIds.length) return;
+      const selected = group.stateIds.every((id) => context.selectedStates.has(id));
+      if (e.shiftKey && selected) {
+        group.stateIds.forEach((id) => context.selectedStates.delete(id));
+        context.primaryFromSelection();
+        context.markSelection();
+        context.queueDraw();
+        return;
+      }
+      context.choose('state', group.stateIds[0], { keep: e.shiftKey || selected });
+      group.stateIds.forEach((id) => context.selectedStates.add(id));
+      context.showProperties(false);
+      context.markSelection();
+      context.properties();
+      const groups = (context.machine.groups ?? []).filter((g) =>
+        g.stateIds.every((id) => context.selectedStates.has(id)),
+      );
+      const items = [
+        ...context.machine.states.filter((s) => context.selectedStates.has(s.id)),
+        ...groups,
+        ...groups.flatMap((g) => Object.values(g.contextPositions ?? {})),
+        ...(context.machine.comments ?? []).filter((c) => context.selectedComments.has(c.id)),
+      ];
+      context.drag = {
+        start: context.point(e),
+        moved: false,
+        anchors: commentAnchors(context.machine).filter(
+          (a) => !context.selectedComments.has(a.comment.id),
+        ),
+        items: [...new Set(items)].map((item) => ({ item, x: item.x, y: item.y })),
+      };
+      return;
+    }
     const already = context.selectionSet(type).has(key);
     context.choose(type, key, {
       toggle: e.shiftKey,
@@ -72,6 +107,11 @@ export function createCanvasInteractions(context) {
       ),
       items: [
         ...context.machine.states.filter((s) => context.selectedStates.has(s.id)),
+        ...(context.machine.groups ?? [])
+          .filter(
+            (g) => g.stateIds.length && g.stateIds.every((id) => context.selectedStates.has(id)),
+          )
+          .flatMap((g) => [g, ...Object.values(g.contextPositions ?? {})]),
         ...(context.machine.comments ?? []).filter((c) => context.selectedComments.has(c.id)),
       ].map((item) => ({
         item,
@@ -342,7 +382,7 @@ export function createCanvasInteractions(context) {
         e.stopPropagation();
         if ((context.source || context.commentSource) && (e.button === 0 || e.button === 2))
           context.connectToGroup(hit.id);
-        else if (e.button === 0) context.openGroupById(hit.id);
+        else if (e.button === 0) startGroupDrag(e, 'group', hit.id);
         return;
       }
       if (hit?.type === 'group-edge') {

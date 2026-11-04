@@ -295,7 +295,14 @@ export function createCanvasRenderer(context) {
       routes: shownRoutes,
       invalidEdges,
       tokenColor,
-      selectedStates: context.selectedStates,
+      selectedStates: new Set([
+        ...context.selectedStates,
+        ...(context.machine.groups ?? [])
+          .filter(
+            (g) => g.stateIds.length && g.stateIds.every((id) => context.selectedStates.has(id)),
+          )
+          .map((g) => g.id),
+      ]),
       selectedComments: context.selectedComments,
       selectedCommentLinks: context.selectedCommentLinks,
       edgeSelected: (e, i) => context.edgeSelected(e, e.originalIndex ?? i),
