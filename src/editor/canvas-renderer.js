@@ -11,7 +11,7 @@ import { dragEdgeRoute, interactiveRoutes } from '../core/interactive-routes.js'
 import { visualMachine } from '../core/start-views.js';
 import { createLiveRouting } from './live-routing.js';
 import { repairDraggedRoutes } from '../core/incremental-layout.js';
-import { storeDrawingRoutes } from '../core/drawing-routes.js';
+import { storeDrawingRoutes, drawingRouteKey } from '../core/drawing-routes.js';
 export function createCanvasRenderer(context) {
   const syncGroupPositions = (shown) => {
     const groups = new Map((context.machine.groups ?? []).map((group) => [group.id, group]));
@@ -28,10 +28,13 @@ export function createCanvasRenderer(context) {
   context.disposeRouting = () => {
     liveRouting.dispose();
     context.settleRoutes = null;
+    viewSnapshots.clear();
   };
   let mapScene = null;
   let shownCache = null;
   let routeSnapshot = null;
+  const viewSnapshots = new Map();
+  const viewKey = (group, simple) => JSON.stringify([group ?? null, simple]);
   context.settleRoutes = () => {
     if (!routeSnapshot || routeSnapshot.group !== context.openGroup) return;
     const shown = visualMachine(graphView(context.machine, context.openGroup)),
@@ -132,10 +135,15 @@ export function createCanvasRenderer(context) {
     const portalEdit = context.portalDrag?.moved ? context.portalDrag : null;
     const manualEdit = edgeEdit ?? portalEdit;
     const dragging = context.drag?.moved || manualEdit;
-    const routing = dragging ? interactiveRoutes : routeEdges;
     const sameTopology =
       shownCache?.version === context.documentVersion && shownCache.group === context.openGroup;
     const shown = sameTopology ? shownCache.machine : graphView(context.machine, context.openGroup);
+    if (
+      routeSnapshot?.group !== context.openGroup ||
+      routeSnapshot?.simple !== editorSettings.simplified
+    )
+      routeSnapshot =
+        viewSnapshots.get(viewKey(context.openGroup, editorSettings.simplified)) ?? null;
     if (sameTopology) syncGroupPositions(shown);
     if (sameTopology && context.openGroup) {
       const positions = context.machine.groups.find(
@@ -197,6 +205,7 @@ export function createCanvasRenderer(context) {
         edge.originalIndices?.length > 1
           ? `${edge.originalIndices.length} transitions`
           : baseLabel(edge),
+      signature = drawingRouteKey(visualMachine(shown), shown.edges.map(label)),
       liveSnapshot =
         !manualEdit &&
         (dragging || routeSnapshot?.manualVersion !== context.documentVersion) &&
@@ -215,32 +224,21 @@ export function createCanvasRenderer(context) {
                 label,
               )[0];
             })
-          : !dragging && shown.drawingRoutes?.length
-            ? routeEdges(shown, label)
-            : liveSnapshot
-              ? interactiveRoutes(shown, label, liveSnapshot)
-              : dragging
-                ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
-                : editorSettings.rerouteWhileDragging &&
-                    liveRouting.started &&
-                    routeSnapshot?.group === context.openGroup
-                  ? interactiveRoutes(shown, label, routeSnapshot)
-                  : routeSnapshot?.version === context.documentVersion &&
-                      routeSnapshot.group === context.openGroup &&
-                      routeSnapshot.simple === editorSettings.simplified &&
-                      visualMachine(shown).states.every((state) => {
-                        const old = routeSnapshot.nodes.get(state.id);
-                        return old?.x === state.x && old?.y === state.y;
-                      })
-                    ? routeSnapshot.routes
-                    : routeEdges(shown, label);
-    if (!dragging || manualEdit?.committing)
+          : liveSnapshot
+            ? interactiveRoutes(shown, label, liveSnapshot)
+            : dragging
+              ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+              : routeSnapshot?.signature === signature
+                ? routeSnapshot.routes
+                : routeEdges(shown, label);
+    if (!dragging || manualEdit?.committing) {
       routeSnapshot = {
         routes: shownRoutes,
         comments: structuredClone(shown.comments ?? []),
         version: context.documentVersion,
         group: context.openGroup,
         simple: editorSettings.simplified,
+        signature,
         manualVersion: manualEdit?.committing
           ? context.documentVersion
           : routeSnapshot?.manualVersion,
@@ -248,6 +246,22 @@ export function createCanvasRenderer(context) {
           visualMachine(shown).states.map((state) => [state.id, { x: state.x, y: state.y }]),
         ),
       };
+      viewSnapshots.set(viewKey(context.openGroup, editorSettings.simplified), routeSnapshot);
+      if (manualEdit?.committing)
+        storeDrawingRoutes(
+          context.machine,
+          visualMachine(shown),
+          shown.edges.map(label),
+          shownRoutes,
+          `${context.openGroup ?? 'main'}:${editorSettings.simplified}`,
+        );
+      if (viewSnapshots.size > 32) {
+        const oldest = [...viewSnapshots.keys()].find(
+          (key) => key !== viewKey(null, editorSettings.simplified),
+        );
+        viewSnapshots.delete(oldest);
+      }
+    }
     if (context.openGroup) {
       const group = context.machine.groups.find((group) => group.id === context.openGroup);
       if (group) {
@@ -263,18 +277,22 @@ export function createCanvasRenderer(context) {
       }
     }
     if (context.overviewView) {
-      const reuse =
-          overviewCache &&
-          (dragging ||
-            (overviewCache.version === context.documentVersion &&
-              overviewCache.simple === editorSettings.simplified)),
-        overview = reuse ? overviewCache.machine : graphView(context.machine),
-        overviewRoutes = reuse ? overviewCache.routes : routing(overview, label);
+      const overview = graphView(context.machine),
+        overviewSignature = drawingRouteKey(visualMachine(overview), overview.edges.map(label)),
+        mainSnapshot = viewSnapshots.get(viewKey(null, editorSettings.simplified)),
+        reuse = overviewCache?.signature === overviewSignature,
+        overviewRoutes =
+          mainSnapshot?.signature === overviewSignature
+            ? mainSnapshot.routes
+            : reuse
+              ? overviewCache.routes
+              : routeEdges(overview, label);
       overviewCache = {
         machine: overview,
         routes: overviewRoutes,
         version: context.documentVersion,
         simple: editorSettings.simplified,
+        signature: overviewSignature,
       };
       if (reuse) syncGroupPositions(overview);
       context.overviewGraph.setView(context.overviewView);

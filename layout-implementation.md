@@ -59,6 +59,12 @@ Reciprocal bundles allocate an independent lane band to each direction, includin
 
 The regression suite contains 155 passing domain tests, including cycle balance, a dangling state leaving a cycle, long-cycle detection, multiplicity-independent analysis, weak flow scoring, and unequal clockwise bundles. Seven targeted browser workflows pass. Both private fixture overviews and all eight group views remain clear under adaptive curve separation checks, including incident wires and loops.
 
+## Stable routing across view navigation
+
+The editor retains bounded per-view route snapshots keyed by group, caption mode, and full drawing signature. An open overlay's background uses the main canvas's exact displayed routes and labels; closing restores that snapshot. Subgroup routing and worker replies no longer replace the overview's state simply because the active view changed. Geometry or caption changes still invalidate the relevant snapshot. Committed manual edge/portal geometry is also stored using the existing optional drawing metadata.
+
+Two browser regressions record painted curve paths and text coordinates across three open/close cycles, with live routing enabled and disabled and a mix of automatic, reciprocal, and saved manual curves. Together with the existing gesture/layout checks, nine targeted browser workflows pass.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.
