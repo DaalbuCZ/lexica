@@ -11,6 +11,84 @@ import { routeEdges } from '../src/core/layout.js';
 import { parseMachine } from '../src/core/lexer.js';
 import { createLiveRouting } from '../src/editor/live-routing.js';
 import { compactAesthetics } from '../src/core/aesthetic-layout.js';
+import { tidyTree } from '../src/core/tidy-tree.js';
+import { flowAnalysis, flowScore } from '../src/core/flow-aesthetics.js';
+
+test('configured entry edges get their own width while a terminal fork stays short and balanced', () => {
+  const machine = {
+    start: 'start',
+    states: ['start', 'entry', 'up', 'down'].map((id) => ({ id })),
+    edges: [
+      { from: 'start', to: 'entry', label: 'x'.repeat(40) },
+      { from: 'entry', to: 'up', label: '=' },
+      { from: 'entry', to: 'down', label: '-' },
+    ],
+  };
+  tidyTree(machine);
+  const [start, entry, up, down] = machine.states;
+  assert.ok(entry.x - start.x >= 410);
+  assert.ok(up.x - entry.x <= 160);
+  assert.equal(up.x, down.x);
+  assert.equal((up.y + down.y) / 2, entry.y);
+  assert.equal(drawingClearance(machine.states, machine.edges).crossings, 0);
+  assert.ok(
+    corridorRoutes(
+      machine,
+      machine.edges.map((e) => e.label),
+    ),
+  );
+});
+
+test('flow cleanup straightens a steep chain without breaking routed feasibility', () => {
+  const machine = {
+    start: 'a',
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 300, y: 400 },
+      { id: 'c', x: 600, y: 800 },
+    ],
+    edges: [
+      { from: 'a', to: 'b', label: 'x' },
+      { from: 'b', to: 'c', label: 'y' },
+    ],
+  };
+  const flow = flowAnalysis(machine),
+    map = (states) => new Map(states.map((s) => [s.id, s])),
+    states = compactAesthetics(machine);
+  assert.ok(flowScore(flow, map(states)) < flowScore(flow, map(machine.states)));
+  assert.ok(corridorRoutes({ ...machine, states }, ['x', 'y']));
+  assert.deepEqual(
+    flowAnalysis({ ...machine, edges: [...machine.edges, { from: 'c', to: 'a' }] }),
+    [],
+  );
+});
+
+test('cycle occupancy counts descendants as well as their directly attached state', () => {
+  const machine = {
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 600, y: 0 },
+      { id: 'c', x: 300, y: 600 },
+      { id: 'd', x: 250, y: 200 },
+      { id: 'e', x: 300, y: 250 },
+      { id: 'f', x: 300, y: 300 },
+    ],
+    edges: [
+      ['a', 'b'],
+      ['b', 'c'],
+      ['c', 'a'],
+      ['a', 'd'],
+      ['d', 'e'],
+      ['e', 'f'],
+    ].map(([from, to]) => ({ from, to, label: 'x' })),
+  };
+  const analysis = cycleAnalysis(machine),
+    nodes = new Map(machine.states.map((s) => [s.id, { ...s }])),
+    before = cycleScore(analysis, nodes);
+  nodes.get('e').x = 800;
+  nodes.get('f').x = 1000;
+  assert.ok(before - cycleScore(analysis, nodes) > 2300);
+});
 import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
 import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
 import { circularStartRing } from '../src/core/radial-ring.js';
