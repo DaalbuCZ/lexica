@@ -819,7 +819,9 @@ export function createCanvasInteractions(context) {
       context.draw();
     });
     context.listen(window, 'resize', () => {
+      context.viewportVersion++;
       context.resizeCanvas();
+      context.queueDraw();
       if (!document.body.classList.contains('properties-hidden')) context.showProperties(true);
     });
     setupCanvasGestures(context.overviewCanvas, {

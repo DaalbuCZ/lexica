@@ -1,14 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  GripVertical,
-  Play,
-  Square,
-  ArrowDown,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, Play, Square, ArrowDown } from 'lucide-react';
 import { useStudio, readStorage, writeStorage } from '../state/studio.js';
 import { useLexer } from '../hooks/useLexer.js';
 import { setupInputHighlights } from '../core/input-highlights.js';
@@ -60,8 +51,8 @@ export function Tester({ debuggerRef }) {
   const CollapseIcon = {
     bottom: collapsed ? ChevronUp : ChevronDown,
     top: collapsed ? ChevronDown : ChevronUp,
-    left: collapsed ? ChevronRight : ChevronLeft,
-    right: collapsed ? ChevronLeft : ChevronRight,
+    left: collapsed ? ChevronUp : ChevronDown,
+    right: collapsed ? ChevronUp : ChevronDown,
   }[dock];
   const [canPrevious, setCanPrevious] = useState(false),
     [canNext, setCanNext] = useState(false);

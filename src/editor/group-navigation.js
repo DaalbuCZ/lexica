@@ -50,6 +50,13 @@ export function createGroupNavigation(context) {
       !matchMedia('(prefers-reduced-motion: reduce)').matches
     ) {
       context.groupClosing = true;
+      const opacity = getComputedStyle(context.overviewCanvas).opacity;
+      context.groupTintAnimation?.cancel();
+      context.groupTintAnimation = context.overviewCanvas.animate([{ opacity }, { opacity: 1 }], {
+        duration: 140,
+        easing: 'ease-in',
+        fill: 'forwards',
+      });
       context.groupAnimation?.cancel();
       context.groupPanel.style.pointerEvents = 'none';
       const animation = context.groupPanel.animate(
@@ -63,6 +70,7 @@ export function createGroupNavigation(context) {
           context.groupClosing = false;
           closeGroup(fromHistory, false);
           animation.cancel();
+          context.groupTintAnimation?.cancel();
           context.groupPanel.style.pointerEvents = '';
         })
         .catch(() => {});
@@ -90,7 +98,9 @@ export function createGroupNavigation(context) {
   }
   function openGroupById(id, recordHistory = true) {
     if (!context.machine.groups?.some((g) => g.id === id)) return;
+    context.groupTintOpening = !context.openGroup;
     context.groupClosing = false;
+    context.groupTintAnimation?.cancel();
     context.groupAnimation?.cancel();
     context.groupPanel.style.pointerEvents = '';
     context.groupHistoryOwned = recordHistory;

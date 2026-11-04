@@ -699,8 +699,73 @@ body[data-tester-dock='right'] .canvas-status {
   text-decoration: none;
 }
 body[data-tester-dock='right'].tester-collapsed .canvas-status {
-  right: 18px;
-  bottom: 60px;
+  right: calc(var(--tester-width, 320px) + 12px);
+  bottom: 12px;
+}
+details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  flex: none;
+}
+details[open] > summary::before {
+  transform: rotate(45deg);
+}
+@keyframes debugger-open {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes debugger-close {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+.debugger-window.animated-window[data-state='open'] {
+  animation: debugger-open 140ms ease-out;
+}
+.debugger-window.animated-window[data-state='closed'] {
+  animation: debugger-close 120ms ease-in forwards;
+}
+.react-dialog.export-panel {
+  width: 1000px;
+}
+.export-panel #export-preview {
+  height: min(48vh, 480px);
+  min-height: 260px;
+  resize: vertical;
+}
+.svg-preview {
+  display: block;
+  width: 100%;
+  height: min(42vh, 400px);
+  object-fit: contain;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 12px 0;
 }
 button:not(:disabled),
 [role='button']:not([aria-disabled='true']),

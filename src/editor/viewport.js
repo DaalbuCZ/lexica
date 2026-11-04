@@ -133,6 +133,18 @@ export function createViewport(context) {
         x: state.x + offset.x - visible.width / 2 - (visible.x - start.x),
         y: state.y + offset.y - visible.height / 2 - (visible.y - start.y),
       };
+    const scale = Math.min(surface.clientWidth / start.width, surface.clientHeight / start.height);
+    // Keep nearby steps still; pan only when the active node leaves the comfortable viewing area.
+    const x = state.x + offset.x,
+      y = state.y + offset.y,
+      margin = Math.min(130 / scale, visible.width / 4, visible.height / 4);
+    if (
+      x >= visible.x + margin &&
+      x <= visible.x + visible.width - margin &&
+      y >= visible.y + margin &&
+      y <= visible.y + visible.height - margin
+    )
+      return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setView(target);
       return;
@@ -140,8 +152,8 @@ export function createViewport(context) {
     const began = performance.now();
     const tick = (now) => {
       if (context.disposed) return;
-      const progress = Math.min(1, (now - began) / 240),
-        ease = 1 - (1 - progress) ** 3;
+      const progress = Math.min(1, (now - began) / 320),
+        ease = progress * progress * (3 - 2 * progress);
       setView({
         ...start,
         x: start.x + (target.x - start.x) * ease,

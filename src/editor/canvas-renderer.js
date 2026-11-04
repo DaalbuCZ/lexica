@@ -6,23 +6,28 @@ import { transitionError } from '../core/lexer.js';
 import { routeEdges } from '../core/layout.js';
 import { graphView, groupFor } from '../core/groups.js';
 import { tokenColorClass } from '../core/token-colors.js';
-import { visibleViewport } from './visible-viewport.js';
+import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
 import { interactiveRoutes } from '../core/interactive-routes.js';
 import { visualMachine } from '../core/start-views.js';
 export function createCanvasRenderer(context) {
   let mapScene = null;
+  let shownCache = null;
   let routeSnapshot = null;
-  let overviewCache = null,
-    mapDrawTime = 0;
+  let overviewCache = null;
+  let viewportMetrics, viewportVersion;
   let validationVersion = -1,
     invalidEdges = new Set();
+  let paletteTheme,
+    tokenStyle,
+    tokenColors = new Map();
   function drawMap() {
-    const now = performance.now();
-    if (context.drag?.moved && now - mapDrawTime < 80) return;
-    mapDrawTime = now;
     const view = context.view(),
       surface = context.overviewView ? context.overviewCanvas : context.elements.canvas;
-    const viewport = visibleViewport(view, surface);
+    if (!viewportMetrics || viewportVersion !== context.viewportVersion) {
+      viewportMetrics = measureVisibleViewport(surface);
+      viewportVersion = context.viewportVersion;
+    }
+    const viewport = visibleViewport(view, surface, viewportMetrics);
     if (context.overviewView) {
       const offset = context.groupWindowOffset,
         local = context.graph.view();
@@ -70,6 +75,12 @@ export function createCanvasRenderer(context) {
     return `M ${a.x} ${a.y} L ${p.x} ${p.y}`;
   }
   function draw() {
+    const theme = document.documentElement.dataset.theme;
+    if (!tokenStyle || paletteTheme !== theme) {
+      paletteTheme = theme;
+      tokenStyle = getComputedStyle(document.documentElement);
+      tokenColors = new Map();
+    }
     if (validationVersion !== context.documentVersion) {
       validationVersion = context.documentVersion;
       invalidEdges = new Set(
@@ -80,8 +91,18 @@ export function createCanvasRenderer(context) {
     }
     const dragging = context.drag?.moved || context.edgeDrag?.moved || context.portalDrag?.moved;
     const routing = dragging ? interactiveRoutes : routeEdges;
-    const shown = graphView(context.machine, context.openGroup),
-      project = (id) => (context.openGroup ? id : (groupFor(context.machine, id)?.id ?? id)),
+    const sameTopology =
+      shownCache?.version === context.documentVersion && shownCache.group === context.openGroup;
+    const shown = sameTopology ? shownCache.machine : graphView(context.machine, context.openGroup);
+    if (sameTopology && context.openGroup) {
+      const positions = context.machine.groups.find(
+        (group) => group.id === context.openGroup,
+      )?.contextPositions;
+      for (const state of shown.states)
+        if (state.outside && positions?.[state.id]) Object.assign(state, positions[state.id]);
+    }
+    shownCache = { machine: shown, version: context.documentVersion, group: context.openGroup };
+    const project = (id) => (context.openGroup ? id : (groupFor(context.machine, id)?.id ?? id)),
       failedGroups = new Set(),
       markGroup = (id) => {
         const group = groupFor(context.machine, id);
@@ -114,16 +135,20 @@ export function createCanvasRenderer(context) {
         states: [...context.graphFailures.states, ...failedGroups].map(project),
         edges: context.graphFailures.edges,
       },
-      tokenStyle = getComputedStyle(document.documentElement),
       hasError =
         invalidGraph ||
         context.graphFailures.states.length ||
         context.graphFailures.edges.length ||
         context.graphTrace?.token === 'ERROR',
-      tokenColor = (name) =>
-        hasError
-          ? null
-          : tokenStyle.getPropertyValue('--token-accent-' + tokenColorClass(name).slice(-1)).trim(),
+      tokenColor = (name) => {
+        if (hasError) return null;
+        if (!tokenColors.has(name))
+          tokenColors.set(
+            name,
+            tokenStyle.getPropertyValue('--token-accent-' + tokenColorClass(name).slice(-1)).trim(),
+          );
+        return tokenColors.get(name);
+      },
       baseLabel = editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
       label = (edge) =>
         edge.originalIndices?.length > 1
@@ -133,7 +158,11 @@ export function createCanvasRenderer(context) {
         ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
         : routeSnapshot?.version === context.documentVersion &&
             routeSnapshot.group === context.openGroup &&
-            routeSnapshot.simple === editorSettings.simplified
+            routeSnapshot.simple === editorSettings.simplified &&
+            visualMachine(shown).states.every((state) => {
+              const old = routeSnapshot.nodes.get(state.id);
+              return old?.x === state.x && old?.y === state.y;
+            })
           ? routeSnapshot.routes
           : routeEdges(shown, label);
     if (!dragging)
@@ -175,7 +204,7 @@ export function createCanvasRenderer(context) {
         simple: editorSettings.simplified,
       };
       context.overviewGraph.setView(context.overviewView);
-      context.positionGroupPanel(
+      const panelMoved = context.positionGroupPanel(
         overview.states.find((state) => state.id === context.openGroup),
         graphBounds(shown, shownRoutes),
       );
@@ -196,6 +225,7 @@ export function createCanvasRenderer(context) {
           },
         });
       mapScene = { machine: shown, routes: shownRoutes };
+      if (panelMoved) context.syncGrid();
     } else mapScene = { machine: shown, routes: shownRoutes };
     context.graph.draw({
       machine: shown,
@@ -226,7 +256,6 @@ export function createCanvasRenderer(context) {
         context.placementPoint,
       ),
     });
-    if (context.overviewView) context.syncGrid();
   }
   return {
     draw,

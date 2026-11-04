@@ -28,6 +28,9 @@ export function createGroupWindow(context) {
       height: Math.max(initial.y + initial.height, next.y + next.height) - y,
     });
     const offset = context.groupWindowOffset;
+    const key = [t.x, t.y, t.scale, box.x, box.y, box.width, box.height, heading].join(':');
+    if (!opening && context.groupWindowPositionKey === key) return false;
+    context.groupWindowPositionKey = key;
     Object.assign(panel.style, {
       left: t.x + (box.x + offset.x) * t.scale + 'px',
       top: t.y + (box.y + offset.y) * t.scale - heading + 'px',
@@ -51,6 +54,14 @@ export function createGroupWindow(context) {
       height: context.elements.canvas.clientHeight,
     };
     if (opening && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (context.groupTintOpening) {
+        context.groupTintAnimation?.cancel();
+        context.groupTintAnimation = context.overviewCanvas.animate(
+          [{ opacity: 1 }, { opacity: 0.4 }],
+          { duration: 170, easing: 'ease-out' },
+        );
+        context.groupTintOpening = false;
+      }
       context.groupAnimation?.cancel();
       panel.style.pointerEvents = 'none';
       const animation = panel.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], {
@@ -65,6 +76,7 @@ export function createGroupWindow(context) {
         })
         .catch(() => {});
     }
+    return true;
   }
   return { positionGroupPanel };
 }

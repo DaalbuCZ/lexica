@@ -1,10 +1,9 @@
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { TextField, TextArea, Slider } from '@radix-ui/themes';
+import { TextField, TextArea } from '@radix-ui/themes';
 import { useStudio, persistedMachine, readStorage, writeStorage } from '../state/studio.js';
 import { parseMachine, toTikz } from '../core/lexer.js';
-import { machineSvg } from '../core/svg-export.js';
-import { SPRING_DEFAULTS, SPRING_LIMITS, springSettings } from '../core/spring-settings.js';
+import { useSvgExport } from '../hooks/useSvgExport.js';
 import { graphView } from '../core/groups.js';
 import { routeEdges } from '../core/layout.js';
 import { createGraphCanvas, graphBounds } from '../core/canvas-graph.js';
@@ -127,7 +126,12 @@ function ImportDialog({ onClose, dialog }) {
 }
 function ExportDialog({ onClose, dialog }) {
   const [format, setFormat] = useState('json'),
-    [standalone, setStandalone] = useState(true);
+    [standalone, setStandalone] = useState(true),
+    [svgId, setSvgId] = useState('main');
+  const source = useStudio((s) => s.scene.machine),
+    simplified = useStudio((s) => s.settings.simplified);
+  const svg = useSvgExport(source, simplified, format === 'svg');
+  const svgFile = svg.files.find((file) => file.id === svgId) ?? svg.files[0];
   const machine = persistedMachine();
   let text = '',
     error = '';
@@ -137,27 +141,30 @@ function ExportDialog({ onClose, dialog }) {
         ? JSON.stringify(machine, null, 2)
         : format === 'tex'
           ? toTikz(machine, standalone)
-          : machineSvg(machine);
+          : (svgFile?.text ?? '');
+    if (format === 'svg') error = svg.error;
   } catch (issue) {
     error = issue.message;
   }
-  const download = () => {
-    const url = URL.createObjectURL(
-      new Blob([text], {
-        type:
-          format === 'json'
-            ? 'application/json'
-            : format === 'svg'
-              ? 'image/svg+xml'
-              : 'application/x-tex',
-      }),
-    );
+  const downloadFile = (data, filename, type) => {
+    const url = URL.createObjectURL(new Blob([data], { type }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'lexer.' + format;
+    anchor.download = filename;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const download = () =>
+    downloadFile(
+      text,
+      format === 'svg' ? svgFile.filename : 'lexer.' + format,
+      format === 'svg'
+        ? 'image/svg+xml'
+        : format === 'json'
+          ? 'application/json'
+          : 'application/x-tex',
+    );
+  const pending = format === 'svg' && svg.pending;
   return (
     <Modal
       title="Export your machine"
@@ -180,6 +187,30 @@ function ExportDialog({ onClose, dialog }) {
           />
         )}
       </div>
+      {format === 'svg' && (
+        <>
+          {svg.files.length > 1 && (
+            <Select label="Diagram" value={svgFile?.id ?? 'main'} onChange={setSvgId}>
+              {svg.files.map((file) => (
+                <option key={file.id} value={file.id}>
+                  {file.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          {pending ? (
+            <p role="status">Generating SVG diagrams…</p>
+          ) : (
+            svgFile && (
+              <img
+                className="svg-preview"
+                alt={`${svgFile.name} SVG preview`}
+                src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgFile.text)}
+              />
+            )
+          )}
+        </>
+      )}
       <TextArea size="2" id="export-preview" spellCheck={false} readOnly value={text} />
       {error && <p role="alert">{error}</p>}
       {format === 'tex' && (
@@ -190,7 +221,7 @@ function ExportDialog({ onClose, dialog }) {
       <div className="dialog-actions">
         <Button
           id="copy"
-          disabled={!!error}
+          disabled={!!error || pending}
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(text);
@@ -202,9 +233,17 @@ function ExportDialog({ onClose, dialog }) {
         >
           Copy to clipboard
         </Button>
-        <Button id="download" className="primary" disabled={!!error} onClick={download}>
+        <Button id="download" className="primary" disabled={!!error || pending} onClick={download}>
           ↓ Download .{format}
         </Button>
+        {format === 'svg' && svg.files.length > 1 && (
+          <Button
+            disabled={!!error || pending}
+            onClick={() => downloadFile(svg.archive, 'lexer-diagrams.zip', 'application/zip')}
+          >
+            Download all SVGs (.zip)
+          </Button>
+        )}
       </div>
     </Modal>
   );
@@ -212,16 +251,15 @@ function ExportDialog({ onClose, dialog }) {
 function LayoutDialog({ onClose, dialog }) {
   const [mode, setMode] = useState(() => {
     const value = readStorage('lexica-layout-mode', 'circle', false);
-    return ['tree', 'circle', 'spring'].includes(value) ? value : 'circle';
+    return ['tree', 'circle'].includes(value) ? value : 'circle';
   });
   const [spacing, setSpacing] = useState(() => {
     const value = readStorage('lexica-layout-density', '0.75', false);
     return ['0.35', '0.5', '0.75', '1'].includes(value) ? value : '0.75';
   });
-  const [forces, setForces] = useState(() =>
-      springSettings(readStorage('lexica-spring-forces', {})),
+  const [smartGroups, setSmartGroups] = useState(() =>
+      readStorage('lexica-layout-smart-groups', true),
     ),
-    [smartGroups, setSmartGroups] = useState(() => readStorage('lexica-layout-smart-groups', true)),
     [disregardGroups, setDisregardGroups] = useState(() =>
       readStorage('lexica-layout-disregard-groups', false),
     ),
@@ -231,7 +269,6 @@ function LayoutDialog({ onClose, dialog }) {
     setBusy(true);
     writeStorage('lexica-layout-mode', mode, false);
     writeStorage('lexica-layout-density', spacing, false);
-    writeStorage('lexica-spring-forces', forces);
     writeStorage('lexica-layout-smart-groups', smartGroups);
     writeStorage('lexica-layout-disregard-groups', disregardGroups);
     requestAnimationFrame(() =>
@@ -239,7 +276,6 @@ function LayoutDialog({ onClose, dialog }) {
         await useStudio.getState().controller.arrange({
           mode,
           spacing: Number(spacing),
-          forces,
           smartGroups,
           disregardGroups,
         });
@@ -258,7 +294,6 @@ function LayoutDialog({ onClose, dialog }) {
       <Select id="layout-mode" label="Layout" value={mode} onChange={setMode}>
         <option value="tree">Tree</option>
         <option value="circle">Radial</option>
-        <option value="spring">Spring</option>
       </Select>
       <Select id="layout-density" label="Density" value={spacing} onChange={setSpacing}>
         <option value="0.35">Extra compact</option>
@@ -266,41 +301,6 @@ function LayoutDialog({ onClose, dialog }) {
         <option value="0.75">Normal</option>
         <option value="1">Spacious</option>
       </Select>
-      {mode === 'spring' && (
-        <div id="spring-forces" className="spring-forces" role="group" aria-label="Spring forces">
-          {Object.keys(SPRING_DEFAULTS).map((key) => (
-            <label className="force-field" key={key} htmlFor={'spring-' + key}>
-              {key === 'distance'
-                ? 'Link distance'
-                : key[0].toUpperCase() + key.slice(1) + ' force'}
-              <output>{forces[key]}</output>
-              <Slider
-                id={'spring-' + key}
-                aria-label={key === 'distance' ? 'Link distance' : key + ' force'}
-                min={SPRING_LIMITS[key][0]}
-                max={SPRING_LIMITS[key][1]}
-                step={key === 'distance' ? 10 : key === 'repel' ? 0.5 : 0.01}
-                value={[forces[key]]}
-                onValueChange={([value]) =>
-                  setForces({
-                    ...forces,
-                    [key]: value,
-                  })
-                }
-              />
-            </label>
-          ))}
-          <Button
-            onClick={() =>
-              setForces({
-                ...SPRING_DEFAULTS,
-              })
-            }
-          >
-            Reset forces
-          </Button>
-        </div>
-      )}
       <Check
         id="layout-portals"
         label="Smart groups for crowded graphs"

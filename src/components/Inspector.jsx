@@ -19,11 +19,14 @@ import { Button, Check, Field, IconButton, Select } from './ui.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 
 export function Inspector() {
-  const scene = useStudio((s) => s.scene),
+  const currentScene = useStudio((s) => s.scene),
     controller = useStudio((s) => s.controller),
     settings = useStudio((s) => s.settings),
     open = useStudio((s) => s.propertiesOpen);
   const present = usePresence(open);
+  const retainedScene = useRef(currentScene);
+  if (open) retainedScene.current = currentScene;
+  const scene = open ? currentScene : retainedScene.current;
   const { machine, selection } = scene;
   const total =
     scene.selectedStates.size +

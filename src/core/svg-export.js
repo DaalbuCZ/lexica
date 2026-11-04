@@ -6,7 +6,8 @@ import { transitionError, isAccepting, statePortalBox } from './lexer.js';
 import { routeEdges } from './layout.js';
 import { visualMachine } from './start-views.js';
 import { portalTip } from './portals.js';
-export function machineSvg(machine) {
+import { graphView } from './groups.js';
+export function machineSvg(machine, { simplified = editorSettings.simplified } = {}) {
   const selectedStates = new Set(),
     selectedComments = new Set(),
     selectedCommentLinks = new Set(),
@@ -27,9 +28,13 @@ export function machineSvg(machine) {
           "'": '&#39;',
         })[c],
     );
-  const graph = {
-    bounds: () => graphBounds(machine, routeEdges(machine)),
-  };
+  const labelFor = (edge) =>
+    edge.originalIndices?.length > 1
+      ? `${edge.originalIndices.length} transitions`
+      : simplified
+        ? simpleTransitionLabel(edge)
+        : transitionLabel(edge);
+  const routes = routeEdges(machine, labelFor);
   function portalTag(name, box, invalid = false) {
     const l = box.x - box.w / 2,
       r = box.x + box.w / 2,
@@ -54,23 +59,19 @@ export function machineSvg(machine) {
         })
         .join(''),
       edgeLabels = '';
-    const routes = routeEdges(
-      machine,
-      editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
-    );
     for (let i = 0; i < machine.edges.length; i++) {
       const e = machine.edges[i],
         r = routes[i];
-      const issue = transitionError(machine, e),
+      const issue = e.groupEdge ? '' : transitionError(machine, e),
         invalid = !!issue;
       html += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title><path class="edge ${edgeSelected(e, i) ? 'selected-edge' : ''}" d="${r.d}"/><path class="edge-hit" d="${r.d}"/></g>`;
-      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box" x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}" x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(editorSettings.simplified ? simpleTransitionLabel(e) : e.label ? transitionLabel(e) : '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
+      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box" x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}" x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
     }
     for (const s of visualMachine(machine).states) {
       const label = stateLabel(s.name);
       if (s.id === machine.start || s.startView !== undefined)
         html += `<path class="edge" d="M ${s.x - 85} ${s.y} L ${s.x - 40} ${s.y}"/>`;
-      html += `<g class="node ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})"><circle r="36"/>${
+      html += `<g class="node ${s.outside ? 'outside' : ''} ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})">${s.group ? '<rect x="-48" y="-36" width="96" height="72" rx="12"/>' : '<circle r="36"/>'}${
         s.portal
           ? (() => {
               const box = statePortalBox(s),
@@ -108,22 +109,34 @@ export function machineSvg(machine) {
     return html;
   }
   function exportSvg() {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.innerHTML =
+    const content =
       '<defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64756c"/></marker></defs><g>' +
       svgMarkup() +
       '</g>';
-    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    svg.setAttribute('width', '820');
-    svg.setAttribute('height', '510');
-    const box = graph.bounds();
-    svg.setAttribute('viewBox', `${box.x - 30} ${box.y - 30} ${box.width + 60} ${box.height + 60}`);
-    svg.querySelector('.connection-preview')?.remove();
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent =
+    const box = graphBounds(machine, routes);
+    const style =
       '.edge{fill:none;stroke:#65755d;stroke-width:1.6;marker-end:url(#arrow)}.edge-hit,.comment-link-hit{display:none}.edge-label-box{fill:white;stroke:#798b79;stroke-width:1}.edge-text.boxed{stroke:none}.edge-text{font:11px monospace;fill:#53634b;paint-order:stroke;stroke:white;stroke-width:6px}.node circle{fill:#f9fbf5;stroke:#718664;stroke-width:1.7}.node .inner{fill:none}.node text{text-anchor:middle;font:12px sans-serif;fill:#425838}.node .token-label{font:9px monospace}.portal path{fill:#edf5e9;stroke:#386b4e;stroke-width:1.2}.portal text{font:10px monospace;fill:#386b4e}.portal-wire{stroke:#386b4e;fill:none}.invalid path{stroke:#b54f3c}.invalid text{fill:#b54f3c}.comment-label rect{fill:#fff9da;stroke:#cbb879;stroke-width:1}.comment-label text{font:11px sans-serif;fill:#756536}.selection-box,.comment-preview{display:none}.comment-link{fill:none;stroke:#8b907e;stroke-width:1.4;stroke-dasharray:6 5}';
-    svg.prepend(style);
-    return new XMLSerializer().serializeToString(svg);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(box.width + 60)}" height="${Math.ceil(box.height + 60)}" viewBox="${box.x - 30} ${box.y - 30} ${box.width + 60} ${box.height + 60}"><style>${style}.node rect{fill:#f9fbf5;stroke:#718664;stroke-width:1.7}.outside circle{stroke-dasharray:6 4}</style>${content}</svg>`;
   }
   return exportSvg();
+}
+export function svgDocuments(machine, options) {
+  const views = [
+    { id: 'main', name: 'Main graph', filename: 'main.svg', view: graphView(machine) },
+    ...(machine.groups ?? []).map((group, index) => ({
+      id: group.id,
+      name: group.name,
+      filename: `${index + 1}-${
+        group.name
+          .replace(/[^\p{L}\p{N}_-]+/gu, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 80) || 'group'
+      }.svg`,
+      view: graphView(machine, group.id),
+    })),
+  ];
+  return views.map(({ view, ...file }) => ({
+    ...file,
+    text: machineSvg({ ...machine, ...view, startViews: view.startViews }, options),
+  }));
 }

@@ -5,16 +5,17 @@ import { portalBoxAtTip } from './portals.js';
 export function interactiveRoutes(machine, label, snapshot) {
   machine = visualMachine(machine);
   if (snapshot && snapshot.routes.length === machine.edges.length) {
-    const nodes = new Map(machine.states.map((state) => [state.id, state]));
+    const deltas = new Map(
+      machine.states.map((state) => {
+        const previous = snapshot.nodes.get(state.id);
+        return [state.id, { x: state.x - previous.x, y: state.y - previous.y }];
+      }),
+    );
+    const move = (point, d) => ({ ...point, x: point.x + d.x, y: point.y + d.y });
     return machine.edges.map((edge, index) => {
       const route = snapshot.routes[index],
-        delta = (id) => ({
-          x: nodes.get(id).x - snapshot.nodes.get(id).x,
-          y: nodes.get(id).y - snapshot.nodes.get(id).y,
-        }),
-        a = delta(edge.from),
-        b = edge.portal != null ? a : delta(edge.to),
-        move = (point, d) => ({ ...point, x: point.x + d.x, y: point.y + d.y });
+        a = deltas.get(edge.from),
+        b = edge.portal != null ? a : deltas.get(edge.to);
       if (!a.x && !a.y && !b.x && !b.y) return route;
       const next = {
         ...route,

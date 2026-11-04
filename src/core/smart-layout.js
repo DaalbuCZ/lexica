@@ -9,6 +9,7 @@ import { blockLayout } from './block-layout.js';
 import { compactPlanar } from './compact-planar.js';
 import { linearLayout } from './linear-layout.js';
 import dagre from '@dagrejs/dagre';
+import { layeredLayout } from './layered-layout.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -88,8 +89,10 @@ function place(machine, focus, options) {
   const mode = compactBranch ? 'tree' : (options.mode ?? 'circle'),
     spacing = options.spacing ?? 0.75;
   const arrange = (candidate) => {
-    if (mode === 'tree') tidyTree(candidate, spacing);
-    else if (mode === 'circle') radialTree(candidate, spacing);
+    if (mode === 'tree') {
+      if (simpleBranch(candidate)) tidyTree(candidate, spacing);
+      else layeredLayout(candidate, spacing);
+    } else if (mode === 'circle') radialTree(candidate, spacing);
     else autoLayout(candidate, mode, spacing, false, options.forces ?? {}, false);
   };
   const extent = (states) =>

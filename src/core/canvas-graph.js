@@ -163,6 +163,7 @@ export function graphPalette(dark, style) {
   };
 }
 export function createGraphCanvas(canvas, minimap) {
+  const pathCache = new WeakMap();
   const ctx = canvas.getContext('2d'),
     mapCtx = minimap.getContext('2d');
   let view = {
@@ -208,11 +209,17 @@ export function createGraphCanvas(canvas, minimap) {
     context.lineJoin = 'round';
     return t;
   }
+  let palette, paletteTheme;
   function colors() {
-    return graphPalette(
-      document.documentElement.dataset.theme === 'dark',
-      typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement) : null,
-    );
+    const dark = document.documentElement.dataset.theme === 'dark';
+    if (!palette || paletteTheme !== dark) {
+      paletteTheme = dark;
+      palette = graphPalette(
+        dark,
+        typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement) : null,
+      );
+    }
+    return palette;
   }
   function draw(next) {
     scene = next;
@@ -253,7 +260,10 @@ export function createGraphCanvas(canvas, minimap) {
     }
     ctx.setLineDash([]);
     if (pathRoutes !== routes) {
-      paths = routes.map((r) => new Path2D(r.d));
+      paths = routes.map((route) => {
+        if (!pathCache.has(route)) pathCache.set(route, new Path2D(route.d));
+        return pathCache.get(route);
+      });
       pathRoutes = routes;
     }
     for (let i = 0; i < routes.length; i++) {

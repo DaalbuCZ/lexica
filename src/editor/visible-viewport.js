@@ -1,6 +1,6 @@
 import { canvasTransform } from '../core/canvas-graph.js';
 
-export function visibleViewport(view, canvas) {
+export function measureVisibleViewport(canvas) {
   const area = canvas.getBoundingClientRect(),
     tester = document.querySelector('.tester')?.getBoundingClientRect(),
     dock = document.body.dataset.testerDock;
@@ -14,7 +14,11 @@ export function visibleViewport(view, canvas) {
     else if (dock === 'top') top = Math.max(top, tester.bottom - area.top);
     else bottom = Math.min(bottom, tester.top - area.top);
   }
-  const t = canvasTransform(view, area.width, area.height);
+  return { left, top, right, bottom, width: area.width, height: area.height };
+}
+export function visibleViewport(view, canvas, metrics = measureVisibleViewport(canvas)) {
+  const { left, top, right, bottom, width, height } = metrics;
+  const t = canvasTransform(view, width, height);
   return {
     x: (left - t.x) / t.scale,
     y: (top - t.y) / t.scale,

@@ -50,6 +50,7 @@ export function createEditorController(
   const $ = (id) => document.getElementById(id);
   context.$ = $;
   context.documentVersion = 0;
+  context.viewportVersion = 0;
   context.machine = initialMachine;
   initializeGroupPositions(context.machine);
   context.selection = {
@@ -195,6 +196,7 @@ export function createEditorController(
   }
   function render() {
     if (context.disposed) return;
+    context.viewportVersion++;
     commentAnchors(context.machine);
     pruneSelection();
     syncGroupPresentation();
@@ -610,6 +612,7 @@ export function createEditorController(
   }
   installInteractions();
   const observer = new ResizeObserver(() => {
+    context.viewportVersion++;
     resizeCanvas();
     queueDraw();
   });
@@ -814,6 +817,7 @@ export function createEditorController(
     dispose() {
       context.disposed = true;
       context.groupAnimation?.cancel();
+      context.groupTintAnimation?.cancel();
       cancelAnimationFrame(context.cameraFrame);
       scope.dispose();
       observer.disconnect();
