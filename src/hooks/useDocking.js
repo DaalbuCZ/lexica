@@ -28,16 +28,28 @@ function findTarget(targets, x, y, preferred) {
   return best;
 }
 
+function setPreviewBounds(element, { x, y, width, height }) {
+  Object.assign(element.style, {
+    inset: y + 'px auto auto ' + x + 'px',
+    width: width + 'px',
+    height: height + 'px',
+  });
+}
+
+function clearPreviews() {
+  document.body.classList.remove('docking');
+  document.getElementById('dock-outlines')?.replaceChildren();
+  const preview = document.getElementById('dock-preview');
+  if (preview) preview.hidden = true;
+}
+
 export function useDockGrip(name) {
   const drag = useRef(null);
   useEffect(() => {
     const settings = dockSettings(readStorage('lexica-docks', {}));
     document.body.dataset[name + 'Dock'] = settings[name];
     return () => {
-      if (drag.current?.moved) {
-        document.body.classList.remove('docking');
-        document.getElementById('dock-preview').hidden = true;
-      }
+      if (drag.current?.moved) clearPreviews();
     };
   }, [name]);
   const pickTarget = (target, { clientX, clientY }) => {
@@ -53,9 +65,7 @@ export function useDockGrip(name) {
     const target = drag.current;
     if (!target) return;
     drag.current = null;
-    document.body.classList.remove('docking');
-    const preview = document.getElementById('dock-preview');
-    if (preview) preview.hidden = true;
+    clearPreviews();
     if (target.moved && !cancel) {
       const hit = pickTarget(target, event);
       if (hit?.distance === 0) applyDock(name, hit.box.zone);
@@ -87,19 +97,28 @@ export function useDockGrip(name) {
         const detail = { name, targets: [] };
         preview.dispatchEvent(new CustomEvent('measure-dock-targets', { detail }));
         target.targets = detail.targets;
+        target.outlines = new Map();
+        for (const box of target.targets) {
+          const outline = document.createElement('div');
+          outline.className = 'dock-preview dock-outline';
+          setPreviewBounds(outline, box);
+          target.outlines.set(box, outline);
+        }
+        document.getElementById('dock-outlines').replaceChildren(...target.outlines.values());
       }
       const hit = pickTarget(target, event);
       if (!hit) return;
       const { box, distance } = hit;
-      preview.dataset.panel = name;
-      preview.dataset.zone = box.zone;
-      preview.toggleAttribute('data-outside', distance > 0);
-      Object.assign(preview.style, {
-        inset: box.y + 'px auto auto ' + box.x + 'px',
-        width: box.width + 'px',
-        height: box.height + 'px',
-      });
-      preview.hidden = false;
+      const active = distance === 0 ? box : null;
+      if (target.active !== active) {
+        if (target.active) target.outlines.get(target.active).hidden = false;
+        target.active = active;
+        preview.hidden = !active;
+        if (active) {
+          target.outlines.get(active).hidden = true;
+          setPreviewBounds(preview, active);
+        }
+      }
       document.body.classList.add('docking');
     },
     onPointerUp: (event) => finish(event),

@@ -1,10 +1,11 @@
-import { RadioCards, Slider } from '@radix-ui/themes';
+import { Flex, RadioCards, Slider, useThemeContext } from '@radix-ui/themes';
 import { Moon, Sun } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
-import { toggleTheme } from '../hooks/useTheme.js';
+import { setTheme } from '../hooks/useTheme.js';
 import { Modal, Check, Select, Button } from './ui.jsx';
 
 export function SettingsPanel({ dialog, onClose }) {
+  const { appearance } = useThemeContext();
   const settings = useStudio((s) => s.settings),
     showSkipped = useStudio((s) => s.showSkipped),
     machine = useStudio((s) => s.scene.machine),
@@ -16,6 +17,7 @@ export function SettingsPanel({ dialog, onClose }) {
         <section className="settings-section settings-wide">
           <h3>Machine</h3>
           <RadioCards.Root
+            className="machine-type-cards"
             size="1"
             columns="2"
             gap="2"
@@ -107,11 +109,26 @@ export function SettingsPanel({ dialog, onClose }) {
         </section>
         <section className="settings-section settings-wide settings-theme">
           <h3>Appearance</h3>
-          <Button id="theme-toggle" onClick={toggleTheme}>
-            <Moon className="tool-icon theme-moon" />
-            <Sun className="tool-icon theme-sun" />
-            Switch theme
-          </Button>
+          <Flex gap="2" wrap="wrap" role="group" aria-label="Color theme">
+            <Button
+              aria-pressed={appearance === 'light'}
+              variant={appearance === 'light' ? 'solid' : 'soft'}
+              color={appearance === 'light' ? undefined : 'gray'}
+              onClick={() => setTheme('light')}
+            >
+              <Sun className="tool-icon" />
+              Light mode
+            </Button>
+            <Button
+              aria-pressed={appearance === 'dark'}
+              variant={appearance === 'dark' ? 'solid' : 'soft'}
+              color={appearance === 'dark' ? undefined : 'gray'}
+              onClick={() => setTheme('dark')}
+            >
+              <Moon className="tool-icon" />
+              Dark mode
+            </Button>
+          </Flex>
         </section>
       </div>
     </Modal>

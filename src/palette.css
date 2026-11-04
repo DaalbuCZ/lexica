@@ -106,20 +106,20 @@
   --gray-a10: #edf1f5a0;
   --gray-a11: #bdcbd7;
   --gray-a12: #edf1f5;
-  --color-background: #303639;
+  --color-background: #2b3134;
   --color-panel-solid: #3e4549;
   --color-panel: #3e4549f5;
   --color-surface: #2d3337;
 }
 :root[data-theme='dark'] {
-  background: #303639;
+  background: #2b3134;
   color: #edf1f5;
   --green: #a9d5ff;
   --line: #5b666c;
   --panel: #3e4549f5;
 }
 :root[data-theme='dark'] .canvas-wrap {
-  background-color: #343a3e;
+  background-color: #2f3539;
 }
 .canvas-wrap {
   background-color: #fafcf8;

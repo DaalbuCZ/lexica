@@ -139,7 +139,7 @@ export function graphPalette(dark, style) {
     text: dark ? '#f1f5f9' : '#4b6041',
     node: dark ? '#465157' : '#f9fbf5',
     panel: dark ? '#444d52' : '#fff',
-    background: dark ? '#343a3e' : '#fafcf8',
+    background: dark ? '#2f3539' : '#fafcf8',
     green: variable('--green', dark ? '#a9d5ff' : '#386b4e'),
     selected: dark ? '#c7e5ff' : '#5b7b48',
     selectedFill: dark ? '#3d566b' : '#eaf1e2',

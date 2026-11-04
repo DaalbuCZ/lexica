@@ -1126,13 +1126,13 @@
 
   /* Lift dark surfaces so the canvas feels softer while labels stay legible. */
   :root[data-theme='dark'] {
-    background: #303639;
+    background: #2b3134;
     --line: #5b666c;
     --panel: #3e4549f5;
     scrollbar-color: #818d93 #394044;
   }
   [data-theme='dark'] .canvas-wrap {
-    background-color: #343a3e;
+    background-color: #2f3539;
     background-image: radial-gradient(#505b60 0.8px, transparent 0.8px);
   }
   [data-theme='dark'] .inspector,
@@ -1152,7 +1152,7 @@
     background: #2d3337;
   }
   [data-theme='dark'] .edge-text {
-    stroke: #343a3e;
+    stroke: #2f3539;
   }
   [data-theme='dark'] .edge-label-box {
     fill: #444d52;
@@ -2022,7 +2022,7 @@
     border: 2px solid var(--green);
     border-radius: 8px;
   }
-  .dock-preview[data-outside] {
+  .dock-preview.dock-outline {
     background: transparent;
     border-style: dashed;
   }

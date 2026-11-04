@@ -103,6 +103,7 @@ export default function App() {
       <Suspense fallback={null}>
         <Dialogs />
       </Suspense>
+      <div id="dock-outlines" aria-hidden="true" />
       <div id="dock-preview" className="dock-preview" hidden aria-hidden="true" />
       <Toaster
         position="bottom-center"

@@ -13,8 +13,7 @@ export function useTheme() {
     return () => media.removeEventListener('change', apply);
   }, []);
 }
-export function toggleTheme() {
-  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  writeStorage('lexica-theme', next, false);
+export function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  writeStorage('lexica-theme', theme, false);
 }
