@@ -198,8 +198,12 @@ function place(machine, focus, options) {
           const view = graphView(trial, group.id),
             outside = view.states.filter((s) => s.outside);
           if (outside.length !== 1 || outside[0].outsideSource !== copy.start) return null;
+          const refined = polishSubgroup(view);
           return {
-            states: [...view.states.filter((s) => !s.outside), { ...outside[0], id: copy.start }],
+            states: [
+              ...refined.filter((s) => !s.outside),
+              { ...refined.find((s) => s.outside), id: copy.start },
+            ],
           };
         })
       : null;
@@ -998,7 +1002,10 @@ export function solveLayout(topology, focus = null, options = {}) {
         { preserveStartRing, radial: !id },
       );
       if (!id && !machine.groups?.length)
-        accepted = polishRadialBranches({ ...view, states: accepted });
+        accepted = polishRadialBranches(
+          { ...view, states: accepted },
+          { stats: (metrics.radialAesthetics = {}) },
+        );
       const positions = new Map(accepted.map((s) => [s.id, s]));
       for (const s of view.states) {
         const p = positions.get(s.id);

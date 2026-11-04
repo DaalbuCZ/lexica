@@ -5,7 +5,14 @@ import { simpleTransitionLabel } from './editor-settings.js';
 
 // Work in outward-facing branch frames, but certify against the complete
 // drawing. Local feasibility alone cannot rule out collisions with a neighbor.
-export function polishRadialBranches(machine, { maxRoutes = 32 } = {}) {
+export function polishRadialBranches(machine, { maxRoutes = 32, stats = {} } = {}) {
+  Object.assign(stats, {
+    regions: 0,
+    candidates: 0,
+    accepted: 0,
+    routeChecks: 0,
+    budgetExhausted: false,
+  });
   const root = machine.states.find((s) => s.id === machine.start);
   if (
     !root ||
@@ -63,6 +70,7 @@ export function polishRadialBranches(machine, { maxRoutes = 32 } = {}) {
   if (baseline.crossings) return states;
   for (const branch of branches) {
     if (checked >= maxRoutes) break;
+    stats.regions++;
     const ids = new Set(branch),
       nodes = new Map(states.map((s) => [s.id, s])),
       anchors = branch
@@ -104,6 +112,7 @@ export function polishRadialBranches(machine, { maxRoutes = 32 } = {}) {
       maxRoutes: 8,
       radialOrigin: toLocal(root),
       acceptCandidate: (candidate) => {
+        stats.candidates++;
         if (checked >= maxRoutes) return false;
         const moved = new Map(candidate.map((s) => [s.id, toWorld(s)])),
           next = states.map((s) => moved.get(s.id) ?? s);
@@ -119,10 +128,13 @@ export function polishRadialBranches(machine, { maxRoutes = 32 } = {}) {
         checked++;
         if (!corridorRoutes({ ...machine, states: next, comments: [] }, labels)) return false;
         accepted = next;
+        stats.accepted++;
         return true;
       },
     });
     states = accepted;
   }
+  stats.routeChecks = checked;
+  stats.budgetExhausted = checked >= maxRoutes;
   return states;
 }

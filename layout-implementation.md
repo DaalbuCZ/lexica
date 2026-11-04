@@ -81,6 +81,12 @@ Ungrouped radial drawings reuse the whole-subgroup candidate family in outward-f
 
 Regressions cover an attached comment choosing an open cycle face and an ungrouped 43-state radial drawing releasing an enclosed state while retaining its ring and already tidy neighboring branches. The 82-state real fixture was also checked in the running app with and without autogroups; the complete route sets remained certified clear.
 
+## Radial packing order and diagnostics
+
+The radial branch seed now runs whole-subgroup aesthetic selection before wedge packing, while the start attachments can still be rearranged. The late radial pass remains useful for safe cleanup with the start ring pinned, but cannot on its own change the dominant branch shape. `metrics.radialAesthetics` records regions examined, candidates reaching the global check, accepted candidates, routing checks and whether the global budget was exhausted.
+
+On the user's `Downloads/fsm.txt` (82 states, 134 transitions), the previous late-only pass examined all 14 regions, accepted 20 candidates and used 20 of 32 routing checks: it was not falling back because of budget exhaustion. Moving the selection before packing reduced cycle-enclosure incidences from 18 to 8, longest edge length from about 1972 to 1375 and total edge length from about 64209 to 60389. Both complete drawings were certified clear. These measurements describe this fixture rather than a guarantee for every graph.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

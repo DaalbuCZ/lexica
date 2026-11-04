@@ -25,6 +25,49 @@ import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthe
 import { transitionBundles } from '../src/core/graph-bundles.js';
 import { polishSubgroup } from '../src/core/subgroup-aesthetics.js';
 import { polishRadialBranches } from '../src/core/radial-aesthetics.js';
+import { simpleTransitionLabel } from '../src/core/editor-settings.js';
+
+test('radial assembly keeps a cyclic branch exit outside its cycles before late cleanup', () => {
+  const m = {
+    start: 'root',
+    states: [
+      'root',
+      'text',
+      'quote',
+      'double',
+      'end',
+      ...Array.from({ length: 33 }, (_, i) => `leaf${i}`),
+    ].map((id) => ({ id, name: id, x: 0, y: 0 })),
+    edges: [
+      ['root', 'text'],
+      ['root', 'quote'],
+      ['quote', 'text'],
+      ['quote', 'double'],
+      ['double', 'text'],
+      ['double', 'end'],
+      ...Array.from({ length: 33 }, (_, i) => ['root', `leaf${i}`]),
+    ].map(([from, to]) => ({ from, to, label: 'x' })),
+    groups: [],
+    comments: [],
+  };
+  const result = solveLayout(layoutTopology(m), null, {
+      mode: 'circle',
+      spacing: 0.5,
+      smartGroups: false,
+    }),
+    nodes = new Map(result.machine.states.map((s) => [s.id, s]));
+  assert.equal(result.machine.groups.length, 0);
+  for (const cycle of cycleAnalysis(result.machine).cycles)
+    assert.equal(insideCycle(nodes.get('end'), cycle, nodes), false);
+  assert.equal(
+    validateRouteSeparation(routeEdges(result.machine, simpleTransitionLabel), {
+      maxDepth: 24,
+      maxPairs: 4096,
+    }).status,
+    'clear',
+  );
+  assert.equal(result.metrics.radialAesthetics.budgetExhausted, false);
+});
 
 test('attached comments prefer an open face even when the cycle interior has the widest free sector', () => {
   const m = {
