@@ -111,18 +111,22 @@ export function createViewport(context) {
     return context.overviewView ?? context.graph.view();
   }
   function syncGrid() {
-    const canvas = context.$('canvas'),
-      v = context.graph.view(),
-      scale = Math.min(canvas.clientWidth / v.width, canvas.clientHeight / v.height);
-    if (!(scale > 0)) return;
-    const size = 100 * scale;
-    const x = (canvas.clientWidth - v.width * scale) / 2 - v.x * scale - size / 2,
-      y = (canvas.clientHeight - v.height * scale) / 2 - v.y * scale - size / 2;
-    const grid =
-      document.querySelector('.group-overlay:not([hidden])') ??
-      document.querySelector('.canvas-wrap');
-    grid.style.backgroundSize = `${size}px ${size}px`;
-    grid.style.backgroundPosition = `${x}px ${y}px`;
+    const update = (grid, canvas, v) => {
+      if (!grid || !canvas || !v) return;
+      const t = canvasTransform(v, canvas.clientWidth, canvas.clientHeight);
+      if (!(t.scale > 0)) return;
+      const size = 100 * t.scale,
+        area = canvas.getBoundingClientRect(),
+        parent = grid.getBoundingClientRect();
+      grid.style.backgroundSize = `${size}px ${size}px`;
+      grid.style.backgroundPosition = `${area.left - parent.left + t.x - size / 2}px ${area.top - parent.top + t.y - size / 2}px`;
+    };
+    update(
+      context.canvasWrap,
+      context.overviewView ? context.overviewCanvas : context.$('canvas'),
+      context.overviewView ?? context.graph.view(),
+    );
+    if (context.overviewView) update(context.groupPanel, context.$('canvas'), context.graph.view());
   }
   function setView(v) {
     if (context.overviewView) {

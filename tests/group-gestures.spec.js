@@ -68,6 +68,38 @@ test('mouse wheel pans the background while a subgroup stays open', async ({ pag
     .toBeGreaterThan(2);
   await expect(page.locator('.group-overlay')).toBeVisible();
 });
+
+test('middle-button background pan moves the overview and its dots together', async ({ page }) => {
+  await setup(page);
+  const p = await groupPoint(page);
+  await page.mouse.click(p.x, p.y);
+  await expect(page.locator('.group-overlay')).toBeVisible();
+  const outside = await backgroundPoint(page),
+    before = await transform(page, '.group-overview-backdrop'),
+    gridBefore = await page
+      .locator('.canvas-wrap')
+      .evaluate((el) => el.style.backgroundPosition.split(' ').map(parseFloat));
+  await page.mouse.move(outside.x, outside.y);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(outside.x + 50, outside.y + 30, { steps: 5 });
+  await page.mouse.up({ button: 'middle' });
+  await expect
+    .poll(async () => {
+      const t = await transform(page, '.group-overview-backdrop');
+      return Math.hypot(t.x - before.x, t.y - before.y);
+    })
+    .toBeGreaterThan(2);
+  const after = await transform(page, '.group-overview-backdrop'),
+    gridAfter = await page
+      .locator('.canvas-wrap')
+      .evaluate((el) => el.style.backgroundPosition.split(' ').map(parseFloat));
+  expect(gridAfter[0] - gridBefore[0]).toBeCloseTo(after.x - before.x, 2);
+  expect(gridAfter[1] - gridBefore[1]).toBeCloseTo(after.y - before.y, 2);
+  await expect(page.locator('.group-overlay')).toBeVisible();
+  const blank = await backgroundPoint(page);
+  await page.mouse.click(blank.x, blank.y, { button: 'middle' });
+  await expect(page.locator('.group-overlay')).toBeVisible();
+});
 test('touch opening, background panning and closing do not leave a phantom finger', async ({
   page,
   context,

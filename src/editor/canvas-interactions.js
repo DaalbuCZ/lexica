@@ -767,9 +767,11 @@ export function createCanvasInteractions(context) {
       context.mapTransform = null;
     };
     context.listen(context.overviewCanvas, 'pointerdown', (event) => {
-      if (!event.isPrimary || event.button !== 0) return;
+      if (!event.isPrimary || ![0, 1].includes(event.button)) return;
+      if (event.button === 1) event.preventDefault();
       context.outsideGroupPress = {
         id: event.pointerId,
+        button: event.button,
         x: event.clientX,
         y: event.clientY,
         lastX: event.clientX,
@@ -805,7 +807,8 @@ export function createCanvasInteractions(context) {
       'pointerup',
       (event) => {
         if (context.outsideGroupPress?.id !== event.pointerId) return;
-        const shouldClose = !context.outsideGroupPress.moved;
+        const shouldClose =
+          !context.outsideGroupPress.moved && context.outsideGroupPress.button === 0;
         context.outsideGroupPress = null;
         if (shouldClose && context.overviewView) context.closeGroup();
       },
@@ -819,6 +822,9 @@ export function createCanvasInteractions(context) {
       },
       true,
     );
+    context.listen(context.overviewCanvas, 'auxclick', (event) => {
+      if (event.button === 1) event.preventDefault();
+    });
     context.listen(window, 'wheel', context.wheelGraph, {
       passive: false,
       capture: true,
