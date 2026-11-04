@@ -5,6 +5,18 @@ import { commentLayout } from './comments.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
+  for (const laneScale of [2, 1.5, 1]) {
+    const routes = routeLanes(machine, labels, {
+      previous,
+      dirty,
+      onFailure: laneScale === 1 ? onFailure : undefined,
+      laneScale,
+    });
+    if (routes) return routes;
+  }
+  return null;
+}
+function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) {
   const nodes = new Map(machine.states.map((s) => [s.id, s])),
     bundles = new Map(),
     routes = previous ? [...previous] : [],
@@ -39,7 +51,7 @@ export function corridorRoutes(machine, labels, { previous = null, dirty = null,
         dy = b.y - a.y,
         len = Math.hypot(dx, dy) || 1,
         sign = compare(e.from, e.to) <= 0 ? 1 : -1,
-        port = Math.max(-30, Math.min(30, (lane - (members.length - 1) / 2) * 7)),
+        port = Math.max(-30, Math.min(30, (lane - (members.length - 1) / 2) * 7 * laneScale)),
         along = Math.sqrt(37 * 37 - port * port);
       for (const [s, forward, key] of [
         [a, 1, `${i}:a`],
@@ -115,8 +127,8 @@ export function corridorRoutes(machine, labels, { previous = null, dirty = null,
           len = Math.hypot(dx, dy) || 1,
           // Canonical physical normal keeps lane assignments stable on reversal.
           sign = compare(e.from, e.to) <= 0 ? 1 : -1,
-          offset = (lane - (members.length - 1) / 2) * 14;
-        for (const extra of [0, 8, 16]) {
+          offset = (lane - (members.length - 1) / 2) * 14 * laneScale;
+        for (const extra of laneScale === 1 ? [0, 8, 16] : [16, 8, 0]) {
           const shift = offset === 0 ? 0 : offset + Math.sign(offset) * extra;
           const nx = (-dy / len) * sign,
             ny = (dx / len) * sign,

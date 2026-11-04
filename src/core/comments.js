@@ -1,6 +1,8 @@
 import { emptyAngles } from './angular-space.js';
 import { routeEdges } from './layout.js';
 import { simpleTransitionLabel } from './editor-settings.js';
+import { curveAvoidsBox, mix } from './route-geometry.js';
+import { curveClearance } from './curve-clearance.js';
 export function commentLayout(comment) {
   const lines = [];
   for (const paragraph of comment.text.split('\n')) {
@@ -157,6 +159,15 @@ export function placeCommentsAfterLayout(machine) {
     const angles = emptyAngles(directions),
       base = Math.max(95, w / 2 + 65, h / 2 + 65);
     const candidates = [
+      ...Array.from({ length: 48 }, (_, i) => {
+        const angle = ((i % 24) * Math.PI) / 12,
+          radius = base + Math.floor(i / 24) * 90;
+        return {
+          x: center.x + Math.cos(angle) * radius - w / 2,
+          y: center.y + Math.sin(angle) * radius - h / 2,
+          rank: 0,
+        };
+      }),
       ...Array.from(
         {
           length: 3 * 24,
@@ -191,6 +202,34 @@ export function placeCommentsAfterLayout(machine) {
           y: box.y + h / 2,
         };
       let score = Math.hypot(mid.x - center.x, mid.y - center.y) * 0.15 + candidate.rank * 12;
+      for (const route of routes)
+        if (
+          !curveAvoidsBox(route, {
+            left: box.x - 8,
+            right: box.x + w + 8,
+            top: box.y - 8,
+            bottom: box.y + h + 8,
+          })
+        )
+          score += 10000;
+      for (const state of attached) {
+        const links = commentLinks({
+          ...machine,
+          states: [state],
+          comments: [{ ...comment, x: box.x, y: box.y }],
+        });
+        for (const link of links) {
+          const leader = {
+            p0: link.from,
+            p3: link.to,
+            c1: mix(link.from, link.to, 1 / 3),
+            c2: mix(link.from, link.to, 2 / 3),
+          };
+          for (const route of routes)
+            if (curveClearance(leader, route, { maxPairs: 128, maxDepth: 18 }).status !== 'clear')
+              score += 10000;
+        }
+      }
       for (const state of machine.states) {
         const dx = Math.max(box.x - state.x, 0, state.x - box.x - w),
           dy = Math.max(box.y - state.y, 0, state.y - box.y - h);
@@ -226,7 +265,7 @@ export function placeCommentsAfterLayout(machine) {
               h: Math.abs(a.y - b.y) + 12,
             })
           )
-            score += 250;
+            score += 10000;
       if (!best || score < best.score)
         best = {
           ...box,

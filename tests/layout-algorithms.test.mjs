@@ -10,6 +10,9 @@ import { storeDrawingRoutes } from '../src/core/drawing-routes.js';
 import { routeEdges } from '../src/core/layout.js';
 import { parseMachine } from '../src/core/lexer.js';
 import { createLiveRouting } from '../src/editor/live-routing.js';
+import { compactAesthetics } from '../src/core/aesthetic-layout.js';
+import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
+import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({
@@ -25,6 +28,75 @@ const machine = () => ({
 const snapshot = (m, routes) => ({
   routes,
   nodes: new Map(m.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+});
+
+test('label-aware compaction shortens short branches without shrinking the configured edge', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: -800, y: 0 },
+      { id: 'join', x: 0, y: 0 },
+      { id: 'up', x: 200, y: -600 },
+      { id: 'down', x: 200, y: 600 },
+    ],
+    edges: [
+      { from: 'root', to: 'join', label: 'x'.repeat(70) },
+      { from: 'join', to: 'up', label: 'a' },
+      { from: 'join', to: 'down', label: 'b' },
+    ],
+  };
+  const states = compactAesthetics(m),
+    nodes = new Map(states.map((s) => [s.id, s]));
+  const distance = (a, b) =>
+    Math.hypot(nodes.get(a).x - nodes.get(b).x, nodes.get(a).y - nodes.get(b).y);
+  assert.ok(distance('root', 'join') >= 590);
+  assert.ok(distance('join', 'up') < 350);
+  assert.ok(distance('join', 'down') < 350);
+  assert.ok(
+    corridorRoutes(
+      { ...m, states },
+      m.edges.map((e) => e.label),
+    ),
+  );
+});
+
+test('reciprocal lanes prefer readable separation while remaining disjoint', () => {
+  const m = {
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 0, y: 240 },
+    ],
+    edges: [
+      { from: 'a', to: 'b', label: 'a' },
+      { from: 'b', to: 'a', label: 'b' },
+    ],
+  };
+  const routes = corridorRoutes(m, ['a', 'b']),
+    a = curvePoint(routes[0], 0.5),
+    b = curvePoint(routes[1], 0.5);
+  assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 25);
+  assert.equal(validateRouteSeparation(routes).status, 'clear');
+});
+
+test('attached comments can choose the free side of their anchor', () => {
+  const m = {
+    routingPolicy: 'corridor',
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 240, y: 0 },
+    ],
+    edges: [{ from: 'a', to: 'b', label: 'a' }],
+    comments: [{ id: 'c', nodeId: 'a', text: 'A note', x: 0, y: 0 }],
+  };
+  placeCommentsAfterLayout(m);
+  const c = m.comments[0],
+    size = commentLayout(c),
+    routes = routeEdges(m, (e) => e.label);
+  assert.ok(
+    routes.every((r) =>
+      curveAvoidsBox(r, { left: c.x, right: c.x + size.w, top: c.y, bottom: c.y + size.h }),
+    ),
+  );
 });
 test('feasible layout is independent of drawing geometry and retains clear skeletons', () => {
   const m = machine(),

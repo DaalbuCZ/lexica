@@ -23,6 +23,16 @@ Representative CLI runs were about 3.5 seconds ungrouped and 1.1 seconds grouped
 
 The two older browser workflows fail on both the unchanged `cb86977` baseline and this implementation: the SVG preview test expects a textarea that the UI replaced with an image, and the group workflow cannot click an offscreen Close group button. These failures are separate from the new passing layout workflow.
 
+## Aesthetic refinement
+
+The subsequent aesthetic pass operates on the certified drawing. It considers rigid chunks on either side of articulation vertices as well as individual nodes, uses per-edge transition-label length targets, and accepts a move only after clearance and complete curve routing pass. Long configured edges retain their required length while short neighboring edges can contract. Candidate and route-check budgets keep the additional search bounded.
+
+Comment placement searches a full compass of directions and checks both the comment box and its leader against rendered curves. Reciprocal bundles prefer wider ports and lanes, with narrower certified alternatives when surrounding geometry requires them. These preferences never bypass the crossing checks.
+
+In the private CLI comparison, the ungrouped drawing's bounds decreased from about 5,164 × 5,041 to 3,939 × 4,120 (about 38% less bounding area). The comparison-operator subgroup decreased from about 594 × 686 to 430 × 335. Additional search increased representative CLI times to about six seconds ungrouped and 2.4 seconds grouped. These are local measurements, not performance guarantees.
+
+The regression suite now contains 141 passing domain tests, including label-dependent branch shortening, reciprocal separation and clear-side comment placement.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.
