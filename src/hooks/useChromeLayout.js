@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { placeDockedPanel } from '../core/docking.js';
+import { debuggerZones, dockSides, placeDockedPanel } from '../core/docking.js';
 
 /** Keep the fixed editor controls in the space left by the docked tester. */
 export function useChromeLayout() {
@@ -18,14 +18,7 @@ export function useChromeLayout() {
       for (const [key, value] of Object.entries(values))
         if (element.style[key] !== value) element.style[key] = value;
     };
-    const showPreview = ({ x, y, width, height }) => {
-      set(preview, {
-        left: x + 'px',
-        top: y + 'px',
-        width: width + 'px',
-        height: height + 'px',
-      });
-    };
+    let measureTargets;
     const place = () => {
       frame = null;
       const gap = 16,
@@ -100,18 +93,6 @@ export function useChromeLayout() {
         return { toolbarLeft, toolbarTop, stackedTop, vertical };
       };
       const { toolbarLeft, toolbarTop, stackedTop, vertical } = positionToolbar(toolbar, dock);
-      if (!preview.hidden && preview.dataset.panel === 'toolbar') {
-        // Measure the toolbar in the target orientation without moving the live controls.
-        const sample = toolbar.cloneNode(true);
-        sample.removeAttribute('id');
-        sample.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
-        sample.inert = true;
-        sample.style.visibility = 'hidden';
-        positionToolbar(sample, preview.dataset.zone);
-        toolbar.after(sample);
-        showPreview(sample.getBoundingClientRect());
-        sample.remove();
-      }
       let crumbLeft = vertical ? logo.right + gap : left,
         crumbTop = vertical ? top : stackedTop ? toolbarTop + row + gap : logo.bottom + gap;
       const crumbRight = dock === 'right' ? toolbarLeft - gap : right;
@@ -133,6 +114,7 @@ export function useChromeLayout() {
         if (panel) resize.observe(panel);
         debuggerPanel = panel;
       }
+      let debuggerBounds;
       if (panel) {
         const area = { left: left - gap, right: right + gap, top: top - gap, bottom: bottom + gap };
         set(panel, {
@@ -143,12 +125,41 @@ export function useChromeLayout() {
           .map((element) => element.getBoundingClientRect())
           .filter((rect) => rect.width > 0 && rect.height > 0);
         const size = { width: panel.offsetWidth, height: panel.offsetHeight };
-        const position = (zone) => placeDockedPanel(zone, size, area, obstacles, gap);
-        const { x, y } = position(document.body.dataset.debuggerDock || 'top');
+        debuggerBounds = (zone) => ({
+          ...placeDockedPanel(zone, size, area, obstacles, gap),
+          ...size,
+        });
+        const { x, y } = debuggerBounds(document.body.dataset.debuggerDock || 'top');
         set(panel, { left: x + 'px', top: y + 'px', translate: 'none' });
-        if (!preview.hidden && preview.dataset.panel === 'debugger')
-          showPreview({ ...position(preview.dataset.zone), ...size });
       }
+      measureTargets = (name) => {
+        if (name === 'debugger')
+          return debuggerBounds
+            ? debuggerZones.map((zone) => ({ zone, ...debuggerBounds(zone) }))
+            : [];
+
+        // Measure the target orientation without moving the live controls.
+        const sample = (name === 'toolbar' ? toolbar : preview).cloneNode(name === 'toolbar');
+        sample.removeAttribute('id');
+        sample.removeAttribute('style');
+        sample.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
+        sample.inert = true;
+        sample.hidden = false;
+        sample.style.visibility = 'hidden';
+        sample.dataset.panel = name;
+        (name === 'toolbar' ? toolbar : preview).after(sample);
+        const targets = dockSides.map((zone) => {
+          if (name === 'toolbar') positionToolbar(sample, zone);
+          else sample.dataset.side = zone;
+          const { x, y, width, height } = sample.getBoundingClientRect();
+          return { zone, x, y, width, height };
+        });
+        sample.remove();
+        return targets;
+      };
+    };
+    const provideTargets = ({ detail }) => {
+      detail.targets = measureTargets(detail.name);
     };
     const schedule = () => {
       if (frame == null) frame = requestAnimationFrame(place);
@@ -172,13 +183,11 @@ export function useChromeLayout() {
         'data-debugging',
       ],
     });
-    mutation.observe(preview, {
-      attributes: true,
-      attributeFilter: ['hidden', 'data-zone', 'data-panel'],
-    });
+    preview.addEventListener('measure-dock-targets', provideTargets);
     window.addEventListener('resize', schedule);
     place();
     return () => {
+      preview.removeEventListener('measure-dock-targets', provideTargets);
       resize.disconnect();
       mutation.disconnect();
       window.removeEventListener('resize', schedule);

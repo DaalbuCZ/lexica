@@ -1,9 +1,9 @@
 import { placeFloatingRect } from './floating-placement.js';
 
-const sides = ['top', 'bottom', 'left', 'right'];
+export const dockSides = ['top', 'bottom', 'left', 'right'];
 export function nearestDock(x, y, width, height) {
   const distances = [y, height - y, x, width - x];
-  return sides[distances.indexOf(Math.min(...distances))];
+  return dockSides[distances.indexOf(Math.min(...distances))];
 }
 const cornerZones = {
   'top-start': 'left-start',
@@ -16,6 +16,8 @@ const cornerZones = {
   'right-end': 'bottom-end',
 };
 
+export const debuggerZones = [...dockSides, ...Object.keys(cornerZones)];
+
 export function nearestDockZone(x, y, width, height) {
   const side = nearestDock(x, y, width, height);
   const fraction = side === 'top' || side === 'bottom' ? x / width : y / height;
@@ -26,11 +28,9 @@ export function nearestDockZone(x, y, width, height) {
 
 export function dockSettings(value) {
   return {
-    toolbar: sides.includes(value?.toolbar) ? value.toolbar : 'top',
-    tester: sides.includes(value?.tester) ? value.tester : 'bottom',
-    debugger: sides.some((side) => [side, side + '-start', side + '-end'].includes(value?.debugger))
-      ? value.debugger
-      : 'top',
+    toolbar: dockSides.includes(value?.toolbar) ? value.toolbar : 'top',
+    tester: dockSides.includes(value?.tester) ? value.tester : 'bottom',
+    debugger: debuggerZones.includes(value?.debugger) ? value.debugger : 'top',
   };
 }
 export function placeDockedPanel(zone, size, area, obstacles, gap = 16) {

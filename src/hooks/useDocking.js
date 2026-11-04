@@ -8,13 +8,47 @@ function applyDock(name, side) {
   document.body.dataset[name + 'Dock'] = side;
   if (name !== 'debugger') window.dispatchEvent(new Event('resize'));
 }
+function findTarget(targets, x, y, preferred) {
+  let best;
+  for (const box of targets) {
+    const dx = Math.max(box.x - x, x - box.x - box.width, 0);
+    const dy = Math.max(box.y - y, y - box.y - box.height, 0);
+    const distance = Math.hypot(dx, dy);
+    const centerDistance = Math.hypot(x - box.x - box.width / 2, y - box.y - box.height / 2);
+    if (
+      !best ||
+      distance < best.distance ||
+      (distance === best.distance &&
+        (centerDistance < best.centerDistance ||
+          (centerDistance === best.centerDistance && box.zone === preferred)))
+    ) {
+      best = { box, distance, centerDistance };
+    }
+  }
+  return best;
+}
+
 export function useDockGrip(name) {
   const drag = useRef(null);
   useEffect(() => {
     const settings = dockSettings(readStorage('lexica-docks', {}));
     document.body.dataset[name + 'Dock'] = settings[name];
-    return () => document.body.classList.remove('docking');
+    return () => {
+      if (drag.current?.moved) {
+        document.body.classList.remove('docking');
+        document.getElementById('dock-preview').hidden = true;
+      }
+    };
   }, [name]);
+  const pickTarget = (target, { clientX, clientY }) => {
+    const preferred = name === 'debugger' ? nearestDockZone : nearestDock;
+    return findTarget(
+      target.targets,
+      clientX,
+      clientY,
+      preferred(clientX, clientY, innerWidth, innerHeight),
+    );
+  };
   const finish = (event, cancel = false) => {
     const target = drag.current;
     if (!target) return;
@@ -22,7 +56,10 @@ export function useDockGrip(name) {
     document.body.classList.remove('docking');
     const preview = document.getElementById('dock-preview');
     if (preview) preview.hidden = true;
-    if (target.moved && !cancel) applyDock(name, target.side);
+    if (target.moved && !cancel) {
+      const hit = pickTarget(target, event);
+      if (hit?.distance === 0) applyDock(name, hit.box.zone);
+    }
     if (event.currentTarget.hasPointerCapture(target.id))
       event.currentTarget.releasePointerCapture(target.id);
   };
@@ -45,15 +82,23 @@ export function useDockGrip(name) {
       event.stopPropagation();
       if (Math.hypot(event.clientX - target.x, event.clientY - target.y) > 5) target.moved = true;
       if (!target.moved) return;
-      const getDock = name === 'debugger' ? nearestDockZone : nearestDock;
-      target.side = getDock(event.clientX, event.clientY, innerWidth, innerHeight);
-      const [side, segment = 'center'] = target.side.split('-');
       const preview = document.getElementById('dock-preview');
-      if (preview.dataset.panel !== name) preview.removeAttribute('style');
-      preview.dataset.side = side;
-      preview.dataset.segment = segment;
-      if (preview.dataset.zone !== target.side) preview.dataset.zone = target.side;
+      if (!target.targets) {
+        const detail = { name, targets: [] };
+        preview.dispatchEvent(new CustomEvent('measure-dock-targets', { detail }));
+        target.targets = detail.targets;
+      }
+      const hit = pickTarget(target, event);
+      if (!hit) return;
+      const { box, distance } = hit;
       preview.dataset.panel = name;
+      preview.dataset.zone = box.zone;
+      preview.toggleAttribute('data-outside', distance > 0);
+      Object.assign(preview.style, {
+        inset: box.y + 'px auto auto ' + box.x + 'px',
+        width: box.width + 'px',
+        height: box.height + 'px',
+      });
       preview.hidden = false;
       document.body.classList.add('docking');
     },
