@@ -534,7 +534,7 @@ const shortcuts = {
 };
 function ShortcutsDialog({ onClose }) {
   return (
-    <Modal title="Keyboard shortcuts" onClose={onClose}>
+    <Modal title="Keyboard shortcuts" className="shortcuts-dialog" onClose={onClose}>
       <p className="shortcuts-intro">
         Canvas shortcuts apply outside text fields. Debugger shortcuts also work in the lexer input.
         Text fields keep their normal editing keys.

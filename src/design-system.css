@@ -859,6 +859,27 @@ details[open] > summary::before {
 .react-dialog.export-panel {
   width: 1000px;
 }
+.react-dialog.shortcuts-dialog {
+  width: 760px;
+  overscroll-behavior: contain;
+}
+.shortcuts-dialog .shortcut-groups {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.shortcuts-dialog .shortcut-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.shortcuts-dialog .shortcut-row kbd {
+  flex: 0 1 auto;
+  max-width: 55%;
+  white-space: normal;
+}
+@media (max-width: 650px) {
+  .shortcuts-dialog .shortcut-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .export-panel #export-preview {
   height: min(48vh, 480px);
   min-height: 260px;
