@@ -211,7 +211,9 @@ function ExportDialog({ onClose, dialog }) {
           )}
         </>
       )}
-      <TextArea size="2" id="export-preview" spellCheck={false} readOnly value={text} />
+      {format !== 'svg' && (
+        <TextArea size="2" id="export-preview" spellCheck={false} readOnly value={text} />
+      )}
       {error && <p role="alert">{error}</p>}
       {format === 'tex' && (
         <p className="export-help">

@@ -4,7 +4,11 @@ import { portalBoxAtTip } from './portals.js';
 /** Linear-time drag geometry. Full obstacle routing runs again after release. */
 export function interactiveRoutes(machine, label, snapshot) {
   machine = visualMachine(machine);
-  if (snapshot && snapshot.routes.length === machine.edges.length) {
+  if (
+    snapshot &&
+    snapshot.routes.length === machine.edges.length &&
+    machine.states.every((state) => snapshot.nodes.has(state.id))
+  ) {
     const deltas = new Map(
       machine.states.map((state) => {
         const previous = snapshot.nodes.get(state.id);

@@ -816,6 +816,7 @@ export function createEditorController(
     },
     dispose() {
       context.disposed = true;
+      context.disposeRouting();
       context.groupAnimation?.cancel();
       context.groupTintAnimation?.cancel();
       cancelAnimationFrame(context.cameraFrame);

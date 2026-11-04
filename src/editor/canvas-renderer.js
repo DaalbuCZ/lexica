@@ -9,7 +9,10 @@ import { tokenColorClass } from '../core/token-colors.js';
 import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
 import { interactiveRoutes } from '../core/interactive-routes.js';
 import { visualMachine } from '../core/start-views.js';
+import { createLiveRouting } from './live-routing.js';
 export function createCanvasRenderer(context) {
+  const liveRouting = createLiveRouting(context);
+  context.disposeRouting = () => liveRouting.dispose();
   let mapScene = null;
   let shownCache = null;
   let routeSnapshot = null;
@@ -30,21 +33,14 @@ export function createCanvasRenderer(context) {
     const viewport = visibleViewport(view, surface, viewportMetrics);
     if (context.overviewView) {
       const offset = context.groupWindowOffset,
-        local = context.graph.view();
-      const left = Math.max(local.x, viewport.x - offset.x),
-        top = Math.max(local.y, viewport.y - offset.y);
+        left = viewport.x - offset.x,
+        top = viewport.y - offset.y;
       context.graph.drawMap(
         {
           x: left,
           y: top,
-          width: Math.max(
-            1,
-            Math.min(local.x + local.width, viewport.x - offset.x + viewport.width) - left,
-          ),
-          height: Math.max(
-            1,
-            Math.min(local.y + local.height, viewport.y - offset.y + viewport.height) - top,
-          ),
+          width: viewport.width,
+          height: viewport.height,
         },
         mapScene ?? undefined,
       );
@@ -154,17 +150,27 @@ export function createCanvasRenderer(context) {
         edge.originalIndices?.length > 1
           ? `${edge.originalIndices.length} transitions`
           : baseLabel(edge),
-      shownRoutes = dragging
-        ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
-        : routeSnapshot?.version === context.documentVersion &&
-            routeSnapshot.group === context.openGroup &&
-            routeSnapshot.simple === editorSettings.simplified &&
-            visualMachine(shown).states.every((state) => {
-              const old = routeSnapshot.nodes.get(state.id);
-              return old?.x === state.x && old?.y === state.y;
-            })
-          ? routeSnapshot.routes
-          : routeEdges(shown, label);
+      liveSnapshot =
+        editorSettings.rerouteWhileDragging && (dragging || liveRouting.started)
+          ? liveRouting.snapshot(shown, editorSettings.simplified)
+          : null,
+      shownRoutes = liveSnapshot
+        ? interactiveRoutes(shown, label, liveSnapshot)
+        : dragging
+          ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+          : editorSettings.rerouteWhileDragging &&
+              liveRouting.started &&
+              routeSnapshot?.group === context.openGroup
+            ? interactiveRoutes(shown, label, routeSnapshot)
+            : routeSnapshot?.version === context.documentVersion &&
+                routeSnapshot.group === context.openGroup &&
+                routeSnapshot.simple === editorSettings.simplified &&
+                visualMachine(shown).states.every((state) => {
+                  const old = routeSnapshot.nodes.get(state.id);
+                  return old?.x === state.x && old?.y === state.y;
+                })
+              ? routeSnapshot.routes
+              : routeEdges(shown, label);
     if (!dragging)
       routeSnapshot = {
         routes: shownRoutes,

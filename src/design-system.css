@@ -702,6 +702,9 @@ body[data-tester-dock='right'].tester-collapsed .canvas-status {
   right: calc(var(--tester-width, 320px) + 12px);
   bottom: 12px;
 }
+body[data-tester-dock='left'].tester-collapsed .canvas-status {
+  bottom: 8px;
+}
 details > summary {
   list-style: none;
   display: flex;

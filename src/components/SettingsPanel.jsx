@@ -49,6 +49,12 @@ export function SettingsPanel({ dialog, onClose }) {
             onChange={(simplified) => change({ simplified })}
           />
           <Check
+            id="reroute-while-dragging"
+            label="Recalculate paths while dragging"
+            checked={settings.rerouteWhileDragging}
+            onChange={(rerouteWhileDragging) => change({ rerouteWhileDragging })}
+          />
+          <Check
             id="label-boxes"
             label="Label backgrounds"
             checked={machine.labelBoxes}
