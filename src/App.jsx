@@ -1,5 +1,6 @@
 import { Button } from './components/ui.jsx';
 import { Component, lazy, Suspense, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Expand, Minus, Plus } from 'lucide-react';
 import { useStudio, writeStorage } from './state/studio.js';
 import { editorSettings } from './core/editor-settings.js';
@@ -103,8 +104,13 @@ export default function App() {
       <Suspense fallback={null}>
         <Dialogs />
       </Suspense>
-      <div id="dock-outlines" aria-hidden="true" />
-      <div id="dock-preview" className="dock-preview" hidden aria-hidden="true" />
+      {createPortal(
+        <>
+          <div id="dock-outlines" aria-hidden="true" />
+          <div id="dock-preview" className="dock-preview" hidden aria-hidden="true" />
+        </>,
+        document.body,
+      )}
       <Toaster
         position="bottom-center"
         closeButton

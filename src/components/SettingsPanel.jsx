@@ -66,6 +66,15 @@ export function SettingsPanel({ dialog, onClose }) {
               })
             }
           />
+          <Select
+            id="group-presentation"
+            label="Open groups in"
+            value={settings.groupPresentation}
+            onChange={(groupPresentation) => change({ groupPresentation })}
+          >
+            <option value="canvas">Full canvas</option>
+            <option value="overlay">Floating window</option>
+          </Select>
         </section>
         <div className="settings-stack">
           <section className="settings-section">
@@ -85,15 +94,6 @@ export function SettingsPanel({ dialog, onClose }) {
               checked={settings.followDebugState}
               onChange={(followDebugState) => change({ followDebugState })}
             />
-            <Select
-              id="group-presentation"
-              label="Open groups in"
-              value={settings.groupPresentation}
-              onChange={(groupPresentation) => change({ groupPresentation })}
-            >
-              <option value="canvas">Full canvas</option>
-              <option value="overlay">Floating window</option>
-            </Select>
             <div className="settings-slider-label">
               <label htmlFor="pinch-sensitivity">Pinch sensitivity</label>
               <output>{settings.pinchSensitivity.toFixed(1)}×</output>
