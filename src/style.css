@@ -2024,7 +2024,7 @@
   }
   .dock-preview[data-panel='tester'] {
     width: auto;
-    height: var(--tester);
+    height: var(--tester-height, 190px);
   }
   .dock-preview[data-panel='tester'][data-side='top'] {
     inset: 0 0 auto;
@@ -2043,11 +2043,6 @@
   }
   .dock-preview[data-panel='tester'][data-side='right'] {
     right: 0;
-  }
-  .tester-collapsed .dock-preview[data-panel='tester']:is([data-side='left'], [data-side='right']) {
-    top: auto;
-    width: var(--tester-width, 320px);
-    height: 48px;
   }
   @media (max-width: 650px) {
     header {

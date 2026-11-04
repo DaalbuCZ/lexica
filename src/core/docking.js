@@ -5,13 +5,23 @@ export function nearestDock(x, y, width, height) {
   const distances = [y, height - y, x, width - x];
   return sides[distances.indexOf(Math.min(...distances))];
 }
-const segments = ['start', 'center', 'end'];
+const cornerZones = {
+  'top-start': 'left-start',
+  'left-start': 'top-start',
+  'top-end': 'right-start',
+  'right-start': 'top-end',
+  'bottom-start': 'left-end',
+  'left-end': 'bottom-start',
+  'bottom-end': 'right-end',
+  'right-end': 'bottom-end',
+};
 
 export function nearestDockZone(x, y, width, height) {
   const side = nearestDock(x, y, width, height);
   const fraction = side === 'top' || side === 'bottom' ? x / width : y / height;
-  const segment = segments[fraction < 1 / 3 ? 0 : fraction < 2 / 3 ? 1 : 2];
-  return segment === 'center' ? side : side + '-' + segment;
+  if (fraction < 1 / 3) return cornerZones[side + '-start'];
+  if (fraction >= 2 / 3) return cornerZones[side + '-end'];
+  return side;
 }
 
 export function dockSettings(value) {
