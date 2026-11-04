@@ -860,6 +860,9 @@ details > summary::before {
   order: 1;
   margin-left: auto;
 }
+.compact-memory:not([open]) > summary::before {
+  transform: rotate(135deg);
+}
 .compact-memory .app-icon-button.danger {
   color: var(--error);
 }
