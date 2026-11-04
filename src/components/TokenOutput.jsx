@@ -6,7 +6,8 @@ import { packTokenRows } from '../core/token-rows.js';
 export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeOffsets }) {
   const ref = useRef(null),
     measure = useRef(null),
-    measurementCache = useRef(null);
+    measurementCache = useRef(null),
+    tracedToken = useRef(null);
   const [width, setWidth] = useState(300),
     [fontVersion, setFontVersion] = useState(0);
   useLayoutEffect(() => {
@@ -68,7 +69,15 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
     estimateSize: (index) => (packed[index]?.height ?? 48) + 6,
     overscan: 3,
   });
-  const firstActive = tokens.findIndex((token) => activeOffsets.has(token.offset));
+  const firstActive = useMemo(
+    () => (activeOffsets.size ? tokens.findIndex((token) => activeOffsets.has(token.offset)) : -1),
+    [tokens, activeOffsets],
+  );
+  const trace = (token) => {
+    if (token === tracedToken.current) return;
+    tracedToken.current = token;
+    onTrace(token);
+  };
   useEffect(() => {
     if (firstActive < 0) return;
     if (virtual) {
@@ -88,10 +97,9 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
       style={virtual ? { width: sizes[index].width } : undefined}
       className={`token ${token.token === 'ERROR' ? 'error' : `token-tinted ${tokenColorClass(token.token)}`} ${token.skip ? 'token-skipped' : ''} ${activeOffsets.has(token.offset) ? 'token-active' : ''}`}
       title={`Click to select in input · Hover to trace in graph · Offset ${token.offset}`}
-      onPointerEnter={() => onTrace(token)}
-      onPointerLeave={() => onTrace(null)}
-      onFocus={() => onTrace(token)}
-      onBlur={() => onTrace(null)}
+      onPointerMove={() => trace(token)}
+      onFocus={() => trace(token)}
+      onBlur={() => trace(null)}
       onClick={() => onSelect(token)}
     >
       <b>
@@ -106,6 +114,8 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
       id="tokens"
       ref={ref}
       aria-busy={pending}
+      onScroll={() => trace(null)}
+      onPointerLeave={() => trace(null)}
       className={virtual ? 'react-virtual-tokens' : undefined}
     >
       {error ? (

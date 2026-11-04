@@ -15,12 +15,12 @@ import { DebuggerWindow } from './DebuggerWindow.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 export function Tester({ debuggerRef }) {
   // Document edits may mutate the machine in place; selection changes need no lexer rerender.
-  useStudio((s) => s.scene.version);
+  const version = useStudio((s) => s.scene.version);
   const machine = useStudio((s) => s.scene.machine),
     input = useStudio((s) => s.input),
     showSkipped = useStudio((s) => s.showSkipped),
     controller = useStudio((s) => s.controller);
-  const analysis = useLexer(machine, input);
+  const analysis = useLexer(machine, input, version);
   const inputRef = useRef(null),
     mirror = useRef(null),
     errorsRef = useRef(null),
@@ -79,16 +79,17 @@ export function Tester({ debuggerRef }) {
   const sync = () => {
     const area = inputRef.current,
       layer = mirror.current;
-    if (!area || !layer) return;
+    if (!area || !layer || area.closest('.analysis-pending')) return;
     layer.style.paddingRight = 11 + Math.max(0, area.offsetWidth - area.clientWidth) + 'px';
     layer.scrollTop = area.scrollTop;
     layer.scrollLeft = area.scrollLeft;
     highlights.current?.refresh();
   };
   useLayoutEffect(() => {
-    highlights.current?.render(analysis.pending ? [] : analysis.tokens);
+    if (analysis.pending) return;
+    highlights.current?.render(analysis.tokens);
     sync();
-  }, [analysis.tokens, analysis.pending, input]);
+  }, [analysis.tokens, analysis.pending]);
   useEffect(() => {
     const observer = new ResizeObserver(() => {
       if (!document.body.classList.contains('resizing-tester')) sync();
@@ -106,7 +107,7 @@ export function Tester({ debuggerRef }) {
     setCanNext(false);
     setCanPrevious(false);
     setHover(null);
-    setActiveOffsets(new Set());
+    setActiveOffsets((offsets) => (offsets.size ? new Set() : offsets));
   }, [analysis.key, input]);
   useEffect(() => {
     if (!controller) return;

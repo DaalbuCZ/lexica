@@ -36,7 +36,8 @@ export function useTesterResize() {
     return () => {
       window.removeEventListener('resize', resize);
       if (frame.current !== null) cancelAnimationFrame(frame.current);
-      document.body.classList.remove('resizing-tester');
+      drag.current?.handle.style.removeProperty('--tester-resize-preview');
+      document.body.classList.remove('previewing-tester-resize');
     };
   }, []);
   const update = (value) => {
@@ -45,34 +46,32 @@ export function useTesterResize() {
       [vertical(side) ? 'width' : 'height']: testerSize(value, side, innerWidth, innerHeight),
     };
     current.current = next;
-    if (!drag.current) setSizes(next);
+    setSizes(next);
     apply(next);
   };
   const flush = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
-    if (pending.current !== null) {
-      update(pending.current);
-      pending.current = null;
-    }
+    const preview = drag.current;
+    if (!preview || pending.current === null) return;
+    const next = testerSize(pending.current, side, innerWidth, innerHeight);
+    const delta = (next - preview.size) * (['left', 'top'].includes(side) ? 1 : -1);
+    preview.handle.style.setProperty('--tester-resize-preview', delta + 'px');
   };
   const finish = (event, cancel = false) => {
     const previous = drag.current;
     if (!previous) return;
     drag.current = null;
-    if (cancel) {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-      frame.current = null;
-      pending.current = null;
-      current.current = previous.original;
-      setSizes(previous.original);
-      apply(previous.original);
-    } else {
-      flush();
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    if (!cancel && pending.current !== null) {
+      update(pending.current);
       writeStorage(storageKey, current.current);
     }
-    document.body.classList.remove('resizing-tester');
-    window.dispatchEvent(new Event('resize'));
+    pending.current = null;
+    previous.handle.style.removeProperty('--tester-resize-preview');
+    document.body.classList.remove('previewing-tester-resize');
+    if (!cancel) window.dispatchEvent(new Event('resize'));
     if (event.currentTarget.hasPointerCapture(previous.id))
       event.currentTarget.releasePointerCapture(previous.id);
   };
@@ -94,12 +93,10 @@ export function useTesterResize() {
         x: event.clientX,
         y: event.clientY,
         size: vertical(side) ? box.width : box.height,
-        original: {
-          ...current.current,
-        },
+        handle: event.currentTarget,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
-      document.body.classList.add('resizing-tester');
+      document.body.classList.add('previewing-tester-resize');
     },
     onPointerMove: (event) => {
       const previous = drag.current;
