@@ -133,7 +133,7 @@ export function MemoryCells({ heading = true }) {
     </>
   );
 }
-export function MemoryRules({ edge, index, edit, machine }) {
+export function MemoryRules({ edge, index, edit, machine, simple = false }) {
   const [open, setOpen] = useState(
     !!(edge.guard || edge.guards?.length || edge.effect || edge.effects?.length),
   );
@@ -160,14 +160,14 @@ export function MemoryRules({ edge, index, edit, machine }) {
     }
     state.controller.update((next) => pasteConditions(next.edges[index], text));
   };
+  const Container = simple ? 'details' : 'section';
   return (
-    <details
+    <Container
       id="memory-rules"
       className="simple-memory"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      {...(simple ? { open, onToggle: (event) => setOpen(event.currentTarget.open) } : {})}
     >
-      <summary>Memory rules</summary>
+      {simple ? <summary>Memory rules</summary> : <h3>Memory rules</h3>}
       <div className="simple-memory-content">
         {['guard', 'effect'].map((kind) => {
           const list = kind === 'guard' ? 'guards' : 'effects',
@@ -272,7 +272,7 @@ export function MemoryRules({ edge, index, edit, machine }) {
           );
         })}
       </div>
-    </details>
+    </Container>
   );
 }
 function Rule({ kind, rule, cells, onChange }) {

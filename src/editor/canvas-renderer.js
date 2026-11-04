@@ -22,10 +22,28 @@ export function createCanvasRenderer(context) {
     mapDrawTime = now;
     const view = context.view(),
       surface = context.overviewView ? context.overviewCanvas : context.elements.canvas;
-    (context.overviewView ? context.overviewGraph : context.graph).drawMap(
-      visibleViewport(view, surface),
-      mapScene ?? undefined,
-    );
+    const viewport = visibleViewport(view, surface);
+    if (context.overviewView) {
+      const offset = context.groupWindowOffset,
+        local = context.graph.view();
+      const left = Math.max(local.x, viewport.x - offset.x),
+        top = Math.max(local.y, viewport.y - offset.y);
+      context.graph.drawMap(
+        {
+          x: left,
+          y: top,
+          width: Math.max(
+            1,
+            Math.min(local.x + local.width, viewport.x - offset.x + viewport.width) - left,
+          ),
+          height: Math.max(
+            1,
+            Math.min(local.y + local.height, viewport.y - offset.y + viewport.height) - top,
+          ),
+        },
+        mapScene ?? undefined,
+      );
+    } else context.graph.drawMap(viewport, mapScene ?? undefined);
   }
   function queueDraw() {
     if (context.disposed || context.drawFrame !== null) return;
@@ -113,10 +131,17 @@ export function createCanvasRenderer(context) {
           : baseLabel(edge),
       shownRoutes = dragging
         ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
-        : routeEdges(shown, label);
+        : routeSnapshot?.version === context.documentVersion &&
+            routeSnapshot.group === context.openGroup &&
+            routeSnapshot.simple === editorSettings.simplified
+          ? routeSnapshot.routes
+          : routeEdges(shown, label);
     if (!dragging)
       routeSnapshot = {
         routes: shownRoutes,
+        version: context.documentVersion,
+        group: context.openGroup,
+        simple: editorSettings.simplified,
         nodes: new Map(
           visualMachine(shown).states.map((state) => [state.id, { x: state.x, y: state.y }]),
         ),
@@ -136,16 +161,25 @@ export function createCanvasRenderer(context) {
       }
     }
     if (context.overviewView) {
-      const reuse = dragging && overviewCache,
+      const reuse =
+          overviewCache &&
+          (dragging ||
+            (overviewCache.version === context.documentVersion &&
+              overviewCache.simple === editorSettings.simplified)),
         overview = reuse ? overviewCache.machine : graphView(context.machine),
         overviewRoutes = reuse ? overviewCache.routes : routing(overview, label);
-      overviewCache = { machine: overview, routes: overviewRoutes };
+      overviewCache = {
+        machine: overview,
+        routes: overviewRoutes,
+        version: context.documentVersion,
+        simple: editorSettings.simplified,
+      };
       context.overviewGraph.setView(context.overviewView);
       context.positionGroupPanel(
         overview.states.find((state) => state.id === context.openGroup),
         graphBounds(shown, shownRoutes),
       );
-      if (!reuse)
+      if (!dragging || !reuse)
         context.overviewGraph.draw({
           machine: overview,
           routes: overviewRoutes,
@@ -161,27 +195,7 @@ export function createCanvasRenderer(context) {
             edges: context.graphFailures.edges,
           },
         });
-      const offset = context.groupWindowOffset,
-        move = (point) => ({ ...point, x: point.x + offset.x, y: point.y + offset.y });
-      mapScene = {
-        machine: {
-          states: [...overview.states, ...shown.states.map(move)],
-          edges: [],
-          comments: [...(overview.comments ?? []), ...(shown.comments ?? []).map(move)],
-        },
-        routes: [
-          ...overviewRoutes,
-          ...shownRoutes.map((route) => ({
-            ...route,
-            p0: move(route.p0),
-            p3: move(route.p3),
-            c1: move(route.c1),
-            c2: move(route.c2),
-            label: move(route.label),
-            portalBox: route.portalBox ? move(route.portalBox) : undefined,
-          })),
-        ],
-      };
+      mapScene = { machine: shown, routes: shownRoutes };
     } else mapScene = { machine: shown, routes: shownRoutes };
     context.graph.draw({
       machine: shown,

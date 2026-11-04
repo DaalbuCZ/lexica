@@ -63,7 +63,8 @@ Radix Themes supplies the shared controls; the pre-React palette is mapped onto 
 - Right-drag between states to connect them. Ctrl-drag inserts an intermediary state; continue onto blank canvas to build a chain.
 - Use **A** to toggle accepting states and **C** to place comments.
 - Use Ctrl/Cmd+C, X, V, A, Z, and Shift+Z for clipboard, selection, and history.
-- Select states and choose Group (or use the selection context menu in simplified view); open a group to edit its contents. Floating groups are centered on their group nodes, using the main graph's scale and navigation without moving the camera. Their frames fit their contents and never shrink below their opening bounds. Outside-state images have independent saved positions and cannot edit or move their original states.
+- Select states and choose Group (or use the selection context menu in simplified view); open a group to edit its contents. Floating groups are centered on their group nodes, using the main graph's scale and navigation without moving the camera. Their frames fit their contents and never shrink below their opening bounds. Moving members leaves the group node fixed. The minimap shows only the open group. Outside-state images have independent saved positions and cannot edit or move their original states.
+- The debugger smoothly follows the current state by default. Disable “Follow current state while debugging” under Settings → Navigation to keep the camera still. Manual navigation interrupts a camera move.
 - Settings also controls standard/extended FSM mode, simplified properties, label backgrounds, skipped tokens, zoom sensitivity, and theme.
 - Extended FSMs support numeric stacks, legacy counters, conditions, and ordered side effects.
 - Use the debugger or Alt+S, Alt+Left/Right, and Alt+Shift+Left/Right to inspect execution. Debug controls, status, and memory values appear together in a separate window above the graph.

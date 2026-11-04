@@ -15,12 +15,26 @@ export function createGroup(machine, ids, name) {
     id,
     name: name.trim() || 'New group',
     stateIds: members,
+    x:
+      machine.states.filter((s) => members.includes(s.id)).reduce((sum, s) => sum + s.x, 0) /
+      members.length,
+    y:
+      machine.states.filter((s) => members.includes(s.id)).reduce((sum, s) => sum + s.y, 0) /
+      members.length,
   };
   (machine.groups ??= []).push(group);
   return group;
 }
 export function dissolveGroup(machine, id) {
   machine.groups = (machine.groups ?? []).filter((group) => group.id !== id);
+}
+export function initializeGroupPositions(machine) {
+  for (const group of machine.groups ?? []) {
+    const members = machine.states.filter((s) => group.stateIds.includes(s.id));
+    if (!members.length) continue;
+    group.x ??= members.reduce((sum, s) => sum + s.x, 0) / members.length;
+    group.y ??= members.reduce((sum, s) => sum + s.y, 0) / members.length;
+  }
 }
 export function graphView(machine, focus = null, includeOutside = true) {
   const groups = machine.groups ?? [],
@@ -85,8 +99,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
       id: group.id,
       name: group.name,
       token: '',
-      x: members.reduce((sum, s) => sum + s.x, 0) / members.length,
-      y: members.reduce((sum, s) => sum + s.y, 0) / members.length,
+      x: group.x ?? members.reduce((sum, s) => sum + s.x, 0) / members.length,
+      y: group.y ?? members.reduce((sum, s) => sum + s.y, 0) / members.length,
       group: true,
       count: members.length,
     });
@@ -169,6 +183,11 @@ export function validateGroups(machine) {
     )
       throw Error('Invalid group.');
     groups.add(group.id);
+    if (
+      (group.x !== undefined && !Number.isFinite(group.x)) ||
+      (group.y !== undefined && !Number.isFinite(group.y))
+    )
+      throw Error('Invalid group position.');
     if (group.contextPositions !== undefined) {
       if (
         !group.contextPositions ||

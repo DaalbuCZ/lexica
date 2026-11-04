@@ -130,6 +130,7 @@ export function createCanvasInteractions(context) {
     startGroupDrag(e, 'state', id);
   }
   function startPan(e) {
+    cancelAnimationFrame(context.cameraFrame);
     e.preventDefault();
     context.pan = {
       x: e.clientX,
@@ -728,9 +729,7 @@ export function createCanvasInteractions(context) {
     context.$('minimap').onpointerdown = (e) => {
       e.preventDefault();
       context.mapDragging = true;
-      context.mapTransform = (
-        context.overviewView ? context.overviewGraph : context.graph
-      ).mapTransform();
+      context.mapTransform = context.graph.mapTransform();
       context.$('minimap').setPointerCapture(e.pointerId);
       context.navigateMap(e);
     };

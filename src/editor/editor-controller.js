@@ -15,8 +15,9 @@ import {
 } from '../core/comments.js';
 import { copySelection, pasteSelection } from '../core/selection.js';
 import { validate, isAccepting, setAccepting } from '../core/lexer.js';
-import { createGroup, dissolveGroup, graphView } from '../core/groups.js';
+import { createGroup, dissolveGroup, graphView, initializeGroupPositions } from '../core/groups.js';
 import { listenScope } from './events.js';
+import { editorSettings } from '../core/editor-settings.js';
 export function createEditorController(
   elements,
   { initialMachine, onChange, onUI, onDialog, notify, getTester, onRestoreTester },
@@ -50,6 +51,7 @@ export function createEditorController(
   context.$ = $;
   context.documentVersion = 0;
   context.machine = initialMachine;
+  initializeGroupPositions(context.machine);
   context.selection = {
     type: 'none',
   };
@@ -129,6 +131,7 @@ export function createEditorController(
     resizeCanvas,
     setOverviewView,
     navigateMap,
+    followState,
   } = createViewport(context);
   context.positionGroupPanel = positionGroupPanel;
   context.showProperties = showProperties;
@@ -140,6 +143,7 @@ export function createEditorController(
   context.resizeCanvas = resizeCanvas;
   context.setOverviewView = setOverviewView;
   context.navigateMap = navigateMap;
+  context.followState = followState;
   const {
     syncGroupPresentation,
     closeGroup,
@@ -310,6 +314,10 @@ export function createEditorController(
     publish();
   }
   function beginPlacement(type) {
+    if (type === 'comment' && !context.machine.states.length) {
+      toast('Create a state before adding a comment.');
+      return;
+    }
     cancelConnect();
     context.placingState = type === 'state';
     context.placingComment = type === 'comment';
@@ -324,6 +332,10 @@ export function createEditorController(
     beginPlacement('comment');
   }
   function addComment(position) {
+    if (!context.machine.states.length) {
+      toast('Create a state before adding a comment.');
+      return;
+    }
     if (!position) {
       beginComment();
       return;
@@ -389,6 +401,23 @@ export function createEditorController(
           x: 40 * (context.pasteCount + 1),
           y: 40 * (context.pasteCount + 1),
         });
+      for (const comment of next.comments ?? [])
+        if (result.comments.has(comment.id) && !commentNodeIds(comment).length) {
+          const candidates = context.openGroup
+            ? next.states.filter(
+                (s) =>
+                  next.groups.find((g) => g.id === context.openGroup)?.stateIds.includes(s.id) ||
+                  result.states.has(s.id),
+              )
+            : next.states;
+          const nearest = candidates.toSorted(
+            (a, b) =>
+              Math.hypot(a.x - comment.x, a.y - comment.y) -
+              Math.hypot(b.x - comment.x, b.y - comment.y),
+          )[0];
+          if (!nearest) throw Error('Create a state before pasting a comment.');
+          comment.nodeIds = [nearest.id];
+        }
       if (context.openGroup)
         next.groups
           ?.find((group) => group.id === context.openGroup)
@@ -427,6 +456,21 @@ export function createEditorController(
       !context.selectedCommentLinks.size
     )
       return;
+    const orphanedByLinks = (context.machine.comments ?? []).some(
+      (comment) =>
+        !context.selectedComments.has(comment.id) &&
+        commentNodeIds(comment).length &&
+        commentNodeIds(comment).every((id) =>
+          context.selectedCommentLinks.has(commentLinkKey(comment.id, id)),
+        ) &&
+        !commentNodeIds(comment).some((id) => context.selectedStates.has(id)),
+    );
+    if (orphanedByLinks) {
+      toast(
+        'A comment must stay attached to a state. Delete the comment to remove its last connection.',
+      );
+      return;
+    }
     checkpoint();
     removeCommentLinks(context.machine, context.selectedCommentLinks);
     context.machine.states = context.machine.states.filter(
@@ -451,6 +495,7 @@ export function createEditorController(
       c.nodeIds = commentNodeIds(c).filter((id) => !context.selectedStates.has(id));
       delete c.nodeId;
     }
+    context.machine.comments = context.machine.comments.filter((c) => commentNodeIds(c).length);
     if (context.selectedComments.has(context.commentSource)) context.commentSource = null;
     if (context.selectedStates.has(context.machine.start)) context.machine.start = null;
     if (context.selectedStates.has(context.source)) {
@@ -681,10 +726,12 @@ export function createEditorController(
           group = context.machine.groups?.find((g) => g.stateIds.includes(id));
         if (group && group.id !== context.openGroup) openGroupById(group.id, false);
         else if (id && !group && context.openGroup) closeGroup(true, false);
-      }
+        if (editorSettings.followDebugState) context.followState(id);
+      } else cancelAnimationFrame(context.cameraFrame);
       queueDraw();
     },
     replace(next) {
+      initializeGroupPositions(next);
       checkpoint();
       cancelConnect();
       context.machine = next;
@@ -767,6 +814,7 @@ export function createEditorController(
     dispose() {
       context.disposed = true;
       context.groupAnimation?.cancel();
+      cancelAnimationFrame(context.cameraFrame);
       scope.dispose();
       observer.disconnect();
       themeObserver.disconnect();

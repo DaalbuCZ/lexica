@@ -12,6 +12,7 @@ import { Toolbar } from './components/Toolbar.jsx';
 import { Tester } from './components/Tester.jsx';
 import { IconButton } from './components/ui.jsx';
 import { ContextMenu } from './components/ContextMenu.jsx';
+import { Toaster, toast } from 'sonner';
 const Dialogs = lazy(() =>
   import('./components/Dialogs.jsx').then((module) => ({
     default: module.Dialogs,
@@ -39,14 +40,8 @@ export default function App() {
   }, [propertiesOpen]);
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(
-      () =>
-        useStudio.setState({
-          notice: '',
-        }),
-      3500,
-    );
-    return () => clearTimeout(timer);
+    toast(notice);
+    useStudio.setState({ notice: '' });
   }, [notice]);
   useEffect(() => {
     document.body.classList.add('app-ready');
@@ -135,11 +130,12 @@ export default function App() {
         <Dialogs />
       </Suspense>
       <div id="dock-preview" className="dock-preview" hidden aria-hidden="true" />
-      {notice && (
-        <div id="toast" role="status">
-          {notice}
-        </div>
-      )}
+      <Toaster
+        position="bottom-center"
+        closeButton
+        duration={3500}
+        toastOptions={{ className: 'lexica-toast' }}
+      />
       {contextMenu && <ContextMenu menu={contextMenu} />}
     </>
   );

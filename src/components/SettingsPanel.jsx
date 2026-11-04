@@ -70,6 +70,12 @@ export function SettingsPanel({ dialog, onClose }) {
         </section>
         <section className="settings-section settings-wide">
           <h3>Navigation</h3>
+          <Check
+            id="follow-debug-state"
+            label="Follow current state while debugging"
+            checked={settings.followDebugState}
+            onChange={(followDebugState) => change({ followDebugState })}
+          />
           <Select
             id="group-presentation"
             label="Open groups in"

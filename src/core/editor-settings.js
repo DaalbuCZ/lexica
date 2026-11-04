@@ -7,12 +7,14 @@ export function readEditorSettings(storage) {
     return {
       groupPresentation: saved.groupPresentation === 'overlay' ? 'overlay' : 'canvas',
       simplified: saved.simplified === true,
+      followDebugState: saved.followDebugState !== false,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {
     return {
       groupPresentation: 'canvas',
       simplified: false,
+      followDebugState: true,
       pinchSensitivity: 1,
     };
   }

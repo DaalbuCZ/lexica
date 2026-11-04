@@ -2230,6 +2230,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'canvas',
       simplified: true,
+      followDebugState: true,
       pinchSensitivity: 2,
     },
   );
@@ -2240,6 +2241,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'canvas',
       simplified: false,
+      followDebugState: true,
       pinchSensitivity: 1,
     },
   );
@@ -2252,6 +2254,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'canvas',
       simplified: false,
+      followDebugState: true,
       pinchSensitivity: 1,
     },
   );

@@ -11,7 +11,8 @@ export function useAnchoredPanel(panel, anchorId) {
         toolbar = anchor.closest('.toolbar')?.getBoundingClientRect() ?? box,
         dock = document.body.dataset.toolbarDock;
       panel.style.maxHeight = Math.max(160, innerHeight - 24) + 'px';
-      const { width, height } = panel.getBoundingClientRect();
+      const width = panel.offsetWidth,
+        height = panel.offsetHeight;
       let left = box.left,
         top = toolbar.bottom + 14;
       if (dock === 'left') {

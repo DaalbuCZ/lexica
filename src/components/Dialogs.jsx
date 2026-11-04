@@ -15,13 +15,18 @@ import { SettingsPanel } from './SettingsPanel.jsx';
 import { Check, Select, Modal } from './ui.jsx';
 import { MemoryCells } from './MemoryEditor.jsx';
 import { destinationName } from './Inspector.jsx';
+import { usePresence } from '../hooks/usePresence.js';
 export function Dialogs() {
-  const dialog = useStudio((s) => s.dialog);
+  const current = useStudio((s) => s.dialog),
+    retained = useRef(null),
+    present = usePresence(!!current);
+  if (current) retained.current = current;
+  const dialog = current ?? retained.current;
   const close = () =>
     useStudio.setState({
       dialog: null,
     });
-  if (!dialog) return null;
+  if (!present || !dialog) return null;
   const props = {
     dialog,
     onClose: close,
@@ -490,11 +495,24 @@ const shortcuts = {
     ['Select tool', 'V'],
     ['Pan tool', 'H'],
     ['Temporary pan', 'Space'],
-    ['Add comment', 'C'],
+    ['Place an attached comment', 'C'],
     ['Toggle accepting state', 'A'],
     ['Delete selection', 'Delete'],
-    ['Cancel action', 'Esc'],
+    ['Cancel / close properties / close group', 'Esc'],
     ['Show shortcuts', '?'],
+  ],
+  'Canvas gestures': [
+    ['Move a state or comment', 'Drag'],
+    ['Select an area', 'Shift + drag'],
+    ['Pan', 'Scroll / middle drag / Space + drag'],
+    ['Zoom at pointer', 'Pinch / Ctrl + scroll'],
+    ['Connect states or attach a comment', 'Right-drag'],
+    ['Choose connection destination', 'Right-click, then click target'],
+    ['Insert an intermediary state', 'Ctrl + right-drag'],
+    ['Move a connection bend or portal label', 'Drag'],
+    ['Open a group', 'Click its node'],
+    ['Move toolbar or tester to another edge', 'Drag grip / focus grip + arrow key'],
+    ['Resize lexer tester', 'Drag divider / focus divider + arrow key'],
   ],
   Edit: [
     ['Undo', 'Ctrl / ⌘ Z'],
@@ -515,7 +533,8 @@ function ShortcutsDialog({ onClose }) {
   return (
     <Modal title="Keyboard shortcuts" onClose={onClose}>
       <p className="shortcuts-intro">
-        Shortcuts work when the canvas is active. Text fields keep their normal keys.
+        Canvas shortcuts apply outside text fields. Debugger shortcuts also work in the lexer input.
+        Text fields keep their normal editing keys.
       </p>
       <div className="shortcut-groups">
         {Object.entries(shortcuts).map(([name, items]) => (

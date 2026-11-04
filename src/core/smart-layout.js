@@ -429,6 +429,8 @@ function place(machine, focus, options) {
       const group = machine.groups.find((g) => g.id === state.id),
         dx = next.x - state.x,
         dy = next.y - state.y;
+      group.x = next.x;
+      group.y = next.y;
       for (const member of machine.states)
         if (group.stateIds.includes(member.id)) {
           member.x += dx;

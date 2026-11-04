@@ -4,14 +4,14 @@ import { Theme } from '@radix-ui/themes';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { IconButton } from './ui.jsx';
 
-export function DebuggerWindow({ frame, canPrevious, canNext, onMove, onStop }) {
+export function DebuggerWindow({ open, frame, canPrevious, canNext, onMove, onStop }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     document.body.dataset.debugging = 'true';
     const place = () =>
       document.body.style.setProperty(
         '--debugger-bottom',
-        ref.current.getBoundingClientRect().bottom + 12 + 'px',
+        ref.current.offsetTop + ref.current.offsetHeight + 12 + 'px',
       );
     place();
     const observer = new ResizeObserver(place);
@@ -24,7 +24,13 @@ export function DebuggerWindow({ frame, canPrevious, canNext, onMove, onStop }) 
   }, []);
   return createPortal(
     <Theme asChild>
-      <section ref={ref} className="debugger-window" role="dialog" aria-label="Lexer debugger">
+      <section
+        ref={ref}
+        data-state={open ? 'open' : 'closed'}
+        className="debugger-window animated-window"
+        role="dialog"
+        aria-label="Lexer debugger"
+      >
         <div className="window-heading">
           <h2>Lexer debugger</h2>
           <IconButton icon={X} label="Stop debugging" onClick={onStop} />

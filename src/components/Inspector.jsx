@@ -16,12 +16,14 @@ import { singleCharacterError } from '../core/regex-analysis.js';
 import { transitionLabel } from '../core/labels.js';
 import { MemoryCells, MemoryRules } from './MemoryEditor.jsx';
 import { Button, Check, Field, IconButton, Select } from './ui.jsx';
+import { usePresence } from '../hooks/usePresence.js';
 
 export function Inspector() {
   const scene = useStudio((s) => s.scene),
     controller = useStudio((s) => s.controller),
     settings = useStudio((s) => s.settings),
     open = useStudio((s) => s.propertiesOpen);
+  const present = usePresence(open);
   const { machine, selection } = scene;
   const total =
     scene.selectedStates.size +
@@ -48,7 +50,14 @@ export function Inspector() {
     if (open) controller?.showProperties(true);
   }, [open, scene, settings, controller]);
   return (
-    <aside className="inspector" role="dialog" aria-label="Properties" aria-hidden={!open}>
+    <aside
+      className="inspector animated-window"
+      data-state={open ? 'open' : 'closed'}
+      hidden={!present}
+      role="dialog"
+      aria-label="Properties"
+      aria-hidden={!open}
+    >
       <div className="inspector-title">
         <h2 id="inspector-heading">{title}</h2>
         <div className="inspector-actions">
@@ -85,10 +94,11 @@ export function Inspector() {
             state={machine.states.find((s) => s.id === selection.id)}
             machine={machine}
             controller={controller}
+            simple={settings.simplified}
           />
         ) : selection.type === 'edge' ? (
           <EdgeProperties
-            key={selection.index}
+            key={`${selection.index}-${settings.simplified}`}
             edge={machine.edges[selection.index]}
             index={selection.index}
             machine={machine}
@@ -123,7 +133,7 @@ function Section({ title, children }) {
   );
 }
 
-function StateProperties({ state, machine, controller }) {
+function StateProperties({ state, machine, controller, simple }) {
   if (!state) return null;
   const edit = (change) =>
     controller.update((next) =>
@@ -148,16 +158,18 @@ function StateProperties({ state, machine, controller }) {
           })
         }
       />
-      <Check
-        id="initial"
-        label="Initial state"
-        checked={machine.start === state.id}
-        onChange={(checked) =>
-          controller.update((next) => {
-            next.start = checked ? state.id : null;
-          })
-        }
-      />
+      {!simple && (
+        <Check
+          id="initial"
+          label="Initial state"
+          checked={machine.start === state.id}
+          onChange={(checked) =>
+            controller.update((next) => {
+              next.start = checked ? state.id : null;
+            })
+          }
+        />
+      )}
       <Section title="Token output">
         <Check
           id="accepting"
@@ -165,7 +177,7 @@ function StateProperties({ state, machine, controller }) {
           checked={isAccepting(state)}
           onChange={(value) => edit((s) => setAccepting(s, value))}
         />
-        {isAccepting(state) ? (
+        {isAccepting(state) || !simple ? (
           <>
             <Field
               id="token-name"
@@ -193,52 +205,66 @@ function StateProperties({ state, machine, controller }) {
           <p className="prop-note">Enable token output when this state completes a match.</p>
         )}
       </Section>
-      <Section title={`Connections · ${outgoing.length}`}>
-        {outgoing.length ? (
-          outgoing.map(({ edge, index }) => (
-            <Button
-              key={index}
-              className="connection-row"
-              onClick={() => controller.select('edge', index)}
-            >
-              <span className="connection-expression">{transitionLabel(edge) || 'Empty rule'}</span>
-              <ArrowRight className="tool-icon" />
-              <span>{destinationName(machine, edge)}</span>
-            </Button>
-          ))
-        ) : (
-          <p className="prop-note">Right-drag from this state to create a connection.</p>
-        )}
-      </Section>
-      <details className="property-details">
-        <summary>Portal</summary>
+      {!simple && (
+        <Section title={`Connections · ${outgoing.length}`}>
+          {outgoing.length ? (
+            outgoing.map(({ edge, index }) => (
+              <Button
+                key={index}
+                className="connection-row"
+                onClick={() => controller.select('edge', index)}
+              >
+                <span className="connection-expression">
+                  {transitionLabel(edge) || 'Empty rule'}
+                </span>
+                <ArrowRight className="tool-icon" />
+                <span>{destinationName(machine, edge)}</span>
+              </Button>
+            ))
+          ) : (
+            <p className="prop-note">Right-drag from this state to create a connection.</p>
+          )}
+        </Section>
+      )}
+      {simple && state.portal && (
         <Field
           id="state-portal"
-          label="Portal name (optional)"
-          value={state.portal ?? ''}
-          onCommit={(name) =>
-            edit((s, next) => {
-              name = name.trim();
-              if (name && next.states.some((other) => other.id !== s.id && other.portal === name))
-                throw Error('Choose a unique portal name.');
-              renamePortal(next, s, name);
-            })
-          }
+          label="Portal name"
+          value={state.portal}
+          onCommit={(name) => edit((s, next) => renamePortal(next, s, name.trim()))}
         />
-        <Button
-          id="new-portal"
-          onClick={() => {
-            if (
-              controller.update((next) =>
-                next.edges.push({ from: state.id, to: state.id, label: '', portal: '' }),
+      )}
+      {!simple && (
+        <details className="property-details">
+          <summary>Portal</summary>
+          <Field
+            id="state-portal"
+            label="Portal name (optional)"
+            value={state.portal ?? ''}
+            onCommit={(name) =>
+              edit((s, next) => {
+                name = name.trim();
+                if (name && next.states.some((other) => other.id !== s.id && other.portal === name))
+                  throw Error('Choose a unique portal name.');
+                renamePortal(next, s, name);
+              })
+            }
+          />
+          <Button
+            id="new-portal"
+            onClick={() => {
+              if (
+                controller.update((next) =>
+                  next.edges.push({ from: state.id, to: state.id, label: '', portal: '' }),
+                )
               )
-            )
-              controller.select('edge', controller.getMachine().edges.length - 1);
-          }}
-        >
-          New portal connection
-        </Button>
-      </details>
+                controller.select('edge', controller.getMachine().edges.length - 1);
+            }}
+          >
+            New portal connection
+          </Button>
+        </details>
+      )}
     </>
   );
 }
@@ -274,6 +300,64 @@ function EdgeProperties({ edge, index, machine, controller, simple }) {
       e.invert = inverted;
       matcher(e.label, e.invert);
     });
+  if (simple)
+    return (
+      <>
+        <div className="property-route">
+          <span>{sourceName}</span>
+          <ArrowRight className="tool-icon" />
+          <span>{destinationName(machine, edge)}</span>
+        </div>
+        {characters ? (
+          <>
+            <Field
+              id="simple-characters"
+              label="Characters and ranges"
+              value={characters.characters}
+              spellCheck={false}
+              placeholder="a-zA-Z0-9_"
+              onCommit={(body) => setCharacters(body, characters.inverted)}
+            />
+            <Check
+              id="invert-match"
+              label="Invert set"
+              checked={characters.inverted}
+              onChange={(value) => setCharacters(characters.characters, value)}
+            />
+          </>
+        ) : (
+          <div className="advanced-expression">
+            <strong>Advanced expression</strong>
+            <p className="prop-note">This expression cannot be represented as a character set.</p>
+            <Button
+              onClick={() =>
+                useStudio.setState((s) => ({ settings: { ...s.settings, simplified: false } }))
+              }
+            >
+              Edit in normal view
+            </Button>
+          </div>
+        )}
+        {edge.portal != null && (
+          <Field
+            id="portal-rename"
+            label="Portal name"
+            value={edge.portal}
+            onCommit={(name) =>
+              edit((e, next) => renamePortal(next, destination(next, e), name.trim()))
+            }
+          />
+        )}
+        {issue && (
+          <p className="transition-rule-error" role="alert">
+            {issue}
+          </p>
+        )}
+        {machineType(machine) === 'extended' && (
+          <MemoryRules edge={edge} index={index} edit={edit} machine={machine} simple />
+        )}
+      </>
+    );
   return (
     <>
       <div className="property-route">

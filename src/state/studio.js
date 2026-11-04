@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import { example, validate } from '../core/lexer.js';
 import { readEditorSettings } from '../core/editor-settings.js';
 export function readStorage(key, fallback, json = true) {
@@ -51,10 +52,7 @@ export const useStudio = create((set) => ({
   contextMenu: null,
   notice: restoreError ? 'Could not restore saved machine. Example loaded.' : '',
   set: (changes) => set(changes),
-  notify: (notice) =>
-    set({
-      notice,
-    }),
+  notify: (notice) => toast(notice),
 }));
 export function persistedMachine() {
   const { scene, input, showSkipped } = useStudio.getState();

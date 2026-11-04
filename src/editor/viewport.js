@@ -120,6 +120,37 @@ export function createViewport(context) {
     context.queueDraw();
     if (!document.body.classList.contains('properties-hidden')) showProperties(true);
   }
+  function followState(id) {
+    cancelAnimationFrame(context.cameraFrame);
+    const state = context.machine.states.find((s) => s.id === id);
+    if (!state) return;
+    const start = view(),
+      surface = context.overviewView ? context.overviewCanvas : context.elements.canvas,
+      visible = visibleViewport(start, surface),
+      offset = context.overviewView ? context.groupWindowOffset : { x: 0, y: 0 },
+      target = {
+        ...start,
+        x: state.x + offset.x - visible.width / 2 - (visible.x - start.x),
+        y: state.y + offset.y - visible.height / 2 - (visible.y - start.y),
+      };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setView(target);
+      return;
+    }
+    const began = performance.now();
+    const tick = (now) => {
+      if (context.disposed) return;
+      const progress = Math.min(1, (now - began) / 240),
+        ease = 1 - (1 - progress) ** 3;
+      setView({
+        ...start,
+        x: start.x + (target.x - start.x) * ease,
+        y: start.y + (target.y - start.y) * ease,
+      });
+      if (progress < 1) context.cameraFrame = requestAnimationFrame(tick);
+    };
+    context.cameraFrame = requestAnimationFrame(tick);
+  }
   function fittedView(bounds, canvas) {
     const area = canvas.getBoundingClientRect(),
       tester = document.querySelector('.tester')?.getBoundingClientRect(),
@@ -155,8 +186,8 @@ export function createViewport(context) {
         group = context.machine.groups?.find((g) => g.id === context.openGroup),
         members = context.machine.states.filter((s) => group?.stateIds.includes(s.id));
       if (members.length) {
-        const x = members.reduce((sum, s) => sum + s.x, 0) / members.length,
-          y = members.reduce((sum, s) => sum + s.y, 0) / members.length;
+        const x = group.x ?? members.reduce((sum, s) => sum + s.x, 0) / members.length,
+          y = group.y ?? members.reduce((sum, s) => sum + s.y, 0) / members.length;
         const left = Math.min(bounds.x, x - 60),
           top = Math.min(bounds.y, y - 60),
           right = Math.max(bounds.x + bounds.width, x + 60),
@@ -180,6 +211,7 @@ export function createViewport(context) {
     );
   }
   function zoom(factor, p) {
+    cancelAnimationFrame(context.cameraFrame);
     const v = view(),
       center = p ?? {
         x: v.x + v.width / 2,
@@ -194,6 +226,7 @@ export function createViewport(context) {
     });
   }
   function wheelGraph(e) {
+    cancelAnimationFrame(context.cameraFrame);
     if (e.target !== context.elements.canvas && e.target !== context.overviewCanvas) return;
     e.preventDefault();
     const outside = !!context.overviewView;
@@ -278,9 +311,14 @@ export function createViewport(context) {
     setView(next);
   }
   function navigateMap(e) {
-    const map = context.overviewView ? context.overviewGraph : context.graph;
+    cancelAnimationFrame(context.cameraFrame);
+    const map = context.graph;
     const p = map.mapPoint(e, context.mapTransform ?? map.mapTransform()),
       v = view();
+    if (context.overviewView) {
+      p.x += context.groupWindowOffset.x;
+      p.y += context.groupWindowOffset.y;
+    }
     const visible = visibleViewport(
       v,
       context.overviewView ? context.overviewCanvas : context.elements.canvas,
@@ -307,5 +345,6 @@ export function createViewport(context) {
     resizeCanvas,
     setOverviewView,
     navigateMap,
+    followState,
   };
 }

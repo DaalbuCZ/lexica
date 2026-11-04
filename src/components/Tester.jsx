@@ -6,6 +6,7 @@ import {
   ChevronRight,
   GripVertical,
   Play,
+  Square,
   ArrowDown,
 } from 'lucide-react';
 import { useStudio, readStorage, writeStorage } from '../state/studio.js';
@@ -20,6 +21,7 @@ import { IconButton, Button } from './ui.jsx';
 import { useDockGrip } from '../hooks/useDocking.js';
 import { useTesterResize } from '../hooks/useTesterResize.js';
 import { DebuggerWindow } from './DebuggerWindow.jsx';
+import { usePresence } from '../hooks/usePresence.js';
 export function Tester({ debuggerRef }) {
   const scene = useStudio((s) => s.scene),
     machine = scene.machine,
@@ -63,6 +65,9 @@ export function Tester({ debuggerRef }) {
   }[dock];
   const [canPrevious, setCanPrevious] = useState(false),
     [canNext, setCanNext] = useState(false);
+  const debugPresent = usePresence(!!frame),
+    lastFrame = useRef(null);
+  if (frame) lastFrame.current = frame;
   useLayoutEffect(() => {
     highlights.current = setupInputHighlights(
       inputRef.current,
@@ -255,7 +260,8 @@ export function Tester({ debuggerRef }) {
         <div className="tester-actions">
           <IconButton
             id="step-toggle"
-            icon={Play}
+            icon={frame ? Square : Play}
+            className={frame ? 'debug-stop' : ''}
             label={frame ? 'Stop debugging' : 'Start debugging'}
             aria-pressed={!!frame}
             disabled={analysis.pending}
@@ -270,9 +276,10 @@ export function Tester({ debuggerRef }) {
           />
         </div>
       </div>
-      {frame && (
+      {debugPresent && lastFrame.current && (
         <DebuggerWindow
-          frame={frame}
+          open={!!frame}
+          frame={frame ?? lastFrame.current}
           canPrevious={canPrevious}
           canNext={canNext}
           onMove={move}

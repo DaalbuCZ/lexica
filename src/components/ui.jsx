@@ -11,6 +11,7 @@ import {
 } from '@radix-ui/themes';
 import { X } from 'lucide-react';
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js';
+import { useStudio } from '../state/studio.js';
 export function IconButton({
   icon: Icon,
   label,
@@ -49,10 +50,11 @@ export function Button({ className = '', type = 'button', ...props }) {
 }
 export function Modal({ title, children, onClose, className = '', anchorId }) {
   const [panel, setPanel] = useState(null);
+  const open = useStudio((s) => !!s.dialog);
   useAnchoredPanel(panel, anchorId);
   return (
     <Dialog.Root
-      open
+      open={open}
       modal={!anchorId}
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -63,10 +65,15 @@ export function Modal({ title, children, onClose, className = '', anchorId }) {
         <Theme asChild>
           <Dialog.Content
             ref={setPanel}
-            className={`react-dialog ${anchorId ? 'tool-panel' : ''} ${className}`}
+            className={`react-dialog animated-window ${anchorId ? 'tool-panel' : ''} ${className}`}
             aria-describedby={undefined}
             onInteractOutside={(event) => {
-              if (anchorId) event.preventDefault();
+              // The trigger toggles itself; other outside clicks/focus dismiss the tool.
+              if (
+                anchorId &&
+                document.getElementById(anchorId)?.contains(event.detail.originalEvent.target)
+              )
+                event.preventDefault();
             }}
           >
             <div className="dialog-heading">

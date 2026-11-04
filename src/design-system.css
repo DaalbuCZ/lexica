@@ -693,3 +693,78 @@ body[data-tester-dock='right'] .canvas-status {
   padding: 0;
   min-height: 0;
 }
+#next-error.rt-BaseButton:disabled {
+  color: var(--muted);
+  opacity: 0.45;
+  text-decoration: none;
+}
+body[data-tester-dock='right'].tester-collapsed .canvas-status {
+  right: 18px;
+  bottom: 60px;
+}
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='menuitem'],
+[role='option'],
+.rt-SelectTrigger:not(:disabled),
+summary,
+.check {
+  cursor: pointer;
+}
+.debug-stop .tool-icon {
+  fill: var(--error);
+  color: var(--error);
+}
+@keyframes window-open {
+  from {
+    scale: 0;
+  }
+  to {
+    scale: 1;
+  }
+}
+@keyframes window-close {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 0;
+  }
+}
+.animated-window[data-state='open'] {
+  animation: window-open 170ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.animated-window[data-state='closed'] {
+  animation: window-close 140ms ease-in forwards;
+  pointer-events: none;
+}
+.properties-hidden .inspector.animated-window:not([hidden]) {
+  display: block;
+}
+.inspector.animated-window[hidden] {
+  display: none;
+}
+[data-sonner-toaster] {
+  z-index: 60;
+}
+[data-sonner-toast].lexica-toast {
+  background: #304d37;
+  color: white;
+  border: 0;
+  font-family: inherit;
+  font-size: 11px;
+}
+[data-theme='dark'] [data-sonner-toast].lexica-toast {
+  background: #b8ddff;
+  color: #183047;
+}
+[data-sonner-toast].lexica-toast [data-close-button] {
+  background: inherit;
+  color: inherit;
+  border-color: currentColor;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animated-window[data-state] {
+    animation-duration: 1ms;
+  }
+}
