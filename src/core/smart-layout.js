@@ -16,6 +16,8 @@ import { feasibleRadial } from './feasible-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
 import { circularStartRing } from './radial-ring.js';
+import { solveComponents } from './layout-components.js';
+import { alignHorizontal } from './horizontal-layout.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -820,6 +822,10 @@ export function smartArrange(machine, focus = null, options = {}) {
 }
 
 export function solveLayout(topology, focus = null, options = {}) {
+  if (!focus) {
+    const components = solveComponents(topology, options, solveLayout);
+    if (components) return components;
+  }
   const started = performance.now(),
     metrics = {};
   const atOrigin = (item) => ({ ...item, x: 0, y: 0 });
@@ -1022,6 +1028,20 @@ export function solveLayout(topology, focus = null, options = {}) {
     }
   }
   metrics.routingVerificationMs = performance.now() - routingStarted;
+  if (options.mode === 'tree' || machine.groups?.length || focus) {
+    const align = (id) => {
+      const view = graphView(machine, id),
+        states = alignHorizontal(view),
+        positions = new Map(states.map((s) => [s.id, s]));
+      for (const state of view.states)
+        if (!state.outside && !state.group) state.y = positions.get(state.id).y;
+    };
+    if (focus) align(focus);
+    else {
+      for (const g of machine.groups ?? []) align(g.id);
+      if (options.mode === 'tree') align(null);
+    }
+  }
   const commentsStarted = performance.now();
   placeCommentsAfterLayout(graphView(machine));
   for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {

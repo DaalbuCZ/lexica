@@ -13,6 +13,7 @@ import { destination, statePortalBox, enablePortal, portalBoxAtTip } from './por
 import { loopSlots } from './angular-space.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { drawingRouteKey, savedRoutes } from './drawing-routes.js';
+import { clearNodeLabels } from './label-clearance.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -721,12 +722,13 @@ export function routeEdges(machine, labelFor = transitionLabel) {
   const labels = machine.edges.map(labelFor);
   const key = drawingRouteKey(machine, labels);
   const saved = savedRoutes(machine, key);
-  if (saved) return saved;
+  if (saved) return clearNodeLabels(machine, saved);
   if (routeCache.has(key)) return routeCache.get(key);
   const routes =
     (machine.states.length > 12 || machine.routingPolicy === 'corridor'
       ? corridorRoutes(machine, labels)
       : null) ?? computeRoutes(machine, labels);
+  clearNodeLabels(machine, routes);
   routeCache.set(key, routes);
   if (routeCache.size > 4) routeCache.delete(routeCache.keys().next().value);
   return routes;

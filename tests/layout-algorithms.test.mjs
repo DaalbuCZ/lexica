@@ -16,6 +16,10 @@ import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js
 import { circularStartRing } from '../src/core/radial-ring.js';
 import { createViewport } from '../src/editor/viewport.js';
 import { canvasTransform } from '../src/core/canvas-graph.js';
+import { solveLayout } from '../src/core/smart-layout.js';
+import { layoutTopology } from '../src/core/layout-topology.js';
+import { alignHorizontal } from '../src/core/horizontal-layout.js';
+import { renderedLabelBox } from '../src/core/label-clearance.js';
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({
@@ -31,6 +35,76 @@ const machine = () => ({
 const snapshot = (m, routes) => ({
   routes,
   nodes: new Map(m.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+});
+
+test('disconnected nodes do not change the connected graph or its automatic groups', () => {
+  const m = {
+    start: 'root',
+    states: [{ id: 'root', name: 'Root', token: '', x: 0, y: 0 }],
+    edges: [],
+    groups: [],
+    comments: [],
+  };
+  for (let branch = 0; branch < 3; branch++)
+    for (let i = 0; i < 11; i++) {
+      const id = `b${branch}:${i}`;
+      m.states.push({ id, name: id, token: '', x: 0, y: 0 });
+      m.edges.push({ from: i ? `b${branch}:${i - 1}` : 'root', to: id, label: 'a' });
+    }
+  const options = { mode: 'circle', spacing: 0.5, smartGroups: true },
+    original = solveLayout(layoutTopology(m), null, options).machine,
+    extended = structuredClone(m);
+  extended.states.push({ id: 'island', name: 'Island', token: '', x: 999, y: 999 });
+  const result = solveLayout(layoutTopology(extended), null, options).machine;
+  assert.deepEqual(
+    result.states.filter((s) => s.id !== 'island'),
+    original.states,
+  );
+  assert.deepEqual(result.groups, original.groups);
+  assert.deepEqual(result.edges, original.edges);
+});
+
+test('long transition captions stay clear of their source and destination nodes', () => {
+  const m = {
+      routingPolicy: 'corridor',
+      states: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 350, y: 0 },
+      ],
+      edges: [{ from: 'a', to: 'b', label: 'x'.repeat(90) }],
+    },
+    route = routeEdges(m, (e) => e.label)[0],
+    box = renderedLabelBox(route.label);
+  for (const s of m.states)
+    assert.ok(
+      box.right < s.x - 46 || box.left > s.x + 46 || box.bottom < s.y - 46 || box.top > s.y + 46,
+    );
+  assert.ok(Math.abs(route.p0.y) < 1e-8);
+  assert.ok(Math.abs(route.p3.y) < 1e-8);
+});
+
+test('almost horizontal transitions align exactly when feasible and retain clearance', () => {
+  const m = {
+      start: 'a',
+      states: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 300, y: 12 },
+        { id: 'c', x: 600, y: 12 },
+      ],
+      edges: [
+        { from: 'a', to: 'b', label: 'a' },
+        { from: 'b', to: 'c', label: 'b' },
+      ],
+    },
+    states = alignHorizontal(m);
+  assert.deepEqual(
+    states.map((s) => s.y),
+    [0, 0, 0],
+  );
+  assert.equal(validateRouteSeparation(routeEdges({ ...m, states })).status, 'clear');
+  const blocked = { ...m, states: [...m.states.slice(0, 2), { id: 'obstacle', x: 300, y: 0 }] };
+  blocked.edges = [m.edges[0]];
+  assert.equal(alignHorizontal(blocked)[1].y, 12);
 });
 
 test('a feasible start ring remains circular through aesthetic cleanup', () => {

@@ -39,6 +39,12 @@ Radial cleanup now also scores first-ring regularity and outward progression by 
 
 Fit now shares the visible-viewport calculation with navigation, ignores collapsed tester panels, and uses symmetric padding. Browser regressions check centering on both initial load and Arrange with a collapsed right-side tester, and continue to check local drag/reload.
 
+## Component independence and horizontal alignment
+
+Disconnected components now solve independently and are packed afterward using visible drawing bounds. Retained group membership keeps disconnected members in the same solve. Adding isolated states no longer changes the connected component's automatic groups, candidate selection, or node coordinates. Transition-caption placement uses the actual rendered box and prioritizes node clearance; a fallback label-only move also handles long captions from the legacy router. Intentional manual bends retain their existing label behavior.
+
+Tree and subgroup cleanup tries exact horizontal alignment for edges within a small angle/offset tolerance. The start and outside images stay pinned; proposed alignment must pass node/edge clearance and adaptive rendered-route separation checks. Radial overview alignment is left to its separate outward-flow preference.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

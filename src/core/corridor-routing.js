@@ -2,6 +2,7 @@ import { curveClearance } from './curve-clearance.js';
 import { SpatialIndex } from './spatial-index.js';
 import { mix, curvePoint, finishRoute, curveAvoidsBox, routeBounds } from './route-geometry.js';
 import { commentLayout } from './comments.js';
+import { renderedLabelBox } from './label-clearance.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
@@ -246,23 +247,25 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
     if (previous && !dirty?.has(i)) continue;
     const r = routes[i];
     let best = r.label,
-      bestScore = Infinity;
+      bestScore = Infinity,
+      bestNodeHits = Infinity;
     for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8])
-      for (const dy of [-13, 18, -30, 35]) {
+      for (const dy of [-13, 18, -30, 35, -64, 64, -96, 96]) {
         const p = curvePoint(r, t),
           label = { ...r.label, x: p.x, y: p.y + dy },
           box = labelBox(label);
+        const nodeHits = obstacles.query(box).length;
         const score =
-          obstacles.query(box).length * 1000 +
           labelIndex.query(box).length * 500 +
           index.query(box).filter((j) => j !== i && !curveAvoidsBox(routes[j], box)).length * 100 +
           Math.abs(t - 0.5) +
           Math.abs(dy + 13) * 0.01;
-        if (score < bestScore) {
+        if (nodeHits < bestNodeHits || (nodeHits === bestNodeHits && score < bestScore)) {
           best = label;
           bestScore = score;
+          bestNodeHits = nodeHits;
         }
-        if (score === 0) break;
+        if (score === 0 && nodeHits === 0) break;
       }
     r.label = best;
     labelIndex.set(i, labelBox(best));
@@ -270,5 +273,5 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
   return routes;
 }
 export function labelBox(l) {
-  return { left: l.x - l.w / 2, right: l.x + l.w / 2, top: l.y - l.h / 2, bottom: l.y + l.h / 2 };
+  return renderedLabelBox(l);
 }
