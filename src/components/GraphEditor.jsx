@@ -1,4 +1,3 @@
-import { Button } from './ui.jsx';
 import { useLayoutEffect, useRef } from 'react';
 import { GripVertical, Trash2, X } from 'lucide-react';
 import { useDockGrip } from '../hooks/useDocking.js';
@@ -109,20 +108,20 @@ export function GraphEditor({ children }) {
           label="Move breadcrumbs (drag or use arrow keys)"
           {...grip}
         />
-        <Button
+        <button
+          type="button"
           data-overview
-          variant="ghost"
           aria-current={!group ? 'page' : undefined}
           onClick={() => controller?.closeGroup()}
         >
           Overview
-        </Button>
+        </button>
         {group && (
           <>
-            <span aria-hidden="true">›</span>
-            <Button
+            <span aria-hidden="true">&gt;</span>
+            <button
+              type="button"
               data-current
-              variant="ghost"
               aria-current="page"
               onClick={() => controller.openGroup(group.id)}
               onContextMenu={(e) => {
@@ -146,7 +145,7 @@ export function GraphEditor({ children }) {
               }}
             >
               {group.name}
-            </Button>
+            </button>
           </>
         )}
       </nav>

@@ -96,7 +96,6 @@ export function useChromeLayout() {
       const crumbDock = document.body.dataset.breadcrumbsDock || 'top';
       const positionCrumbs = (element, edge) => {
         const shared = edge === dock;
-        const vertical = edge === 'left' || edge === 'right';
         let x = left;
         let y = top;
         let end = right;
@@ -122,11 +121,8 @@ export function useChromeLayout() {
           position: 'fixed',
           inset: y + 'px auto auto ' + x + 'px',
           width: 'max-content',
-          height: vertical ? 'auto' : row + 'px',
+          height: row + 'px',
           maxWidth: Math.max(row, end - x) + 'px',
-          maxHeight: Math.max(row, bottom - y) + 'px',
-          flexDirection: vertical ? 'column' : 'row',
-          overflowY: vertical ? 'auto' : 'hidden',
           padding: '7px',
         });
         if (edge === 'right') set(element, { left: 'auto', right: innerWidth - end + 'px' });
@@ -152,7 +148,12 @@ export function useChromeLayout() {
         const crumbBox = crumbs.getBoundingClientRect();
         debuggerBounds = (zone) => {
           const bounds = { ...area };
-          if (crumbBox.width && crumbBox.height && zone.split('-')[0] === crumbDock) {
+          if (
+            crumbBox.width &&
+            crumbBox.height &&
+            dock === crumbDock &&
+            zone.split('-')[0] === dock
+          ) {
             if (crumbDock === 'top') bounds.top = crumbBox.bottom;
             if (crumbDock === 'bottom') bounds.bottom = crumbBox.top;
             if (crumbDock === 'left') bounds.left = crumbBox.right;

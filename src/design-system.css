@@ -462,8 +462,11 @@
   margin: 0;
 }
 .group-navigation :is([data-overview], [data-current]) {
+  appearance: none;
   flex: none;
   margin: 0;
+  padding: 0 var(--space-1);
+  border: 0;
   background: transparent;
   box-shadow: none;
 }
