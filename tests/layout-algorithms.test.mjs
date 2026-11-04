@@ -13,6 +13,9 @@ import { createLiveRouting } from '../src/editor/live-routing.js';
 import { compactAesthetics } from '../src/core/aesthetic-layout.js';
 import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
 import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
+import { circularStartRing } from '../src/core/radial-ring.js';
+import { createViewport } from '../src/editor/viewport.js';
+import { canvasTransform } from '../src/core/canvas-graph.js';
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({
@@ -28,6 +31,89 @@ const machine = () => ({
 const snapshot = (m, routes) => ({
   routes,
   nodes: new Map(m.states.map((s) => [s.id, { x: s.x, y: s.y }])),
+});
+
+test('a feasible start ring remains circular through aesthetic cleanup', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: 0, y: 0 },
+      ...Array.from({ length: 6 }, (_, i) => ({
+        id: `a${i}`,
+        x: Math.cos((i * Math.PI) / 3) * (300 + i * 50),
+        y: Math.sin((i * Math.PI) / 3) * (300 + i * 50),
+      })),
+    ],
+    edges: Array.from({ length: 6 }, (_, i) => ({ from: 'root', to: `a${i}`, label: 'a' })),
+  };
+  const ring = circularStartRing(m),
+    states = compactAesthetics({ ...m, states: ring }, { radial: true, preserveStartRing: true });
+  const radii = states.slice(1).map((s) => Math.hypot(s.x, s.y));
+  assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6);
+  assert.ok(
+    corridorRoutes(
+      { ...m, states },
+      m.edges.map((e) => e.label),
+    ),
+  );
+});
+
+test('radial flow favors descendants outward while keeping routed feasibility', () => {
+  const m = {
+    start: 'r',
+    states: [
+      { id: 'r', x: 0, y: 0 },
+      { id: 'p', x: 300, y: 0 },
+      { id: 'c', x: 100, y: 100 },
+    ],
+    edges: [
+      { from: 'r', to: 'p', label: 'a' },
+      { from: 'p', to: 'c', label: 'b' },
+    ],
+  };
+  const states = compactAesthetics(m, { radial: true }),
+    p = states[1],
+    c = states[2];
+  assert.ok(Math.hypot(c.x, c.y) > Math.hypot(p.x, p.y));
+  assert.ok(corridorRoutes({ ...m, states }, ['a', 'b']));
+});
+
+test('fit centers the graph on the canvas when a side tester is collapsed', () => {
+  const previous = globalThis.document;
+  globalThis.document = {
+    body: { dataset: { testerDock: 'right' }, classList: { contains: () => true } },
+    querySelector: () => ({
+      getBoundingClientRect: () => ({
+        left: 750,
+        right: 1000,
+        top: 0,
+        bottom: 600,
+        width: 250,
+        height: 600,
+      }),
+    }),
+  };
+  try {
+    const canvas = {
+        clientWidth: 1000,
+        clientHeight: 600,
+        getBoundingClientRect: () => ({
+          left: 0,
+          right: 1000,
+          top: 0,
+          bottom: 600,
+          width: 1000,
+          height: 600,
+        }),
+      },
+      bounds = { x: -100, y: 50, width: 400, height: 300 },
+      v = createViewport({}).fittedView(bounds, canvas),
+      t = canvasTransform(v, 1000, 600);
+    assert.ok(Math.abs(t.x + (bounds.x + bounds.width / 2) * t.scale - 500) < 1e-6);
+    assert.ok(Math.abs(t.y + (bounds.y + bounds.height / 2) * t.scale - 300) < 1e-6);
+  } finally {
+    globalThis.document = previous;
+  }
 });
 
 test('label-aware compaction shortens short branches without shrinking the configured edge', () => {

@@ -15,6 +15,7 @@ import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
+import { circularStartRing } from './radial-ring.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -976,7 +977,16 @@ export function solveLayout(topology, focus = null, options = {}) {
         throw Error(
           'Could not route the planar view within the layout budget. The drawing was left unchanged.',
         );
-      accepted = compactAesthetics({ ...view, states: accepted });
+      let preserveStartRing = false;
+      if (!id) {
+        const ring = circularStartRing({ ...view, states: accepted });
+        preserveStartRing = ring !== accepted;
+        accepted = ring;
+      }
+      accepted = compactAesthetics(
+        { ...view, states: accepted },
+        { preserveStartRing, radial: !id },
+      );
       const positions = new Map(accepted.map((s) => [s.id, s]));
       for (const s of view.states) {
         const p = positions.get(s.id);

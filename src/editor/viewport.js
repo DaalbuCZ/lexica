@@ -3,7 +3,7 @@ import { canvasTransform } from '../core/canvas-graph.js';
 import { editorSettings } from '../core/editor-settings.js';
 import { placeFloatingRect } from '../core/floating-placement.js';
 import { createGroupWindow } from './group-window.js';
-import { visibleViewport } from './visible-viewport.js';
+import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
 export function createViewport(context) {
   const { positionGroupPanel } = createGroupWindow(context);
   function floatingObstacles(exclude) {
@@ -211,19 +211,11 @@ export function createViewport(context) {
     context.cameraFrame = requestAnimationFrame(tick);
   }
   function fittedView(bounds, canvas) {
-    const area = canvas.getBoundingClientRect(),
-      tester = document.querySelector('.tester')?.getBoundingClientRect(),
-      dock = document.body.dataset.testerDock;
-    let left = 35,
-      right = canvas.clientWidth - 35,
-      top = 80,
-      bottom = canvas.clientHeight - 35;
-    if (tester) {
-      if (dock === 'left') left = Math.max(left, tester.right - area.left + 24);
-      else if (dock === 'right') right = Math.min(right, tester.left - area.left - 24);
-      else if (dock === 'top') top = Math.max(top, tester.bottom - area.top + 24);
-      else bottom = Math.min(bottom, tester.top - area.top - 24);
-    }
+    const visible = measureVisibleViewport(canvas),
+      left = visible.left + 35,
+      right = visible.right - 35,
+      top = visible.top + 65,
+      bottom = visible.bottom - 65;
     const scale = Math.max(
       (bounds.width + 80) / Math.max(120, right - left),
       (bounds.height + 80) / Math.max(120, bottom - top),

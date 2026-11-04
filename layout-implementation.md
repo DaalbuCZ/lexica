@@ -33,6 +33,12 @@ In the private CLI comparison, the ungrouped drawing's bounds decreased from abo
 
 The regression suite now contains 141 passing domain tests, including label-dependent branch shortening, reciprocal separation and clear-side comment placement.
 
+## Radial progression and centering
+
+Radial cleanup now also scores first-ring regularity and outward progression by undirected distance from the start. Same-depth connections and cycles have no forced arrow orientation. Circular first-ring candidates use polar warping, local radial translation, or harmonic displacement; complete clearance and route checks decide whether they are usable. Accepted rings are pinned during later chunk compaction. Candidate size is bounded to avoid enlarging a drawing merely to obtain a circle. A compact certified circle is not guaranteed for every graph; the solver falls back to soft preferences while keeping the non-crossing requirement.
+
+Fit now shares the visible-viewport calculation with navigation, ignores collapsed tester panels, and uses symmetric padding. Browser regressions check centering on both initial load and Arrange with a collapsed right-side tester, and continue to check local drag/reload.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

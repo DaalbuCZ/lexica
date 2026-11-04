@@ -4,7 +4,10 @@ import { simpleTransitionLabel } from './editor-settings.js';
 
 // Improve an already routed planar drawing. Aesthetic scores never buy a
 // crossing: each accepted candidate must have a complete feasible route set.
-export function compactAesthetics(machine, { sweeps = 3, maxRoutes = 48 } = {}) {
+export function compactAesthetics(
+  machine,
+  { sweeps = 3, maxRoutes = 48, preserveStartRing = false, radial = false } = {},
+) {
   const states = machine.states.map((s) => ({ ...s })),
     nodes = new Map(states.map((s) => [s.id, s])),
     neighbors = new Map(states.map((s) => [s.id, new Set()])),
@@ -21,6 +24,21 @@ export function compactAesthetics(machine, { sweeps = 3, maxRoutes = 48 } = {}) 
   }
   const root = nodes.get(machine.start),
     edges = [...links.values()];
+  const depth = new Map(root ? [[root.id, 0]] : []),
+    queue = root ? [root.id] : [];
+  for (let i = 0; i < queue.length; i++)
+    for (const id of neighbors.get(queue[i]))
+      if (!depth.has(id)) {
+        depth.set(id, depth.get(queue[i]) + 1);
+        queue.push(id);
+      }
+  const radius = (id) =>
+    root ? Math.hypot(nodes.get(id).x - root.x, nodes.get(id).y - root.y) : 0;
+  const pinned = new Set(
+    preserveStartRing
+      ? machine.edges.filter((e) => e.from === machine.start && e.portal == null).map((e) => e.to)
+      : [],
+  );
   if (
     root &&
     neighbors.get(root.id).size === states.length - 1 &&
@@ -41,13 +59,35 @@ export function compactAesthetics(machine, { sweeps = 3, maxRoutes = 48 } = {}) 
   const score = () => {
     let cost = 0;
     for (const e of edges) cost += Math.max(0, distance(e) - e.demand) ** 2 / e.demand;
+    if (radial && root) {
+      const ring = [...neighbors.get(root.id)],
+        mean = ring.reduce((sum, id) => sum + radius(id), 0) / Math.max(1, ring.length);
+      cost += ring.reduce(
+        (sum, id) => sum + (3 * (radius(id) - mean) ** 2) / Math.max(160, mean),
+        0,
+      );
+      for (const e of edges) {
+        const a = depth.get(e.a),
+          b = depth.get(e.b);
+        if (a === b || a === undefined || b === undefined) continue;
+        const parent = a < b ? e.a : e.b,
+          child = a < b ? e.b : e.a;
+        cost += (2 * Math.max(0, radius(parent) + 100 - radius(child)) ** 2) / 160;
+      }
+    }
     const w = Math.max(...states.map((s) => s.x)) - Math.min(...states.map((s) => s.x)),
       h = Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y));
     return cost + 0.15 * (w + h);
   };
   const chunks = new Map();
   const offer = (ids) => {
-    if (!ids.length || ids.length === states.length || ids.includes(machine.start)) return;
+    if (
+      !ids.length ||
+      ids.length === states.length ||
+      ids.includes(machine.start) ||
+      ids.some((id) => pinned.has(id))
+    )
+      return;
     ids.sort();
     chunks.set(JSON.stringify(ids), new Set(ids));
   };
@@ -85,6 +125,24 @@ export function compactAesthetics(machine, { sweeps = 3, maxRoutes = 48 } = {}) 
           gain: (d - e.demand) ** 2 / e.demand,
         });
       }
+    if (radial && root) {
+      const first = [...neighbors.get(root.id)],
+        mean = first.reduce((sum, id) => sum + radius(id), 0) / Math.max(1, first.length);
+      for (const s of states) {
+        if (s === root || pinned.has(s.id)) continue;
+        const r = radius(s.id),
+          parents = [...neighbors.get(s.id)].filter((id) => depth.get(id) < depth.get(s.id)),
+          target =
+            depth.get(s.id) === 1 ? mean : Math.max(0, ...parents.map((id) => radius(id) + 160));
+        if (r > 1e-6 && (depth.get(s.id) === 1 || r < target))
+          proposals.push({
+            ids: new Set([s.id]),
+            dx: (s.x - root.x) * (target / r - 1),
+            dy: (s.y - root.y) * (target / r - 1),
+            gain: (3 * (target - r) ** 2) / Math.max(160, target),
+          });
+      }
+    }
     proposals.sort((a, b) => b.gain - a.gain || b.ids.size - a.ids.size);
     for (const p of proposals.slice(0, 64)) {
       if (routeChecks >= maxRoutes) break;
