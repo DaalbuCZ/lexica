@@ -200,7 +200,6 @@ export function setupInputHighlights(input, mirror, colorClass, errorLayer = nul
       CSS.highlights.delete('lexica-step');
       CSS.highlights.delete('lexica-current-token');
       mirror.textContent = input.value + '\u200b';
-      refresh();
     } else renderFallback();
   }
   function rects(start, end) {

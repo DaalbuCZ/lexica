@@ -5,7 +5,8 @@ import { packTokenRows } from '../core/token-rows.js';
 
 export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeOffsets }) {
   const ref = useRef(null),
-    measure = useRef(null);
+    measure = useRef(null),
+    measurementCache = useRef(null);
   const [width, setWidth] = useState(300),
     [fontVersion, setFontVersion] = useState(0);
   useLayoutEffect(() => {
@@ -32,11 +33,23 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
     if (!virtual) return [];
     const context =
       measure.current ?? (measure.current = document.createElement('canvas').getContext('2d'));
-    return tokens.map((token) => {
-      context.font = '11px "IBM Plex Mono",monospace';
-      const text = context.measureText(JSON.stringify(token.value)).width;
-      context.font = '8px "IBM Plex Mono",monospace';
-      const label = context.measureText(token.token + (token.skip ? ' · skip' : '')).width;
+    if (measurementCache.current?.fontVersion !== fontVersion)
+      measurementCache.current = { fontVersion, values: new Map(), labels: new Map() };
+    const { values, labels } = measurementCache.current;
+    const widthOf = (cache, value) => {
+      const cached = cache.get(value);
+      if (cached !== undefined) return cached;
+      const width = context.measureText(value).width;
+      if (cache.size >= 4096) cache.delete(cache.keys().next().value);
+      if (value.length <= 1024) cache.set(value, width);
+      return width;
+    };
+    context.font = '11px "IBM Plex Mono",monospace';
+    const textWidths = tokens.map((token) => widthOf(values, JSON.stringify(token.value)));
+    context.font = '8px "IBM Plex Mono",monospace';
+    return tokens.map((token, index) => {
+      const text = textWidths[index];
+      const label = widthOf(labels, token.token + (token.skip ? ' · skip' : ''));
       return { naturalWidth: Math.ceil(Math.max(label, text) + 22), text };
     });
   }, [tokens, virtual, fontVersion]);

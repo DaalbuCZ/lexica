@@ -27,6 +27,7 @@ export function Tester({ debuggerRef }) {
     highlights = useRef(null),
     session = useRef(null),
     hoverTimer = useRef(null);
+  const scrollFrame = useRef(null);
   const [frame, setFrame] = useState(null),
     [hover, setHover] = useState(null),
     [activeOffsets, setActiveOffsets] = useState(new Set()),
@@ -71,6 +72,8 @@ export function Tester({ debuggerRef }) {
       highlights.current?.dispose();
       highlights.current = null;
       clearTimeout(hoverTimer.current);
+      cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = null;
     };
   }, []);
   const sync = () => {
@@ -324,8 +327,12 @@ export function Tester({ debuggerRef }) {
                 })
               }
               onScroll={() => {
-                clearHover();
-                sync();
+                if (scrollFrame.current !== null) return;
+                scrollFrame.current = requestAnimationFrame(() => {
+                  scrollFrame.current = null;
+                  clearHover();
+                  sync();
+                });
               }}
               onSelect={focusSelection}
               onClick={seek}
