@@ -621,7 +621,11 @@ export function createEditorController(
   observer.observe(elements.canvas);
   observer.observe(canvasWrap);
   const testerPanel = document.querySelector('.tester');
-  if (testerPanel) observer.observe(testerPanel);
+  const testerObserver = new ResizeObserver(() => {
+    context.viewportVersion++;
+    drawMap();
+  });
+  if (testerPanel) testerObserver.observe(testerPanel);
   const themeObserver = new MutationObserver(() => queueDraw());
   themeObserver.observe(document.documentElement, {
     attributes: true,
@@ -833,6 +837,7 @@ export function createEditorController(
       cancelAnimationFrame(context.cameraFrame);
       scope.dispose();
       observer.disconnect();
+      testerObserver.disconnect();
       themeObserver.disconnect();
       cancelAnimationFrame(firstFrame);
       if (context.drawFrame !== null) cancelAnimationFrame(context.drawFrame);

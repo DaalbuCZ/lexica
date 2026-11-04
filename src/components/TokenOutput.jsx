@@ -64,6 +64,7 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
   );
   const packed = useMemo(() => packTokenRows(sizes, width), [sizes, width]);
   const rows = useVirtualizer({
+    directDomUpdates: true,
     count: virtual ? packed.length : 0,
     getScrollElement: () => ref.current,
     estimateSize: (index) => (packed[index]?.height ?? 48) + 6,
@@ -125,7 +126,7 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
       ) : !tokens.length ? (
         <span className="empty">{pending ? 'Analyzing…' : 'Type some input to see tokens.'}</span>
       ) : virtual ? (
-        <div style={{ height: rows.getTotalSize(), position: 'relative', width: '100%' }}>
+        <div ref={rows.containerRef} style={{ position: 'relative', width: '100%' }}>
           {rows.getVirtualItems().map((row) => (
             <div
               key={row.key}
@@ -139,7 +140,6 @@ export function TokenOutput({ tokens, pending, error, onTrace, onSelect, activeO
                 width: '100%',
                 minHeight: 54,
                 paddingBottom: 6,
-                transform: `translateY(${row.start}px)`,
               }}
             >
               {tokens

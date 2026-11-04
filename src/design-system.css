@@ -960,15 +960,3 @@ summary,
     animation-duration: 1ms;
   }
 }
-.previewing-tester-resize {
-  user-select: none;
-}
-.previewing-tester-resize #tester-resize::after {
-  background: var(--green);
-  transform: translateY(var(--tester-resize-preview, 0px));
-  will-change: transform;
-}
-.previewing-tester-resize:is([data-tester-dock='left'], [data-tester-dock='right'])
-  #tester-resize::after {
-  transform: translateX(var(--tester-resize-preview, 0px));
-}

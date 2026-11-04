@@ -36,8 +36,7 @@ export function useTesterResize() {
     return () => {
       window.removeEventListener('resize', resize);
       if (frame.current !== null) cancelAnimationFrame(frame.current);
-      drag.current?.handle.style.removeProperty('--tester-resize-preview');
-      document.body.classList.remove('previewing-tester-resize');
+      document.body.classList.remove('resizing-tester');
     };
   }, []);
   const update = (value) => {
@@ -45,18 +44,16 @@ export function useTesterResize() {
       ...current.current,
       [vertical(side) ? 'width' : 'height']: testerSize(value, side, innerWidth, innerHeight),
     };
+    const dimension = vertical(side) ? 'width' : 'height';
+    if (current.current[dimension] === next[dimension]) return;
     current.current = next;
-    setSizes(next);
-    apply(next);
+    document.body.style.setProperty('--tester-' + dimension, next[dimension] + 'px');
+    if (!drag.current) setSizes(next);
   };
   const flush = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
-    const preview = drag.current;
-    if (!preview || pending.current === null) return;
-    const next = testerSize(pending.current, side, innerWidth, innerHeight);
-    const delta = (next - preview.size) * (['left', 'top'].includes(side) ? 1 : -1);
-    preview.handle.style.setProperty('--tester-resize-preview', delta + 'px');
+    if (drag.current && pending.current !== null) update(pending.current);
   };
   const finish = (event, cancel = false) => {
     const previous = drag.current;
@@ -64,14 +61,17 @@ export function useTesterResize() {
     drag.current = null;
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
-    if (!cancel && pending.current !== null) {
-      update(pending.current);
+    if (cancel) {
+      current.current = previous.original;
+      apply(previous.original);
+    } else {
+      if (pending.current !== null) update(pending.current);
       writeStorage(storageKey, current.current);
     }
+    setSizes(current.current);
     pending.current = null;
-    previous.handle.style.removeProperty('--tester-resize-preview');
-    document.body.classList.remove('previewing-tester-resize');
-    if (!cancel) window.dispatchEvent(new Event('resize'));
+    document.body.classList.remove('resizing-tester');
+    window.dispatchEvent(new Event('resize'));
     if (event.currentTarget.hasPointerCapture(previous.id))
       event.currentTarget.releasePointerCapture(previous.id);
   };
@@ -93,10 +93,10 @@ export function useTesterResize() {
         x: event.clientX,
         y: event.clientY,
         size: vertical(side) ? box.width : box.height,
-        handle: event.currentTarget,
+        original: current.current,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
-      document.body.classList.add('previewing-tester-resize');
+      document.body.classList.add('resizing-tester');
     },
     onPointerMove: (event) => {
       const previous = drag.current;

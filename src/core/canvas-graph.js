@@ -526,11 +526,17 @@ export function createGraphCanvas(canvas, minimap) {
       ctx.strokeRect(x, y, w, h);
     }
   }
+  let cachedMapScene, cachedMapMachine, cachedMapBounds;
   function drawMap(viewport = view, mapScene = scene) {
     if (!mapScene) return;
+    if (cachedMapScene !== mapScene) {
+      cachedMapScene = mapScene;
+      cachedMapMachine = visualMachine(mapScene.machine);
+      cachedMapBounds = graphBounds(cachedMapMachine, mapScene.routes);
+    }
     const routes = mapScene.routes,
-      machine = visualMachine(mapScene.machine),
-      bounds = graphBounds(machine, routes),
+      machine = cachedMapMachine,
+      bounds = cachedMapBounds,
       left = Math.min(bounds.x, viewport.x) - 100,
       top = Math.min(bounds.y, viewport.y) - 100;
     let width = Math.max(bounds.x + bounds.width, viewport.x + viewport.width) - left + 100,
