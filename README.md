@@ -72,6 +72,8 @@ Radix Themes supplies the shared controls; the pre-React palette is mapped onto 
 - Extended FSMs support numeric stacks, legacy counters, conditions, and ordered side effects.
 - Use the debugger or Alt+S, Alt+Left/Right, and Alt+Shift+Left/Right to inspect execution. Debug controls, status, and memory values appear together in a separate window above the graph.
 - Drag the toolbar/tester grips to dock them, or focus a grip and use arrow keys. The tester separator supports dragging and arrow keys.
+- The top toolbar sits beside the logo; the bottom toolbar sits beside the fixed-size minimap. Tester docks reserve space for both.
+- On touchscreens, use two fingers to pan and pinch. Adding or lifting fingers preserves the current view, and the remaining finger can continue panning.
 - Open Keyboard shortcuts for the full reference.
 
 ## Data compatibility

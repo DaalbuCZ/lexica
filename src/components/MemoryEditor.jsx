@@ -1,4 +1,5 @@
-import { Button } from './ui.jsx';
+import { Button, IconButton } from './ui.jsx';
+import { Copy, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useStudio } from '../state/studio.js';
 import {
@@ -164,7 +165,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
   return (
     <Container
       id="memory-rules"
-      className="simple-memory"
+      className={`simple-memory ${simple ? 'compact-memory' : ''}`}
       {...(simple ? { open, onToggle: (event) => setOpen(event.currentTarget.open) } : {})}
     >
       {simple ? <summary>Memory rules</summary> : <h3>Memory rules</h3>}
@@ -190,26 +191,61 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
           return (
             <section className="memory-rule-section" key={kind}>
               <h3>{kind === 'guard' ? 'Stack condition' : 'Stack action'}</h3>
-              <Check
-                id={kind + '-enabled'}
-                label={kind === 'guard' ? 'Use a condition' : 'Update stack'}
-                checked={enabled}
-                disabled={!firstStack && !exists}
-                onChange={(value) =>
-                  edit((e) => {
-                    if (value) {
-                      delete e[disabled];
-                      if (!exists)
-                        e[kind] = {
-                          cell: firstStack.name,
-                          op: kind === 'guard' ? 'empty' : 'push',
-                          value: kind === 'guard' ? 0 : 1,
-                        };
-                    } else e[disabled] = true;
-                  })
-                }
-              />
-              {kind === 'guard' && (
+              <div className="memory-rule-heading">
+                <Check
+                  id={kind + '-enabled'}
+                  label={
+                    simple
+                      ? kind === 'guard'
+                        ? 'Condition'
+                        : 'Action'
+                      : kind === 'guard'
+                        ? 'Use a condition'
+                        : 'Update stack'
+                  }
+                  checked={enabled}
+                  disabled={!firstStack && !exists}
+                  onChange={(value) =>
+                    edit((e) => {
+                      if (value) {
+                        delete e[disabled];
+                        if (!exists)
+                          e[kind] = {
+                            cell: firstStack.name,
+                            op: kind === 'guard' ? 'empty' : 'push',
+                            value: kind === 'guard' ? 0 : 1,
+                          };
+                      } else e[disabled] = true;
+                    })
+                  }
+                />
+                {simple && (
+                  <div className="memory-rule-tools">
+                    {kind === 'guard' && (
+                      <>
+                        <IconButton
+                          icon={Copy}
+                          label="Copy conditions"
+                          disabled={!exists}
+                          onClick={copy}
+                        />
+                        <IconButton
+                          icon={ClipboardPaste}
+                          label="Paste conditions"
+                          onClick={paste}
+                        />
+                      </>
+                    )}
+                    <IconButton
+                      icon={Plus}
+                      label={kind === 'guard' ? 'Add condition' : 'Add action'}
+                      disabled={!enabled || !firstStack}
+                      onClick={add}
+                    />
+                  </div>
+                )}
+              </div>
+              {!simple && kind === 'guard' && (
                 <div className="condition-clipboard">
                   <Button type="button" disabled={!exists} onClick={copy}>
                     Copy conditions
@@ -227,21 +263,22 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
                     cells={cells}
                     onChange={(change) => edit((e) => change(e[kind]))}
                   />
-                  {kind === 'guard' && (
-                    <Select
-                      label="Combine conditions"
-                      value={edge.guardMode ?? 'all'}
-                      onChange={(mode) =>
-                        edit((e) => {
-                          if (mode === 'any') e.guardMode = 'any';
-                          else delete e.guardMode;
-                        })
-                      }
-                    >
-                      <option value="all">All conditions (AND)</option>
-                      <option value="any">Any condition (OR)</option>
-                    </Select>
-                  )}
+                  {kind === 'guard' &&
+                    (!simple || (edge.guard ? 1 : 0) + (edge.guards?.length ?? 0) > 1) && (
+                      <Select
+                        label="Combine conditions"
+                        value={edge.guardMode ?? 'all'}
+                        onChange={(mode) =>
+                          edit((e) => {
+                            if (mode === 'any') e.guardMode = 'any';
+                            else delete e.guardMode;
+                          })
+                        }
+                      >
+                        <option value="all">All conditions (AND)</option>
+                        <option value="any">Any condition (OR)</option>
+                      </Select>
+                    )}
                   {(edge[list] ?? []).map((rule, i) => (
                     <div className="extra-memory-rule" key={i}>
                       <Rule
@@ -250,22 +287,38 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
                         cells={cells}
                         onChange={(change) => edit((e) => change(e[list][i]))}
                       />
-                      <Button
-                        type="button"
-                        onClick={() =>
-                          edit((e) => {
-                            e[list].splice(i, 1);
-                            if (!e[list].length) delete e[list];
-                          })
-                        }
-                      >
-                        Remove {kind === 'guard' ? 'condition' : 'action'}
-                      </Button>
+                      {simple ? (
+                        <IconButton
+                          icon={Trash2}
+                          label={kind === 'guard' ? 'Remove condition' : 'Remove action'}
+                          className="danger"
+                          onClick={() =>
+                            edit((e) => {
+                              e[list].splice(i, 1);
+                              if (!e[list].length) delete e[list];
+                            })
+                          }
+                        />
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={() =>
+                            edit((e) => {
+                              e[list].splice(i, 1);
+                              if (!e[list].length) delete e[list];
+                            })
+                          }
+                        >
+                          Remove {kind === 'guard' ? 'condition' : 'action'}
+                        </Button>
+                      )}
                     </div>
                   ))}
-                  <Button type="button" disabled={!firstStack} onClick={add}>
-                    ＋ Add {kind === 'guard' ? 'condition' : 'action'}
-                  </Button>
+                  {!simple && (
+                    <Button type="button" disabled={!firstStack} onClick={add}>
+                      ＋ Add {kind === 'guard' ? 'condition' : 'action'}
+                    </Button>
+                  )}
                 </>
               )}
             </section>

@@ -55,6 +55,13 @@ export function createCanvasRenderer(context) {
       drawMap();
     });
   }
+  context.flushDraw = () => {
+    if (context.disposed) return;
+    if (context.drawFrame !== null) cancelAnimationFrame(context.drawFrame);
+    context.drawFrame = null;
+    draw();
+    drawMap();
+  };
   function connectionPreviewPath(a, p) {
     if (Math.hypot(p.x - a.x, p.y - a.y) <= 36)
       return routeEdges({

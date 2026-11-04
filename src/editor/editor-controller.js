@@ -515,7 +515,7 @@ export function createEditorController(
     draw();
     publish();
   }
-  function cancelConnect() {
+  function cancelConnect(drawNow = true) {
     context.sourceStartView = null;
     context.commentSource = null;
     context.placingComment = false;
@@ -526,7 +526,7 @@ export function createEditorController(
     context.connectPoint = null;
     context.rightStart = null;
     $('modehint').textContent = '';
-    draw();
+    if (drawNow) draw();
   }
   function connectTo(id) {
     checkpoint();

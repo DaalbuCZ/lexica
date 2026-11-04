@@ -132,10 +132,13 @@ export function createCanvasInteractions(context) {
   function startPan(e) {
     cancelAnimationFrame(context.cameraFrame);
     e.preventDefault();
+    const surface = context.overviewView ? context.overviewCanvas : context.$('canvas'),
+      v = context.view();
     context.pan = {
       x: e.clientX,
       y: e.clientY,
-      v: context.view(),
+      v,
+      scale: Math.min(surface.clientWidth / v.width, surface.clientHeight / v.height),
     };
     document.body.classList.add('panning');
   }
@@ -223,21 +226,25 @@ export function createCanvasInteractions(context) {
     });
     setupCanvasGestures(context.$('canvas'), {
       getView: () => context.view(),
-      setView: context.setView,
+      setView: (view) => {
+        context.setView(view);
+        context.flushDraw();
+      },
       toWorld: (event) =>
         context.overviewView ? context.overviewGraph.point(event) : context.point(event),
       signal: context.scope.signal,
       viewport: () => (context.overviewView ? context.overviewCanvas : context.$('canvas')),
       sensitivity: () => editorSettings.pinchSensitivity,
       onInterrupt: () => {
+        cancelAnimationFrame(context.cameraFrame);
         if (context.drag?.moved) {
           context.save();
-          context.render();
         }
         context.drag = null;
         context.pan = null;
         context.marquee = null;
-        context.cancelConnect();
+        context.cancelConnect(false);
+        context.queueDraw();
         document.body.classList.remove('panning');
       },
     });
@@ -245,7 +252,10 @@ export function createCanvasInteractions(context) {
       context.$('canvas'),
       'pointerdown',
       (e) => {
-        const hit = context.graph.hitClient(e);
+        const hit =
+          (context.source || context.commentSource) && e.button === 2
+            ? context.graph.hitClient(e)
+            : null;
         if ((context.placingComment || context.placingState) && e.button === 2) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -459,9 +469,11 @@ export function createCanvasInteractions(context) {
           };
           context.draw();
         } else {
+          const hadSelection = context.selection.type !== 'none';
           context.clearSelection();
-          context.markSelection();
+          if (hadSelection) context.properties();
           startPan(e);
+          context.queueDraw();
         }
       }
     };
@@ -556,11 +568,7 @@ export function createCanvasInteractions(context) {
         return;
       }
       if (context.pan) {
-        const surface = context.overviewView ? context.overviewCanvas : context.$('canvas'),
-          scale = Math.min(
-            surface.clientWidth / context.pan.v.width,
-            surface.clientHeight / context.pan.v.height,
-          );
+        const scale = context.pan.scale;
         context.setView({
           ...context.pan.v,
           x: context.pan.v.x - (e.clientX - context.pan.x) / scale,
@@ -826,10 +834,14 @@ export function createCanvasInteractions(context) {
     });
     setupCanvasGestures(context.overviewCanvas, {
       getView: () => context.overviewView,
-      setView: context.setOverviewView,
+      setView: (view) => {
+        context.setOverviewView(view);
+        context.flushDraw();
+      },
       toWorld: context.overviewGraph.point,
       sensitivity: () => editorSettings.pinchSensitivity,
       onInterrupt: () => {
+        cancelAnimationFrame(context.cameraFrame);
         context.outsideGroupPress = null;
       },
       signal: context.scope.signal,

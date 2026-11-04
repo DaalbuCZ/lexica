@@ -30,11 +30,12 @@ export function createViewport(context) {
       .map((el) => el.getBoundingClientRect());
   }
   function showProperties(show, event) {
-    context.onUI({
-      propertiesOpen: !!show,
-    });
-    document.body.classList.toggle('properties-hidden', !show);
-    context.$('toggle-properties').setAttribute('aria-expanded', String(show));
+    const wasOpen = !document.body.classList.contains('properties-hidden');
+    if (wasOpen !== !!show) {
+      context.onUI({ propertiesOpen: !!show });
+      document.body.classList.toggle('properties-hidden', !show);
+      context.$('toggle-properties').setAttribute('aria-expanded', String(show));
+    }
     if (!show) {
       if (context.propertiesFrame !== null) cancelAnimationFrame(context.propertiesFrame);
       context.propertiesFrame = null;
@@ -99,6 +100,12 @@ export function createViewport(context) {
       placed = placeFloatingRect(candidate, size, area, obstacles, 12);
     panel.style.left = placed.x - area.left + 'px';
     panel.style.top = placed.y - area.top + 'px';
+    const tester = document.querySelector('.tester'),
+      bottom =
+        document.body.dataset.testerDock === 'bottom' && tester
+          ? Math.min(area.bottom, tester.getBoundingClientRect().top)
+          : area.bottom;
+    panel.style.maxHeight = Math.max(80, bottom - placed.y - 12) + 'px';
   }
   function view() {
     return context.overviewView ?? context.graph.view();

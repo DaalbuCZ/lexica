@@ -14,8 +14,9 @@ import { useTesterResize } from '../hooks/useTesterResize.js';
 import { DebuggerWindow } from './DebuggerWindow.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 export function Tester({ debuggerRef }) {
-  const scene = useStudio((s) => s.scene),
-    machine = scene.machine,
+  // Document edits may mutate the machine in place; selection changes need no lexer rerender.
+  useStudio((s) => s.scene.version);
+  const machine = useStudio((s) => s.scene.machine),
     input = useStudio((s) => s.input),
     showSkipped = useStudio((s) => s.showSkipped),
     controller = useStudio((s) => s.controller);

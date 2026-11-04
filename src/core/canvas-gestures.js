@@ -28,102 +28,124 @@ export function setupCanvasGestures(
 ) {
   const pointers = new Map();
   let gesture = null,
-    pinching = false;
-  const center = () => {
-    const [a, b] = [...pointers.values()];
+    pinching = false,
+    frame = null;
+  const request =
+    globalThis.requestAnimationFrame?.bind(globalThis) ??
+    ((fn) => {
+      fn();
+      return null;
+    });
+  const cancel = globalThis.cancelAnimationFrame?.bind(globalThis) ?? (() => {});
+  const sample = (ids) => {
+    const points = ids.map((id) => pointers.get(id));
     return {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
+      x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+      y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
+      distance:
+        points.length === 2
+          ? Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y))
+          : 1,
     };
   };
-  const distance = () => {
-    const [a, b] = [...pointers.values()];
-    return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+  const flush = () => {
+    frame = null;
+    if (!gesture) return;
+    const point = sample(gesture.ids);
+    setView(
+      pinchView(
+        gesture.view,
+        gesture.anchor,
+        { x: point.x - gesture.rect.left, y: point.y - gesture.rect.top },
+        gesture.size,
+        (gesture.distance / point.distance) ** sensitivity(),
+      ),
+    );
+  };
+  const finishFrame = () => {
+    if (frame !== null) {
+      cancel(frame);
+      flush();
+    }
+  };
+  const rebase = () => {
+    const ids = [...pointers.keys()].slice(0, 2);
+    if (!ids.length) {
+      gesture = null;
+      return;
+    }
+    const point = sample(ids),
+      surface = typeof viewport === 'function' ? viewport() : viewport;
+    gesture = {
+      ids,
+      view: getView(),
+      anchor: toWorld({ clientX: point.x, clientY: point.y }),
+      rect: surface.getBoundingClientRect(),
+      size: { width: surface.clientWidth, height: surface.clientHeight },
+      distance: point.distance,
+    };
+  };
+  const consume = (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
   };
   canvas.addEventListener(
     'pointerdown',
     (event) => {
       if (event.pointerType !== 'touch') return;
-      pointers.set(event.pointerId, {
-        x: event.clientX,
-        y: event.clientY,
-      });
+      finishFrame();
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.size < 2 && !pinching) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (pointers.size === 2) {
+      consume(event);
+      if (!pinching) {
         onInterrupt();
-        const point = center();
-        gesture = {
-          view: getView(),
-          anchor: toWorld({
-            clientX: point.x,
-            clientY: point.y,
-          }),
-          distance: distance(),
-        };
         pinching = true;
       }
+      if (!gesture || gesture.ids.length < 2) rebase();
       for (const id of pointers.keys())
         try {
           canvas.setPointerCapture(id);
-        } catch {}
+        } catch {
+          /* A cancelled touch may already be gone. */
+        }
     },
-    {
-      capture: true,
-      signal,
-    },
+    { capture: true, signal },
   );
   canvas.addEventListener(
     'pointermove',
     (event) => {
       if (!pointers.has(event.pointerId)) return;
-      pointers.set(event.pointerId, {
-        x: event.clientX,
-        y: event.clientY,
-      });
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (!pinching) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (pointers.size !== 2 || !gesture) return;
-      const point = center(),
-        surface = typeof viewport === 'function' ? viewport() : viewport,
-        rect = surface.getBoundingClientRect();
-      setView(
-        pinchView(
-          gesture.view,
-          gesture.anchor,
-          {
-            x: point.x - rect.left,
-            y: point.y - rect.top,
-          },
-          {
-            width: surface.clientWidth,
-            height: surface.clientHeight,
-          },
-          (gesture.distance / distance()) ** sensitivity(),
-        ),
-      );
+      consume(event);
+      if (gesture?.ids.includes(event.pointerId) && frame === null) frame = request(flush);
     },
-    {
-      capture: true,
-      signal,
-    },
+    { capture: true, signal },
   );
   const end = (event) => {
+    if (!pointers.has(event.pointerId)) return;
+    if (!pinching) {
+      pointers.delete(event.pointerId);
+      return;
+    }
+    consume(event);
+    finishFrame();
+    const changedPair = gesture?.ids.includes(event.pointerId);
     pointers.delete(event.pointerId);
-    if (!pinching) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    gesture = null;
-    if (!pointers.size) pinching = false;
+    if (!pointers.size) {
+      pinching = false;
+      gesture = null;
+    } else if (changedPair) rebase();
   };
-  canvas.addEventListener('pointerup', end, {
-    capture: true,
-    signal,
-  });
-  canvas.addEventListener('pointercancel', end, {
-    capture: true,
-    signal,
-  });
+  canvas.addEventListener('pointerup', end, { capture: true, signal });
+  canvas.addEventListener('pointercancel', end, { capture: true, signal });
+  const cleanup = () => {
+    cancel(frame);
+    frame = null;
+    pointers.clear();
+    gesture = null;
+    pinching = false;
+  };
+  signal?.addEventListener('abort', cleanup, { once: true });
+  return cleanup;
 }

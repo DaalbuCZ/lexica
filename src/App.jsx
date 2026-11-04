@@ -6,6 +6,7 @@ import { editorSettings } from './core/editor-settings.js';
 import { usePersistence } from './hooks/usePersistence.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useShortcuts } from './hooks/useShortcuts.js';
+import { useChromeLayout } from './hooks/useChromeLayout.js';
 import { GraphEditor } from './components/GraphEditor.jsx';
 import { Inspector } from './components/Inspector.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
@@ -29,6 +30,7 @@ export default function App() {
   usePersistence();
   useTheme();
   useShortcuts(debuggerRef);
+  useChromeLayout();
   useEffect(() => {
     Object.assign(editorSettings, settings);
     writeStorage('lexica-editor-settings', settings);

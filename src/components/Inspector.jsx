@@ -51,7 +51,7 @@ export function Inspector() {
               : 'Machine';
   useEffect(() => {
     if (open) controller?.showProperties(true);
-  }, [open, scene, settings, controller]);
+  }, [open, selection.type, selection.id, selection.index, controller]);
   return (
     <aside
       className="inspector animated-window"

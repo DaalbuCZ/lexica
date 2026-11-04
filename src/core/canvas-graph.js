@@ -671,7 +671,21 @@ export function createGraphCanvas(canvas, minimap) {
     ctx.lineWidth = Math.max(14, 8 / transform().scale);
     let found = null;
     for (let i = paths.length - 1; i >= 0; i--)
-      if (ctx.isPointInStroke(paths[i], p.x, p.y)) {
+      if (
+        p.x >=
+          Math.min(routes[i].p0.x, routes[i].c1.x, routes[i].c2.x, routes[i].p3.x) -
+            ctx.lineWidth &&
+        p.x <=
+          Math.max(routes[i].p0.x, routes[i].c1.x, routes[i].c2.x, routes[i].p3.x) +
+            ctx.lineWidth &&
+        p.y >=
+          Math.min(routes[i].p0.y, routes[i].c1.y, routes[i].c2.y, routes[i].p3.y) -
+            ctx.lineWidth &&
+        p.y <=
+          Math.max(routes[i].p0.y, routes[i].c1.y, routes[i].c2.y, routes[i].p3.y) +
+            ctx.lineWidth &&
+        ctx.isPointInStroke(paths[i], p.x, p.y)
+      ) {
         found = {
           type: machine.edges[i].groupEdge ? 'group-edge' : 'edge',
           index: machine.edges[i].originalIndex ?? i,
