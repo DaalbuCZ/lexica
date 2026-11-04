@@ -65,12 +65,6 @@ The editor retains bounded per-view route snapshots keyed by group, caption mode
 
 Two browser regressions record painted curve paths and text coordinates across three open/close cycles, with live routing enabled and disabled and a mix of automatic, reciprocal, and saved manual curves. Together with the existing gesture/layout checks, nine targeted browser workflows pass.
 
-## Flow and enclosure polish
-
-Tree columns now reserve room for their own formatted transition captions rather than using one global edge length. Terminal forks use shorter advances and retain their balanced construction; exceptionally long captions have a bounded spacing budget. Non-radial aesthetic cleanup tries rigid branch rotations toward horizontal and diagonal forward flow, excluding feedback edges inside strongly connected regions. It also penalizes insufficient caption space and can lengthen an attachment when needed. Radial flow and fixed start rings retain their existing rules.
-
-Cycle occupancy counts every enclosed state, including descendants farther along a branch. This allows an embedding that frees several states to win even if one state remains enclosed. All candidates still pass the existing crossing, node/wire clearance, minimum edge length and complete corridor routing checks. These are preferences, so a feasible drawing may retain an imperfect arrangement when the alternatives fail those checks or exceed the bounded search budget.
-
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

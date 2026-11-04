@@ -134,10 +134,14 @@ export function cycleScore(analysis, nodes) {
       mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
     score += 4 * lengths.reduce((sum, d) => sum + (d - mean) ** 2 / Math.max(160, mean), 0);
     const ids = new Set(cycle);
-    // Count the whole enclosed branch. Trading three trapped states for one
-    // is an improvement, even when neither embedding has an empty interior.
-    for (const [id, state] of nodes)
-      if (!ids.has(id) && insideCycle(state, cycle, nodes)) score += 1200;
+    for (const id of cycle)
+      for (const next of analysis.neighbors.get(id))
+        if (
+          !ids.has(next) &&
+          [...analysis.neighbors.get(next)].filter((n) => ids.has(n)).length === 1 &&
+          insideCycle(nodes.get(next), cycle, nodes)
+        )
+          score += 1200;
   }
   for (const [id, ins] of analysis.incoming) {
     const outs = analysis.outgoing.get(id);
@@ -185,7 +189,7 @@ export function cycleProposals(analysis, nodes, chunks) {
         const attached = [...chunk].filter((id) => analysis.neighbors.get(anchor).has(id));
         if (attached.length !== 1) continue;
         const p = nodes.get(attached[0]);
-        if (![...chunk].some((id) => insideCycle(nodes.get(id), cycle, nodes))) continue;
+        if (!insideCycle(p, cycle, nodes)) continue;
         const a = nodes.get(anchor),
           base = Math.atan2(a.y - center.y, a.x - center.x),
           old = Math.atan2(p.y - a.y, p.x - a.x);

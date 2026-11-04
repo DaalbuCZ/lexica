@@ -2,7 +2,6 @@ import { drawingClearance } from './planar-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 import { cycleAnalysis, cycleScore, cycleProposals } from './cycle-aesthetics.js';
-import { flowAnalysis, flowScore, flowProposals } from './flow-aesthetics.js';
 
 // Improve an already routed planar drawing. Aesthetic scores never buy a
 // crossing: each accepted candidate must have a complete feasible route set.
@@ -27,24 +26,6 @@ export function compactAesthetics(
   const root = nodes.get(machine.start),
     edges = [...links.values()];
   const motifs = cycleAnalysis(machine);
-  // The dedicated subgroup fork constructor already chooses the balanced,
-  // label-aware optimum for this motif.
-  if (states.length <= 4 && states.some((s) => s.outside) && !motifs.cycles.length) return states;
-  const flow = radial ? [] : flowAnalysis(machine);
-  // Keep an already balanced terminal fan balanced while exploring its
-  // placement. Otherwise independent improvements turn a fork into stairs.
-  const fans = radial
-    ? []
-    : states.flatMap((anchor) => {
-        const leaves = [...neighbors.get(anchor.id)]
-          .filter((id) => neighbors.get(id).size === 1 && id !== machine.start)
-          .map((id) => nodes.get(id));
-        if (leaves.length !== 2) return [];
-        const [a, b] = leaves;
-        return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y + b.y - 2 * anchor.y) < 1e-6
-          ? [{ anchor, a, b }]
-          : [];
-      });
   const depth = new Map(root ? [[root.id, 0]] : []),
     queue = root ? [root.id] : [];
   for (let i = 0; i < queue.length; i++)
@@ -80,11 +61,7 @@ export function compactAesthetics(
     leftGap = Math.min(140, ...outer.map((s) => initialLeft - s.x));
   const score = () => {
     let cost = 0;
-    for (const e of edges) {
-      cost += Math.max(0, distance(e) - e.demand) ** 2 / e.demand;
-      // A caption should fit alongside the edge, not float above its source.
-      cost += (6 * Math.max(0, e.demand - distance(e)) ** 2) / e.demand;
-    }
+    for (const e of edges) cost += Math.max(0, distance(e) - e.demand) ** 2 / e.demand;
     if (radial && root) {
       const ring = [...neighbors.get(root.id)],
         mean = ring.reduce((sum, id) => sum + radius(id), 0) / Math.max(1, ring.length);
@@ -103,7 +80,7 @@ export function compactAesthetics(
     }
     const w = Math.max(...states.map((s) => s.x)) - Math.min(...states.map((s) => s.x)),
       h = Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y));
-    return cost + 0.15 * (w + h) + cycleScore(motifs, nodes) + flowScore(flow, nodes);
+    return cost + 0.15 * (w + h) + cycleScore(motifs, nodes);
   };
   const chunks = new Map();
   const offer = (ids) => {
@@ -138,31 +115,17 @@ export function compactAesthetics(
     let changed = false;
     const proposals = [];
     proposals.push(
-      ...flowProposals(flow, nodes, chunks.values()),
       ...cycleProposals(motifs, nodes, chunks.values()).filter(
         (p) => !p.ids.has(machine.start) && ![...p.ids].some((id) => pinned.has(id)),
       ),
     );
-    for (const { anchor, a, b } of fans) {
-      if ([a, b].some((s) => pinned.has(s.id))) continue;
-      const span = Math.abs(a.y - b.y) / 2;
-      for (const dx of [span, Math.max(100, span * 0.6)])
-        proposals.push({
-          ids: new Set([a.id, b.id]),
-          gain: 600,
-          targets: new Map([
-            [a.id, { x: anchor.x + dx, y: a.y }],
-            [b.id, { x: anchor.x + dx, y: b.y }],
-          ]),
-        });
-    }
     for (const ids of chunks.values())
       for (const e of edges) {
         if (ids.has(e.a) === ids.has(e.b)) continue;
         const a = nodes.get(ids.has(e.a) ? e.a : e.b),
           b = nodes.get(ids.has(e.a) ? e.b : e.a),
           d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (Math.abs(d - e.demand) <= 2 || d < 1e-6) continue;
+        if (d <= e.demand + 2) continue;
         proposals.push({
           ids,
           dx: ((b.x - a.x) * (d - e.demand)) / d,

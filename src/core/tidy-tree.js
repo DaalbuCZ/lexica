@@ -1,4 +1,3 @@
-import { simpleTransitionLabel } from './editor-settings.js';
 // Merge subtree contours instead of reserving the full height at every depth.
 export function tidyTree(machine, spacing = 0.75) {
   spacing = Number.isFinite(spacing) ? Math.max(0.35, Math.min(2, spacing)) : 0.75;
@@ -93,27 +92,9 @@ export function tidyTree(machine, spacing = 0.75) {
     const tree = trees.get(root),
       min = Math.min(...tree.points.map((p) => p.y)),
       max = Math.max(...tree.points.map((p) => p.y));
-    const depths = new Map(tree.points.map((p) => [p.id, p.depth])),
-      widths = new Map();
-    for (const e of machine.edges) {
-      const depth = depths.get(e.from);
-      if (depth === undefined || depths.get(e.to) !== depth + 1) continue;
-      const branching = children.get(e.from).length > 1;
-      widths.set(
-        depth,
-        Math.max(
-          widths.get(depth) ?? 0,
-          branching ? Math.max(150, 200 * spacing) : step,
-          Math.min(480, simpleTransitionLabel(e).length * 7 + 130),
-        ),
-      );
-    }
-    const columns = [160];
-    for (let depth = 0; depth < tree.contour.length; depth++)
-      columns.push(columns[depth] + (widths.get(depth) ?? step));
     for (const p of tree.points) {
       const state = nodes.get(p.id);
-      state.x = columns[p.depth];
+      state.x = 160 + p.depth * step;
       state.y = top + p.y - min;
     }
     top += max - min + gap * 1.5;
