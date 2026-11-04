@@ -1976,12 +1976,12 @@
     left: auto;
     right: calc(var(--dock-right) + 18px);
   }
-  body:is([data-toolbar-dock='left'], [data-toolbar-dock='right']) .toolbar .separator {
+  .toolbar[data-orientation='vertical'] .separator {
     height: 1px;
     width: 24px;
     margin: 3px;
   }
-  body:is([data-toolbar-dock='left'], [data-toolbar-dock='right']) .layout-chevron {
+  .toolbar[data-orientation='vertical'] .layout-chevron {
     display: none;
   }
   .toolbar .dock-grip,
@@ -2022,59 +2022,32 @@
     border: 2px solid var(--green);
     border-radius: 8px;
   }
-  .dock-preview[data-side='top'] {
+  .dock-preview[data-panel='tester'] {
+    width: auto;
+    height: var(--tester);
+  }
+  .dock-preview[data-panel='tester'][data-side='top'] {
     inset: 0 0 auto;
-    height: 80px;
   }
-  .dock-preview[data-side='bottom'] {
+  .dock-preview[data-panel='tester'][data-side='bottom'] {
     inset: auto 0 0;
-    height: 80px;
-  }
-  .dock-preview[data-side='left'] {
-    inset: 0 auto 0 0;
-    width: 80px;
-  }
-  .dock-preview[data-side='right'] {
-    inset: 0 0 0 auto;
-    width: 80px;
-  }
-  .dock-preview[data-panel='debugger']:is([data-side='top'], [data-side='bottom']) {
-    right: auto;
-    width: calc(100% / 3);
-  }
-  .dock-preview[data-panel='debugger']:is([data-side='left'], [data-side='right']) {
-    bottom: auto;
-    height: calc(100% / 3);
-  }
-  .dock-preview[data-panel='debugger']:is(
-      [data-side='top'],
-      [data-side='bottom']
-    )[data-segment='center'] {
-    left: calc(100% / 3);
-  }
-  .dock-preview[data-panel='debugger']:is(
-      [data-side='top'],
-      [data-side='bottom']
-    )[data-segment='end'] {
-    left: calc(200% / 3);
-  }
-  .dock-preview[data-panel='debugger']:is(
-      [data-side='left'],
-      [data-side='right']
-    )[data-segment='center'] {
-    top: calc(100% / 3);
-  }
-  .dock-preview[data-panel='debugger']:is(
-      [data-side='left'],
-      [data-side='right']
-    )[data-segment='end'] {
-    top: calc(200% / 3);
-  }
-  .dock-preview[data-panel='tester']:is([data-side='top'], [data-side='bottom']) {
-    height: var(--tester-height, 190px);
   }
   .dock-preview[data-panel='tester']:is([data-side='left'], [data-side='right']) {
+    top: 0;
+    bottom: 0;
     width: var(--tester-width, min(320px, 45vw));
+    height: 100%;
+  }
+  .dock-preview[data-panel='tester'][data-side='left'] {
+    left: 0;
+  }
+  .dock-preview[data-panel='tester'][data-side='right'] {
+    right: 0;
+  }
+  .tester-collapsed .dock-preview[data-panel='tester']:is([data-side='left'], [data-side='right']) {
+    top: auto;
+    width: var(--tester-width, 320px);
+    height: 48px;
   }
   @media (max-width: 650px) {
     header {

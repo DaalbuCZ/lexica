@@ -49,8 +49,10 @@ export function useDockGrip(name) {
       target.side = getDock(event.clientX, event.clientY, innerWidth, innerHeight);
       const [side, segment = 'center'] = target.side.split('-');
       const preview = document.getElementById('dock-preview');
+      if (preview.dataset.panel !== name) preview.removeAttribute('style');
       preview.dataset.side = side;
       preview.dataset.segment = segment;
+      if (preview.dataset.zone !== target.side) preview.dataset.zone = target.side;
       preview.dataset.panel = name;
       preview.hidden = false;
       document.body.classList.add('docking');
