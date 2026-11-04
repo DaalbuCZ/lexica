@@ -23,6 +23,138 @@ import { renderedLabelBox } from '../src/core/label-clearance.js';
 import { interactiveRoutes } from '../src/core/interactive-routes.js';
 import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthetics.js';
 import { transitionBundles } from '../src/core/graph-bundles.js';
+import { polishSubgroup } from '../src/core/subgroup-aesthetics.js';
+
+test('subgroup candidates give the entry caption room and shorten a balanced fork', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: 0, y: 0, outside: true },
+      { id: 'entry', x: 396, y: 0 },
+      { id: 'up', x: 596, y: -100 },
+      { id: 'down', x: 596, y: 100 },
+    ],
+    edges: [
+      { from: 'root', to: 'entry', label: 'x'.repeat(38) },
+      { from: 'entry', to: 'up', label: '=' },
+      { from: 'entry', to: 'down', label: '-' },
+    ],
+  };
+  const states = polishSubgroup(m),
+    [root, entry, up, down] = states;
+  assert.ok(entry.x - root.x >= 426);
+  assert.ok(up.x - entry.x < 200);
+  assert.equal(up.x, down.x);
+  assert.equal(up.y + down.y, 2 * entry.y);
+  assert.equal(
+    validateRouteSeparation(
+      corridorRoutes(
+        { ...m, states },
+        m.edges.map((e) => e.label),
+      ),
+      { maxDepth: 24 },
+    ).status,
+    'clear',
+  );
+});
+
+test('whole subgroup candidates reach a diamond that local cycle moves cannot expose', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: 0, y: 0, outside: true },
+      { id: 'quote', x: 350, y: 150 },
+      { id: 'text', x: 400, y: -100 },
+      { id: 'double', x: 600, y: 120 },
+      { id: 'end', x: 600, y: -140 },
+    ],
+    edges: [
+      ['root', 'text'],
+      ['root', 'quote'],
+      ['quote', 'text'],
+      ['quote', 'double'],
+      ['double', 'text'],
+      ['double', 'end'],
+      ['text', 'text'],
+    ].map(([from, to]) => ({ from, to, label: 'x' })),
+  };
+  const states = polishSubgroup(m),
+    nodes = new Map(states.map((s) => [s.id, s]));
+  assert.equal(nodes.get('quote').x, nodes.get('text').x);
+  assert.equal(nodes.get('double').y, nodes.get('end').y);
+  assert.ok(nodes.get('end').x > nodes.get('double').x);
+  assert.equal(
+    validateRouteSeparation(
+      corridorRoutes(
+        { ...m, states },
+        m.edges.map((e) => e.label),
+      ),
+      { maxDepth: 24 },
+    ).status,
+    'clear',
+  );
+  assert.deepEqual(polishSubgroup(m), states);
+});
+
+test('alternate entry fan embeddings release a complete tail from enclosing cycles', () => {
+  const m = {
+    start: 'root',
+    states: [
+      ['root', -736, -306],
+      ['s', -371, -382],
+      ['id', 28, -657],
+      ['underscore', 95, -834],
+      ['dollar', 272, -125],
+      ['tail1', -208, -317],
+      ['tail2', -42, -264],
+      ['tail3', 46, -416],
+      ['leaf1', 332, -292],
+      ['leaf2', 448, -92],
+    ].map(([id, x, y]) => ({ id, x, y, ...(id === 'root' ? { outside: true } : {}) })),
+    edges: [
+      ['root', 'id'],
+      ['root', 'underscore'],
+      ['root', 's'],
+      ['root', 'dollar'],
+      ['underscore', 'id'],
+      ['s', 'id'],
+      ['dollar', 'id'],
+      ['dollar', 'underscore'],
+      ['s', 'tail1'],
+      ['tail1', 'tail2'],
+      ['tail2', 'tail3'],
+      ['dollar', 'leaf1'],
+      ['dollar', 'leaf2'],
+    ].map(([from, to]) => ({
+      from,
+      to,
+      label: from === 'root' ? 'x'.repeat(40) : to === 'tail3' ? 'x'.repeat(34) : 'x',
+    })),
+  };
+  const states = polishSubgroup(m),
+    nodes = new Map(states.map((s) => [s.id, s])),
+    cycles = cycleAnalysis(m).cycles,
+    count = (items) => {
+      const map = new Map(items.map((s) => [s.id, s]));
+      return cycles.reduce(
+        (sum, c) => sum + items.filter((s) => !c.includes(s.id) && insideCycle(s, c, map)).length,
+        0,
+      );
+    };
+  assert.ok(count(states) < count(m.states));
+  assert.equal(nodes.get('tail1').y, nodes.get('tail2').y);
+  assert.equal(nodes.get('tail2').y, nodes.get('tail3').y);
+  assert.equal(
+    validateRouteSeparation(
+      corridorRoutes(
+        { ...m, states },
+        m.edges.map((e) => e.label),
+      ),
+      { maxDepth: 24 },
+    ).status,
+    'clear',
+  );
+});
 const machine = () => ({
   start: 'n0',
   states: Array.from({ length: 14 }, (_, i) => ({

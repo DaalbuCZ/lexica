@@ -65,6 +65,14 @@ The editor retains bounded per-view route snapshots keyed by group, caption mode
 
 Two browser regressions record painted curve paths and text coordinates across three open/close cycles, with live routing enabled and disabled and a mix of automatic, reciprocal, and saved manual curves. Together with the existing gesture/layout checks, nine targeted browser workflows pass.
 
+## Whole-subgroup aesthetic candidates
+
+Small subgroups (up to 24 visible states) receive a separate bounded candidate pass after their ordinary layout. This compares complete drawings instead of changing the global radial objective: entry-distance columns expose diamond and staircase alternatives, small entry fans try alternate orders with staggered vertices, articulation tails can rotate together, and two-vertex separators can flip an entire component across their chord. Horizontal entry spacing includes the formatted caption; short terminal forks retain a shorter, symmetric advance.
+
+The objective counts enclosed states across cycles, encourages progress from the subgroup entry, and prefers horizontal chains. At most 24 promising candidates reach the complete corridor router. Every accepted drawing also preserves the baseline node/wire clearance thresholds and passes the straight skeleton crossing check. Outside context positions are applied together with the inner drawing so the accepted geometry is the geometry actually displayed. Main radial placement, incremental dragging, manual bends, and portal views are unchanged by this pass.
+
+Regression motifs cover caption room with a balanced fork, the string diamond with a horizontal exit, and an entry fan that releases its complete tail from enclosing cycles. The actual comparison, small string, identifier, and large string subgroups were rendered and inspected as well as checked for certified route separation.
+
 ## Remaining design items
 
 The complete research design is not fully implemented. Nonplanar inputs still use the existing heuristic fallback rather than the proposed planar-subgraph/dual-face routing algorithm. Routes remain single cubics; general navigation meshes and multisegment route rendering/editing are not implemented. Optional constrained dragging and automatic neighbor relaxation are not exposed. Group placement still uses existing local candidate algorithms before final route validation. Compaction uses final geometric feasibility checks rather than a retained auxiliary triangulation's feasible-region solver.

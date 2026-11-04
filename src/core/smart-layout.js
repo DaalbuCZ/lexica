@@ -20,6 +20,7 @@ import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
 import { validateRouteSeparation } from './layout-validation.js';
+import { polishSubgroup } from './subgroup-aesthetics.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -1046,8 +1047,13 @@ export function solveLayout(topology, focus = null, options = {}) {
         )
           candidate.states = states;
       }
+      if (id) candidate.states = polishSubgroup(candidate);
       const states = alignHorizontal(candidate),
         positions = new Map(states.map((s) => [s.id, s]));
+      if (id)
+        machine.groups.find((g) => g.id === id).contextPositions = Object.fromEntries(
+          states.filter((s) => s.outside).map((s) => [s.id, { x: s.x, y: s.y }]),
+        );
       for (const state of view.states)
         if (!state.outside && !state.group) {
           state.x = positions.get(state.id).x;
