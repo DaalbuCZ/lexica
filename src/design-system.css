@@ -856,6 +856,10 @@ details > summary::before {
 .compact-memory > summary {
   padding-bottom: 0;
 }
+.compact-memory > summary::before {
+  order: 1;
+  margin-left: auto;
+}
 .compact-memory .app-icon-button.danger {
   color: var(--error);
 }
