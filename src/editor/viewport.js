@@ -277,8 +277,8 @@ export function createViewport(context) {
     });
   }
   function wheelGraph(e) {
-    cancelAnimationFrame(context.cameraFrame);
     if (e.target !== context.elements.canvas && e.target !== context.overviewCanvas) return;
+    cancelAnimationFrame(context.cameraFrame);
     e.preventDefault();
     const outside = !!context.overviewView;
     const canvas = outside ? context.overviewCanvas : context.elements.canvas;

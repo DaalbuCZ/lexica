@@ -139,13 +139,22 @@ export function setupCanvasGestures(
   };
   canvas.addEventListener('pointerup', end, { capture: true, signal });
   canvas.addEventListener('pointercancel', end, { capture: true, signal });
+  canvas.addEventListener('lostpointercapture', end, { capture: true, signal });
+  // A canvas can be reparented into a subgroup between touch down and up.
+  // Observe termination at the window too, rather than retaining a phantom finger.
+  const host = canvas.ownerDocument?.defaultView ?? globalThis.window;
+  host?.addEventListener('pointerup', end, { capture: true, signal });
+  host?.addEventListener('pointercancel', end, { capture: true, signal });
   const cleanup = () => {
     cancel(frame);
     frame = null;
+    const captured = [...pointers.keys()];
     pointers.clear();
     gesture = null;
     pinching = false;
+    for (const id of captured) if (canvas.hasPointerCapture?.(id)) canvas.releasePointerCapture(id);
   };
+  host?.addEventListener('blur', cleanup, { signal });
   signal?.addEventListener('abort', cleanup, { once: true });
   return cleanup;
 }

@@ -2865,6 +2865,55 @@ test('pinch zoom preserves its world anchor while scaling and moving across lett
   assert.ok(wheelZoomFactor(5) > 1);
   assert.ok(wheelZoomFactor(5, 2) > wheelZoomFactor(5, 1));
 });
+test('touch termination outside a reparented canvas and explicit reset clear tracked fingers', () => {
+  const handlers = {},
+    hostHandlers = {},
+    captured = new Set(),
+    released = [],
+    host = { addEventListener: (name, fn) => (hostHandlers[name] = fn) },
+    canvas = {
+      clientWidth: 800,
+      clientHeight: 600,
+      ownerDocument: { defaultView: host },
+      addEventListener: (name, fn) => (handlers[name] = fn),
+      setPointerCapture: (id) => captured.add(id),
+      hasPointerCapture: (id) => captured.has(id),
+      releasePointerCapture: (id) => {
+        captured.delete(id);
+        released.push(id);
+      },
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    };
+  let interrupts = 0;
+  const reset = setupCanvasGestures(canvas, {
+    getView: () => ({ x: 0, y: 0, width: 800, height: 600 }),
+    setView() {},
+    toWorld: () => ({ x: 0, y: 0 }),
+    onInterrupt: () => interrupts++,
+  });
+  const event = (id) => ({
+    pointerType: 'touch',
+    pointerId: id,
+    clientX: id * 100,
+    clientY: 100,
+    preventDefault() {},
+    stopImmediatePropagation() {},
+  });
+  handlers.pointerdown(event(1));
+  hostHandlers.pointerup(event(1));
+  handlers.pointerdown(event(2));
+  assert.equal(interrupts, 0);
+  handlers.pointerdown(event(3));
+  assert.equal(interrupts, 1);
+  reset();
+  assert.deepEqual(released.sort(), [2, 3]);
+  handlers.pointerdown(event(4));
+  assert.equal(interrupts, 1);
+  hostHandlers.pointercancel(event(4));
+  handlers.pointerdown(event(5));
+  assert.equal(interrupts, 1);
+});
+
 test('two-finger gestures interrupt dragging, zoom around the midpoint, and consume remaining touches', () => {
   const handlers = {},
     canvas = {

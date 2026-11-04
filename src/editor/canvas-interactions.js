@@ -223,7 +223,7 @@ export function createCanvasInteractions(context) {
         context.queueDraw();
       }
     });
-    setupCanvasGestures(context.$('canvas'), {
+    const resetMainGestures = setupCanvasGestures(context.$('canvas'), {
       getView: () => context.view(),
       setView: (view) => {
         context.setView(view);
@@ -788,7 +788,7 @@ export function createCanvasInteractions(context) {
         if (context.outsideGroupPress?.id !== event.pointerId) return;
         const press = context.outsideGroupPress;
         if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 8) press.moved = true;
-        if (press.moved && press.type !== 'touch') {
+        if (press.moved) {
           const rect = context.overviewCanvas.getBoundingClientRect(),
             scale = canvasTransform(press.view, rect.width, rect.height).scale;
           context.setOverviewView({
@@ -819,7 +819,7 @@ export function createCanvasInteractions(context) {
       },
       true,
     );
-    context.listen(context.canvasWrap, 'wheel', context.wheelGraph, {
+    context.listen(window, 'wheel', context.wheelGraph, {
       passive: false,
       capture: true,
     });
@@ -846,7 +846,7 @@ export function createCanvasInteractions(context) {
       context.queueDraw();
       if (!document.body.classList.contains('properties-hidden')) context.showProperties(true);
     });
-    setupCanvasGestures(context.overviewCanvas, {
+    const resetOverviewGestures = setupCanvasGestures(context.overviewCanvas, {
       getView: () => context.overviewView,
       setView: (view) => {
         context.setOverviewView(view);
@@ -860,6 +860,20 @@ export function createCanvasInteractions(context) {
       },
       signal: context.scope.signal,
     });
+    context.resetCanvasInteractions = () => {
+      resetMainGestures();
+      resetOverviewGestures();
+      if (context.drag?.moved || context.edgeDrag?.moved || context.portalDrag?.moved)
+        context.save();
+      context.drag = null;
+      context.edgeDrag = null;
+      context.portalDrag = null;
+      context.pan = null;
+      context.marquee = null;
+      context.rightStart = null;
+      context.outsideGroupPress = null;
+      document.body.classList.remove('panning');
+    };
   }
   return {
     startCommentConnection,

@@ -837,6 +837,7 @@ export function createEditorController(
       context.groupTintAnimation?.cancel();
       cancelAnimationFrame(context.cameraFrame);
       scope.dispose();
+      context.resetCanvasInteractions = null;
       observer.disconnect();
       testerObserver.disconnect();
       themeObserver.disconnect();

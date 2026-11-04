@@ -15,6 +15,7 @@ export function createGroupNavigation(context) {
     if (active && !context.overviewView)
       context.overviewView = context.groupReturnView ?? context.view();
     if (active && context.elements.canvas.parentElement !== context.groupPanel) {
+      context.resetCanvasInteractions?.();
       context.groupPanel.hidden = false;
       context.groupPanel.append(context.elements.canvas);
       context.groupPanelViewInitialized = false;
@@ -27,6 +28,7 @@ export function createGroupNavigation(context) {
         height: context.elements.canvas.clientHeight,
       };
     } else if (!active && context.overviewView) {
+      context.resetCanvasInteractions?.();
       const overview = context.overviewView;
       context.elements.surface.append(context.elements.canvas);
       context.overviewView = null;
@@ -44,6 +46,7 @@ export function createGroupNavigation(context) {
   function closeGroup(fromHistory = false, animate = true) {
     if (!context.openGroup) return;
     if (context.groupClosing) return;
+    context.resetCanvasInteractions?.();
     if (
       animate &&
       context.overviewView &&
@@ -98,6 +101,7 @@ export function createGroupNavigation(context) {
   }
   function openGroupById(id, recordHistory = true) {
     if (!context.machine.groups?.some((g) => g.id === id)) return;
+    context.resetCanvasInteractions?.();
     context.groupTintOpening = !context.openGroup;
     context.groupClosing = false;
     context.groupTintAnimation?.cancel();
