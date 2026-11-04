@@ -3,7 +3,18 @@ import { canvasTransform } from '../core/canvas-graph.js';
 export function createGroupWindow(context) {
   const panel = context.groupPanel,
     wrap = context.canvasWrap;
-  const padded = (b) => ({ x: b.x - 32, y: b.y - 32, width: b.width + 64, height: b.height + 64 });
+  // A small world-space gutter avoids resizing the backing canvas for subpixel
+  // changes in routed labels and control points during a drag.
+  const padded = (b) => {
+    const x = Math.floor((b.x - 32) / 16) * 16,
+      y = Math.floor((b.y - 32) / 16) * 16;
+    return {
+      x,
+      y,
+      width: Math.ceil((b.x + b.width + 32) / 16) * 16 - x,
+      height: Math.ceil((b.y + b.height + 32) / 16) * 16 - y,
+    };
+  };
   function positionGroupPanel(group, bounds) {
     if (!group || !bounds || !context.overviewView) return;
     const next = padded(bounds),

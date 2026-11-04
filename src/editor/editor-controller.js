@@ -18,6 +18,7 @@ import { validate, isAccepting, setAccepting } from '../core/lexer.js';
 import { createGroup, dissolveGroup, graphView, initializeGroupPositions } from '../core/groups.js';
 import { listenScope } from './events.js';
 import { editorSettings } from '../core/editor-settings.js';
+import { createLayoutTask } from './layout-task.js';
 export function createEditorController(
   elements,
   { initialMachine, onChange, onUI, onDialog, notify, getTester, onRestoreTester },
@@ -45,6 +46,7 @@ export function createEditorController(
   context.add = add;
   const scope = listenScope();
   context.scope = scope;
+  const calculateLayout = createLayoutTask(context);
   const listen = scope.listen;
   context.listen = listen;
   const $ = (id) => document.getElementById(id);
@@ -788,16 +790,21 @@ export function createEditorController(
       });
     },
     async arrange(options) {
-      const next = structuredClone(context.machine);
+      const version = context.documentVersion;
       try {
-        const { smartArrange } = await import('../core/smart-layout.js');
-        if (context.disposed) return;
-        if (options.disregardGroups) next.groups = [];
-        const groups = smartArrange(
-          next,
-          options.disregardGroups ? null : context.openGroup,
+        const { machine: next, groups } = await calculateLayout(
+          context.machine,
+          context.openGroup,
           options,
         );
+        if (context.disposed) return;
+        if (
+          context.documentVersion !== version ||
+          context.drag?.moved ||
+          context.edgeDrag?.moved ||
+          context.portalDrag?.moved
+        )
+          throw Error('The graph changed while arranging. Arrange again to apply the layout.');
         validate(next);
         checkpoint();
         context.machine = next;
@@ -811,7 +818,7 @@ export function createEditorController(
             : 'States arranged. Undo to restore.',
         );
       } catch (error) {
-        toast(error.message);
+        if (error.name !== 'AbortError' && !context.disposed) toast(error.message);
       }
     },
     dispose() {

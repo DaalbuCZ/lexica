@@ -166,6 +166,82 @@ test('reciprocal connections take distinct sides with separate labels', () => {
   assert.ok(Math.abs(forward.label.y - back.label.y) > 70);
 });
 import { statePortalBox } from './src/core/portals.js';
+test('angular refinement spreads neighbors without changing their cyclic order or placing comments', () => {
+  const m = {
+    start: 'hub',
+    states: [
+      { id: 'hub', x: 0, y: 0 },
+      ...[0, 0.5, 3.4].map((a, i) => ({ id: 'n' + i, x: 450 * Math.cos(a), y: 450 * Math.sin(a) })),
+    ],
+    edges: [0, 1, 2].map((i) => ({ from: 'hub', to: 'n' + i, label: 'a' })),
+    comments: [{ id: 'note', text: 'Later', nodeIds: ['hub'], x: 40, y: 50 }],
+  };
+  const before = angularResolution(m),
+    order = () =>
+      m.states
+        .slice(1)
+        .toSorted((a, b) => Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x))
+        .map((s) => s.id),
+    original = order();
+  regularizeAngles(m);
+  assert.ok(angularResolution(m) < before * 0.1);
+  const next = order(),
+    start = next.indexOf(original[0]);
+  assert.deepEqual(
+    original,
+    next.map((_, i) => next[(start + i) % next.length]),
+  );
+  assert.equal(crossingPairs(m).length, 0);
+  assert.deepEqual([m.comments[0].x, m.comments[0].y], [40, 50]);
+});
+test('incoming and outgoing ports use equal angular slots when topology permits', () => {
+  const m = {
+    start: 'hub',
+    states: [
+      { id: 'hub', x: 0, y: 0 },
+      ...[0, 0.6, 3.5].map((a, i) => ({ id: 'n' + i, x: 600 * Math.cos(a), y: 600 * Math.sin(a) })),
+    ],
+    edges: [
+      { from: 'hub', to: 'n0', label: 'a' },
+      { from: 'n1', to: 'hub', label: 'b' },
+      { from: 'hub', to: 'n2', label: 'c' },
+    ],
+  };
+  const routes = routeEdges(m),
+    angles = routes
+      .map((r, i) => {
+        const p = m.edges[i].from === 'hub' ? r.p0 : r.p3;
+        assert.ok(Math.abs(Math.hypot(p.x, p.y) - 37) < 1e-8);
+        return Math.atan2(p.y, p.x);
+      })
+      .sort((a, b) => a - b);
+  for (let i = 0; i < angles.length; i++)
+    assert.ok(
+      Math.abs(
+        (i === angles.length - 1 ? angles[0] + 2 * Math.PI : angles[i + 1]) -
+          angles[i] -
+          (2 * Math.PI) / 3,
+      ) < 1e-6,
+    );
+  assert.equal(crossingPairs(m, true).length, 0);
+});
+test('reciprocal curves stay on opposite physical sides even with an obstacle', () => {
+  const m = {
+    start: null,
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 400, y: 0 },
+      { id: 'obstacle', x: 200, y: 90 },
+    ],
+    edges: [
+      { from: 'a', to: 'b', label: 'a' },
+      { from: 'b', to: 'a', label: 'b' },
+    ],
+  };
+  const [a, b] = routeEdges(m),
+    middle = (r) => (r.p0.y + 3 * r.c1.y + 3 * r.c2.y + r.p3.y) / 8;
+  assert.ok(middle(a) * middle(b) < 0);
+});
 test('auto layout separates all states and retains topology', () => {
   const m = example();
   for (const s of m.states) {
@@ -287,6 +363,7 @@ test('portal JSON fixture produces the expected tokens', () => {
 });
 import { copySelection, pasteSelection } from './src/core/selection.js';
 import { commentLayout } from './src/core/comments.js';
+import { regularizeAngles, angularResolution } from './src/core/angular-layout.js';
 test('pasting a group remaps state IDs and internal edges without duplicating the initial state', () => {
   const m = example();
   const fragment = copySelection(m, new Set(['s0', 's1']), new Set(), new Set());
@@ -3818,7 +3895,8 @@ test('outside references choose an unobstructed side of a triangle with two entr
   for (const edge of view.edges.filter((e) => e.outside)) {
     const a = nodes.get(edge.from),
       b = nodes.get(edge.to);
-    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 750);
+    assert.ok(a.x < Math.min(...view.states.filter((s) => !s.outside).map((s) => s.x)));
+    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 850);
   }
 });
 test('a string-like subgraph keeps its complete contextual graph compact and uncrossed', () => {
@@ -4165,10 +4243,10 @@ test('a small subgraph fork flows from the outside start through its entry to bo
       get = (id) => view.states.find((s) => s.id === id),
       entry = get('entry');
     assert.ok(get('start').x < entry.x);
-    assert.equal(get('start').y, entry.y);
+    assert.ok(Math.abs(get('start').y - entry.y) < 1e-6);
     assert.ok(entry.x < get('first').x);
-    assert.equal(get('first').x, get('second').x);
-    assert.equal(entry.y, (get('first').y + get('second').y) / 2);
+    assert.ok(Math.abs(get('first').x - get('second').x) < 1e-6);
+    assert.ok(Math.abs(entry.y - (get('first').y + get('second').y) / 2) < 1e-6);
     assert.notEqual(get('first').y, get('second').y);
   }
 });

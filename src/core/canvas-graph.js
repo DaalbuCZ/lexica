@@ -89,11 +89,6 @@ export function graphBounds(machine, routes) {
 }
 const contains = (p, b) =>
   p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
-function curve(ctx, r) {
-  ctx.beginPath();
-  ctx.moveTo(r.p0.x, r.p0.y);
-  ctx.bezierCurveTo(r.c1.x, r.c1.y, r.c2.x, r.c2.y, r.p3.x, r.p3.y);
-}
 function arrow(ctx, r, color) {
   const angle = Math.atan2(r.p3.y - r.c2.y, r.p3.x - r.c2.x);
   ctx.save();
@@ -164,6 +159,17 @@ export function graphPalette(dark, style) {
 }
 export function createGraphCanvas(canvas, minimap) {
   const pathCache = new WeakMap();
+  const pathStrings = new Map();
+  const routePath = (route) => {
+    if (!pathCache.has(route)) {
+      if (!pathStrings.has(route.d)) {
+        pathStrings.set(route.d, new Path2D(route.d));
+        if (pathStrings.size > 512) pathStrings.delete(pathStrings.keys().next().value);
+      }
+      pathCache.set(route, pathStrings.get(route.d));
+    }
+    return pathCache.get(route);
+  };
   const ctx = canvas.getContext('2d'),
     mapCtx = minimap.getContext('2d');
   let view = {
@@ -260,10 +266,7 @@ export function createGraphCanvas(canvas, minimap) {
     }
     ctx.setLineDash([]);
     if (pathRoutes !== routes) {
-      paths = routes.map((route) => {
-        if (!pathCache.has(route)) pathCache.set(route, new Path2D(route.d));
-        return pathCache.get(route);
-      });
+      paths = routes.map(routePath);
       pathRoutes = routes;
     }
     for (let i = 0; i < routes.length; i++) {
@@ -555,8 +558,7 @@ export function createGraphCanvas(canvas, minimap) {
     mapCtx.strokeStyle = c.edge;
     mapCtx.lineWidth = 5;
     routes.forEach((r) => {
-      curve(mapCtx, r);
-      mapCtx.stroke();
+      mapCtx.stroke(routePath(r));
     });
     mapCtx.fillStyle = c.mapNode;
     for (const s of machine.states) {

@@ -282,7 +282,7 @@ function LayoutDialog({ onClose, dialog }) {
           disregardGroups,
         });
         setBusy(false);
-        onClose();
+        if (useStudio.getState().dialog === dialog) onClose();
       }, 30),
     );
   };

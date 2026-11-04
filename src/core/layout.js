@@ -11,6 +11,7 @@ import {
 } from './comments.js';
 import { destination, statePortalBox, enablePortal, portalBoxAtTip } from './portals.js';
 import { loopSlots } from './angular-space.js';
+import { spaceEdgePorts } from './edge-ports.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -695,7 +696,13 @@ const routeCache = new Map();
 export function routeEdges(machine, labelFor = transitionLabel) {
   machine = visualMachine(machine);
   const labels = machine.edges.map(labelFor);
-  const key = JSON.stringify([machine.states, machine.edges, machine.comments, labels]);
+  const key = JSON.stringify([
+    machine.states,
+    machine.edges,
+    machine.comments,
+    labels,
+    machine.routingPreview,
+  ]);
   if (routeCache.has(key)) return routeCache.get(key);
   const routes = computeRoutes(machine, labels);
   routeCache.set(key, routes);
@@ -955,9 +962,13 @@ function computeRoutes(machine, labels) {
         const reverse = machine.edges.some(
           (x) => x.portal == null && x.from === e.to && x.to === e.from,
         );
-        const bend =
-          (attempt === 0 ? 0 : Math.ceil(attempt / 2) * 42 * (attempt % 2 ? 1 : -1)) +
-          (reverse ? 90 : 0);
+        // Reversing the endpoints reverses the normal: keep the same signed bend
+        // for both directions so reciprocal arrows occupy opposite physical sides.
+        const bend = reverse
+          ? 90 + Math.ceil(attempt / 2) * 22
+          : attempt === 0
+            ? 0
+            : Math.ceil(attempt / 2) * 42 * (attempt % 2 ? 1 : -1);
         const mid = {
           x: (a.x + b.x) / 2 - uy * bend,
           y: (a.y + b.y) / 2 + ux * bend,
@@ -1125,6 +1136,7 @@ function computeRoutes(machine, labels) {
     };
     routes[i] = route;
   }
+  if (!machine.routingPreview) spaceEdgePorts(machine, routes);
   const paths = routes.map((route) => {
     const points = Array.from(
         {

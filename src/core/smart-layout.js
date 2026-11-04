@@ -10,6 +10,7 @@ import { compactPlanar } from './compact-planar.js';
 import { linearLayout } from './linear-layout.js';
 import dagre from '@dagrejs/dagre';
 import { layeredLayout } from './layered-layout.js';
+import { regularizeAngles } from './angular-layout.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -40,6 +41,7 @@ function place(machine, focus, options) {
   const shown = graphView(machine, focus, false),
     copy = structuredClone(shown),
     anchors = commentAnchors(machine);
+  copy.comments = [];
   if (focus) {
     const whole = structuredClone(graphView(machine, focus));
     if (linearLayout(whole, options.spacing ?? 0.75)) {
@@ -64,7 +66,6 @@ function place(machine, focus, options) {
       );
       for (const edge of machine.edges) if (members.has(edge.from)) delete edge.bend;
       positionComments(anchors);
-      placeCommentsAfterLayout(machine);
       return;
     }
   }
@@ -126,14 +127,18 @@ function place(machine, focus, options) {
       }
     }
     let flow = 0;
-    if (preferFlow)
+    if (focus)
       for (const e of forwardEdges) {
         const a = nodes.get(e.from),
           b = nodes.get(e.to);
-        if (a && b) flow += Math.max(0, 170 - b.x + a.x) + Math.abs(b.y - a.y) * 0.22;
+        if (a && b)
+          flow += preferFlow
+            ? Math.max(0, 170 - b.x + a.x) + Math.abs(b.y - a.y) * 0.22
+            : Math.max(0, a.x - b.x) * 0.5;
       }
     let routedCrossings = 0,
-      boundaryObstruction = 0;
+      boundaryObstruction = 0,
+      outsidePenalty = 0;
     if (focus) {
       const positioned = {
         ...machine,
@@ -150,7 +155,12 @@ function place(machine, focus, options) {
         ),
       };
       const projected = graphView(positioned, focus);
+      projected.comments = [];
+      projected.routingPreview = true;
       const clearance = drawingClearance(projected.states, projected.edges);
+      const left = Math.min(...projected.states.filter((s) => !s.outside).map((s) => s.x));
+      for (const outside of projected.states.filter((s) => s.outside))
+        if (outside.x > left - 140) outsidePenalty += 10000 + outside.x - left + 140;
       if (clearance.wire < 64.99 || clearance.node < 159.99) boundaryObstruction = 100000000;
       routedCrossings += crossingPairs(projected, true, simpleTransitionLabel).length * 1000000;
     }
@@ -159,6 +169,7 @@ function place(machine, focus, options) {
       flow / 70 +
       routedCrossings +
       boundaryObstruction +
+      outsidePenalty +
       c.crossings * 10000 +
       (c.wire < 64.99 || c.node < 159.99 ? 100000000 : 0) +
       Math.sqrt(width * height) / 35 +
@@ -366,6 +377,7 @@ function place(machine, focus, options) {
       return states.reduce(
         (sum, state) =>
           sum +
+          (state.outside ? (state.x - left) * 3 : 0) +
           (entries.has(state.id) ? state.x - left + (state.y - top) * 0.25 : 0) +
           (outputs.has(state.id) ? right - state.x : 0),
         0,
@@ -450,7 +462,6 @@ function place(machine, focus, options) {
   }
   delete machine.startViews;
   positionComments(anchors);
-  placeCommentsAfterLayout(machine);
   if (focus) {
     const group = machine.groups?.find((group) => group.id === focus);
     if (group && chosen.some((state) => state.outside))
@@ -571,7 +582,7 @@ export function groupingCandidates(machine) {
   }
   return result.sort((a, b) => b.length - a.length);
 }
-export function smartArrange(machine, focus = null, options = {}) {
+function arrangeTopology(machine, focus = null, options = {}) {
   if (!focus) for (const group of machine.groups ?? []) place(machine, group.id, options);
   place(machine, focus, options);
   if (
@@ -585,7 +596,6 @@ export function smartArrange(machine, focus = null, options = {}) {
     const anchors = commentAnchors(machine);
     untangle(machine);
     positionComments(anchors);
-    placeCommentsAfterLayout(machine);
   }
   if (focus || options.smartGroups === false) return 0;
   const quality = layoutQuality(machine);
@@ -616,6 +626,82 @@ export function smartArrange(machine, focus = null, options = {}) {
     machine.groups = trial.groups;
     machine.comments = trial.comments;
     count++;
+  }
+  return count;
+}
+export function smartArrange(machine, focus = null, options = {}) {
+  const source = structuredClone(machine);
+  const count = arrangeTopology(machine, focus, options);
+  if (
+    !focus &&
+    !machine.groups?.length &&
+    crossingPairs(machine, true, simpleTransitionLabel).length &&
+    !crossingPairs(source, true, simpleTransitionLabel).length
+  ) {
+    const points = new Map(source.states.map((s) => [s.id, s]));
+    for (const state of machine.states) {
+      const old = points.get(state.id);
+      state.x = old.x;
+      state.y = old.y;
+    }
+    machine.edges.forEach((edge, index) => {
+      if (source.edges[index].bend) edge.bend = structuredClone(source.edges[index].bend);
+      else delete edge.bend;
+    });
+    if (source.startViews) machine.startViews = structuredClone(source.startViews);
+    else delete machine.startViews;
+  }
+  const improve = (id) => {
+    const original = graphView(machine, id),
+      next = structuredClone(original);
+    next.comments = [];
+    if (options.mode !== 'tree') regularizeAngles(next, { forward: !!id });
+    const baseline = crossingPairs(
+      { ...original, comments: [] },
+      true,
+      simpleTransitionLabel,
+    ).length;
+    if (crossingPairs(next, true, simpleTransitionLabel).length > baseline) return;
+    const positions = new Map(next.states.map((s) => [s.id, s]));
+    for (const state of original.states) {
+      const point = positions.get(state.id);
+      if (state.group) {
+        const group = machine.groups.find((g) => g.id === state.id),
+          dx = point.x - state.x,
+          dy = point.y - state.y;
+        group.x = point.x;
+        group.y = point.y;
+        for (const member of machine.states)
+          if (group.stateIds.includes(member.id)) {
+            member.x += dx;
+            member.y += dy;
+          }
+        for (const p of Object.values(group.contextPositions ?? {})) {
+          p.x += dx;
+          p.y += dy;
+        }
+      } else if (!state.outside) {
+        state.x = point.x;
+        state.y = point.y;
+      }
+    }
+    if (id)
+      machine.groups.find((g) => g.id === id).contextPositions = Object.fromEntries(
+        next.states.filter((s) => s.outside).map((s) => [s.id, { x: s.x, y: s.y }]),
+      );
+  };
+  if (focus) improve(focus);
+  else {
+    for (const group of machine.groups ?? []) improve(group.id);
+    improve(null);
+  }
+  placeCommentsAfterLayout(graphView(machine));
+  for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {
+    const shown = graphView(machine, group.id);
+    shown.comments = shown.comments.filter((c) =>
+      (c.nodeIds ?? (c.nodeId ? [c.nodeId] : [])).some((id) => group.stateIds.includes(id)),
+    );
+    placeCommentsAfterLayout(shown);
   }
   return count;
 }

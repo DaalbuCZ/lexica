@@ -20,7 +20,10 @@ export function compactPlanar(machine, positions, forward = false) {
   );
   const valid = () => {
     const c = drawingClearance(states, machine.edges);
-    return !c.crossings && c.node >= 175 && c.wire >= 68;
+    const inner = states.filter((s) => !s.outside),
+      outer = states.filter((s) => s.outside),
+      left = Math.min(...inner.map((s) => s.x));
+    return !c.crossings && c.node >= 175 && c.wire >= 68 && outer.every((s) => s.x <= left - 140);
   };
   const cost = () => {
     const xs = states.map((s) => s.x),

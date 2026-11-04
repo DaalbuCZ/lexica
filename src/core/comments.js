@@ -1,4 +1,6 @@
-import { emptyAngles, loopSlots } from './angular-space.js';
+import { emptyAngles } from './angular-space.js';
+import { routeEdges } from './layout.js';
+import { simpleTransitionLabel } from './editor-settings.js';
 export function commentLayout(comment) {
   const lines = [];
   for (const paragraph of comment.text.split('\n')) {
@@ -80,6 +82,8 @@ export function positionComments(anchors) {
   }
 }
 export function placeCommentsAfterLayout(machine) {
+  if (!machine.comments?.length) return;
+  const routes = routeEdges({ ...machine, comments: [] }, simpleTransitionLabel);
   const states = new Map(machine.states.map((state) => [state.id, state])),
     placed = [];
   const segments = (machine.edges ?? []).flatMap((edge) => {
@@ -117,23 +121,34 @@ export function placeCommentsAfterLayout(machine) {
         y: attached.reduce((sum, s) => sum + s.y, 0) / attached.length,
       };
     const ids = new Set(attached.map((state) => state.id));
-    const directions = machine.edges.flatMap((edge) => {
+    const directions = machine.edges.flatMap((edge, index) => {
       const other =
         ids.has(edge.from) && !ids.has(edge.to)
           ? states.get(edge.to)
           : ids.has(edge.to) && !ids.has(edge.from)
             ? states.get(edge.from)
             : null;
-      return other ? [Math.atan2(other.y - center.y, other.x - center.x)] : [];
+      if (!other) return [];
+      const endpoint = ids.has(edge.from) ? routes[index].p0 : routes[index].p3;
+      return [Math.atan2(endpoint.y - center.y, endpoint.x - center.x)];
     });
     const loopBoxes = [];
     for (const state of attached)
-      for (const angle of loopSlots(machine, state).values()) {
-        const x = state.x + Math.cos(angle) * 105,
-          y = state.y + Math.sin(angle) * 105;
-        directions.push(Math.atan2(y - center.y, x - center.x));
-        loopBoxes.push({ x: x - 70, y: y - 65, w: 140, h: 130 });
-      }
+      for (const [index, edge] of machine.edges.entries())
+        if (edge.from === state.id && edge.to === state.id && edge.portal == null) {
+          const route = routes[index],
+            x = (route.p0.x + 3 * route.c1.x + 3 * route.c2.x + route.p3.x) / 8,
+            y = (route.p0.y + 3 * route.c1.y + 3 * route.c2.y + route.p3.y) / 8;
+          directions.push(Math.atan2(y - center.y, x - center.x));
+          const xs = [route.p0.x, route.c1.x, route.c2.x, route.p3.x],
+            ys = [route.p0.y, route.c1.y, route.c2.y, route.p3.y];
+          loopBoxes.push({
+            x: Math.min(...xs) - 12,
+            y: Math.min(...ys) - 12,
+            w: Math.max(...xs) - Math.min(...xs) + 24,
+            h: Math.max(...ys) - Math.min(...ys) + 24,
+          });
+        }
     directions.push(
       ...placed.map((box) =>
         Math.atan2(box.y + box.h / 2 - center.y, box.x + box.w / 2 - center.x),

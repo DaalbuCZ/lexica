@@ -105,10 +105,7 @@ export function boundaryContext(machine, states, edges, positions = {}) {
             length +
             alignment +
             (width * height - (right - left) * (bottom - top)) / 1500;
-        const input = links.some((edge) => edge.from === source);
-        const preference = input
-          ? Math.max(0, point.x - left) + Math.max(0, point.y - top) * 0.5
-          : Math.max(0, right - point.x);
+        const preference = Math.max(0, point.x - left) + Math.abs(point.y - cy) * 0.05;
         evaluated.push({ ...point, bad, score, preference });
         if (!best || bad < best.bad || (bad === best.bad && score < best.score))
           best = {
