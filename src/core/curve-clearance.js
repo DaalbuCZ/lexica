@@ -26,6 +26,17 @@ export function curveClearance(
   second,
   { clearance = 0, maxDepth = 20, maxPairs = 4096 } = {},
 ) {
+  if (
+    !Number.isFinite(clearance) ||
+    clearance < 0 ||
+    !Number.isInteger(maxDepth) ||
+    maxDepth < 0 ||
+    maxDepth > 64 ||
+    !Number.isInteger(maxPairs) ||
+    maxPairs < 0 ||
+    maxPairs > 1e6
+  )
+    return { status: 'unverified', reason: 'invalid checking budget', checks: 0 };
   const points = (r) => [r.p0, r.c1, r.c2, r.p3];
   const a = points(first),
     b = points(second);

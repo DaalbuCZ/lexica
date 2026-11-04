@@ -2,6 +2,8 @@
 
 Status: proposed architecture, 2026-11-04. This document designs the implementation; it does not claim new solver behavior or measured speedups. Based on the `layout.md` handoff and code at `d7b9408` on `codex/graph-groups-layout`; code observations refer to that working branch, not necessarily the current `main`.
 
+Implementation progress: see [layout-implementation.md](layout-implementation.md) for the shipped paths, measured checks, and remaining design items. The acceptance targets below remain targets rather than measured guarantees.
+
 Reproduction: import `C:/Users/wwwho/Downloads/no-groups-fixed-topology.json` into the local Vite app; select Radial / Compact / Smart Groups off / Disregard previous groups on. Repeat with `groups-fixed-topology.json` in the same directory and Smart Groups on. Each reference has 82 states and 134 transitions; the grouped reference has eight groups. The fixtures are private local inputs and are not part of this document commit.
 
 ## Decision

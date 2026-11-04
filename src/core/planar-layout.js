@@ -42,7 +42,9 @@ export function drawingClearance(states, edges) {
 // Topology is solved independently of the current drawing. Loops and parallel edges
 // share the simple undirected skeleton; their distinct rules remain in the machine.
 export function planarCoordinates(machine) {
-  const ids = machine.states.map((s) => s.id),
+  const ids = machine.states
+      .map((s) => s.id)
+      .sort((a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)),
     index = new Map(ids.map((id, i) => [id, i])),
     pairs = new Map();
   for (const edge of machine.edges) {
@@ -67,7 +69,8 @@ export function planarCoordinates(machine) {
     neighbors[b].push(a);
   }
   const seen = new Set(),
-    positions = new Map();
+    positions = new Map(),
+    rotations = new Map();
   let left = 0,
     planar = true,
     valid = true;
@@ -102,6 +105,11 @@ export function planarCoordinates(machine) {
       valid = false;
       break;
     }
+    for (const [global, vertex] of local)
+      rotations.set(
+        ids[global],
+        result.embedding.order[vertex].map((e) => ids[component[e.to]]),
+      );
     try {
       const edges = skeleton
         .filter(([a, b]) => local.has(a) && local.has(b))
@@ -139,6 +147,7 @@ export function planarCoordinates(machine) {
   }
   const result = {
     planar,
+    rotations,
     positions: valid && positions.size === ids.length ? positions : null,
   };
   cache.set(key, result);

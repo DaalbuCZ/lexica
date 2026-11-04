@@ -12,6 +12,8 @@ import dagre from '@dagrejs/dagre';
 import { layeredLayout } from './layered-layout.js';
 import { regularizeAngles } from './angular-layout.js';
 import { applyLayout, layoutTopology } from './layout-topology.js';
+import { feasibleRadial } from './feasible-layout.js';
+import { corridorRoutes } from './corridor-routing.js';
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -177,6 +179,74 @@ function place(machine, focus, options) {
       wire / 800
     );
   };
+  const feasible =
+    !focus && (options.mode ?? 'circle') === 'circle'
+      ? feasibleRadial(copy, spacing, (branch) => {
+          if (copy.states.length <= 32 || copy.states.some((s) => s.group)) return null;
+          const trial = structuredClone(copy);
+          trial.groups = [];
+          const group = createGroup(trial, branch, 'Branch', () => 'layout-branch');
+          place(trial, group.id, options);
+          const view = graphView(trial, group.id),
+            outside = view.states.filter((s) => s.outside);
+          if (outside.length !== 1 || outside[0].outsideSource !== copy.start) return null;
+          return {
+            states: [...view.states.filter((s) => !s.outside), { ...outside[0], id: copy.start }],
+          };
+        })
+      : null;
+  if (feasible?.states) {
+    // Placement is accepted only with its decorations routed as well. Expansion
+    // preserves the embedding and is bounded; never call global repair here.
+    if (copy.states.length > 12 && !copy.edges.some((e) => e.portal != null)) {
+      const original = structuredClone(feasible.states);
+      let routed = false;
+      for (const scale of [1, 1.4, 2]) {
+        feasible.states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
+        if (
+          corridorRoutes(
+            { ...copy, states: feasible.states, comments: [] },
+            copy.edges.map(simpleTransitionLabel),
+          )
+        ) {
+          routed = true;
+          break;
+        }
+      }
+      if (!routed)
+        throw Error(
+          'Could not find clear routes within the layout budget. The drawing was left unchanged.',
+        );
+    }
+    const positions = new Map(feasible.states.map((s) => [s.id, s]));
+    for (const state of shown.states) {
+      const point = positions.get(state.id);
+      if (state.group) {
+        const group = machine.groups.find((g) => g.id === state.id),
+          dx = point.x - state.x,
+          dy = point.y - state.y;
+        group.x = point.x;
+        group.y = point.y;
+        for (const member of machine.states)
+          if (group.stateIds.includes(member.id)) {
+            member.x += dx;
+            member.y += dy;
+          }
+        for (const p of Object.values(group.contextPositions ?? {})) {
+          p.x += dx;
+          p.y += dy;
+        }
+      } else {
+        state.x = point.x;
+        state.y = point.y;
+      }
+    }
+    for (const edge of shown.edges)
+      if (!edge.groupEdge)
+        delete machine.edges[edge.originalIndex ?? machine.edges.indexOf(edge)]?.bend;
+    positionComments(anchors);
+    return;
+  }
   arrange(copy);
   let best = cost(copy),
     chosen = copy.states,
@@ -583,6 +653,28 @@ export function groupingCandidates(machine) {
   return result.sort((a, b) => b.length - a.length);
 }
 function arrangeTopology(machine, focus = null, options = {}) {
+  if (
+    !focus &&
+    (options.mode ?? 'circle') === 'circle' &&
+    options.smartGroups !== false &&
+    !machine.groups?.length &&
+    machine.states.length > 32
+  ) {
+    let count = 0;
+    for (const ids of groupingCandidates(machine).slice(0, 8)) {
+      const state = machine.states.find((s) => s.id === ids[0]);
+      const group = createGroup(
+        machine,
+        ids,
+        state?.token || state?.name || 'Branch',
+        () => `auto-group-${++count}`,
+      );
+      group.automatic = true;
+    }
+    for (const group of machine.groups ?? []) place(machine, group.id, options);
+    place(machine, null, options);
+    return count;
+  }
   if (!focus) for (const group of machine.groups ?? []) place(machine, group.id, options);
   place(machine, focus, options);
   if (
@@ -726,6 +818,8 @@ export function smartArrange(machine, focus = null, options = {}) {
 }
 
 export function solveLayout(topology, focus = null, options = {}) {
+  const started = performance.now(),
+    metrics = {};
   const atOrigin = (item) => ({ ...item, x: 0, y: 0 });
   const machine = {
     ...topology,
@@ -733,9 +827,18 @@ export function solveLayout(topology, focus = null, options = {}) {
     groups: topology.groups.map(atOrigin),
     comments: topology.comments.map(atOrigin),
     edges: topology.edges.map((edge) => ({ ...edge })),
+    routingPolicy: (options.mode ?? 'circle') === 'circle' ? 'corridor' : undefined,
   };
   const count = arrangeTopology(machine, focus, options);
-  if (!focus && !machine.groups?.length && options.mode !== 'tree' && !machine.startViews?.length)
+  metrics.placementMs = performance.now() - started;
+  const refineStarted = performance.now();
+  if (
+    !focus &&
+    !machine.groups?.length &&
+    options.mode !== 'tree' &&
+    options.mode !== 'circle' &&
+    !machine.startViews?.length
+  )
     repairRadialCrossings(machine);
   const improve = (id) => {
     const original = graphView(machine, id),
@@ -850,8 +953,64 @@ export function solveLayout(topology, focus = null, options = {}) {
   if (focus) improve(focus);
   else {
     for (const group of machine.groups ?? []) improve(group.id);
-    improve(null);
+    if (options.mode !== 'circle') improve(null);
   }
+  metrics.refinementMs = performance.now() - refineStarted;
+  const routingStarted = performance.now();
+  if ((options.mode ?? 'circle') === 'circle') {
+    const certify = (id) => {
+      const view = graphView(machine, id),
+        baseline = drawingClearance(view.states, view.edges);
+      if (baseline.crossings || view.edges.some((e) => e.portal != null || e.bend)) return;
+      const original = view.states.map((s) => ({ ...s }));
+      let accepted;
+      for (const scale of [1, 1.25, 1.6, 2, 3]) {
+        const states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
+        if (corridorRoutes({ ...view, states }, view.edges.map(simpleTransitionLabel))) {
+          accepted = states;
+          break;
+        }
+      }
+      if (!accepted)
+        throw Error(
+          'Could not route the planar view within the layout budget. The drawing was left unchanged.',
+        );
+      const positions = new Map(accepted.map((s) => [s.id, s]));
+      for (const s of view.states) {
+        const p = positions.get(s.id);
+        if (s.group) {
+          const g = machine.groups.find((g) => g.id === s.id),
+            dx = p.x - s.x,
+            dy = p.y - s.y;
+          g.x = p.x;
+          g.y = p.y;
+          for (const member of machine.states)
+            if (g.stateIds.includes(member.id)) {
+              member.x += dx;
+              member.y += dy;
+            }
+          for (const outside of Object.values(g.contextPositions ?? {})) {
+            outside.x += dx;
+            outside.y += dy;
+          }
+        } else if (!s.outside) {
+          s.x = p.x;
+          s.y = p.y;
+        }
+      }
+      if (id)
+        machine.groups.find((g) => g.id === id).contextPositions = Object.fromEntries(
+          accepted.filter((s) => s.outside).map((s) => [s.id, { x: s.x, y: s.y }]),
+        );
+    };
+    if (focus) certify(focus);
+    else {
+      for (const g of machine.groups ?? []) certify(g.id);
+      certify(null);
+    }
+  }
+  metrics.routingVerificationMs = performance.now() - routingStarted;
+  const commentsStarted = performance.now();
   placeCommentsAfterLayout(graphView(machine));
   for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {
     const shown = graphView(machine, group.id);
@@ -860,5 +1019,7 @@ export function solveLayout(topology, focus = null, options = {}) {
     );
     placeCommentsAfterLayout(shown);
   }
-  return { machine, groups: count };
+  metrics.commentsMs = performance.now() - commentsStarted;
+  metrics.totalMs = performance.now() - started;
+  return { machine, groups: count, metrics };
 }

@@ -1,5 +1,4 @@
 import { Graph } from '@khalidsaidi/topoloom/graph';
-import { testPlanarity } from '@khalidsaidi/topoloom/planarity';
 export function faces(order) {
   const seen = new Set(),
     result = [];
@@ -69,7 +68,12 @@ export function planarGrid(input, embedding, preferred = 0) {
           const a = face[i],
             b = face[(i + offset) % face.length];
           if (a !== b && !order[a].includes(b)) {
-            diagonal = [a, b];
+            diagonal = [
+              a,
+              b,
+              face[(i + face.length - 1) % face.length],
+              face[(i + offset + face.length - 1) % face.length],
+            ];
             break;
           }
         }
@@ -83,10 +87,12 @@ export function planarGrid(input, embedding, preferred = 0) {
       directed: false,
     });
     graph = Graph.fromJSON(json);
-    result = testPlanarity(graph, {
-      backend: 'wasm',
-    });
-    if (!result.planar) throw Error('Triangulation must preserve planarity');
+    // Insert into this face's two corners. Retesting the augmented graph may
+    // choose a different embedding, destroying the placement contract.
+    const [a, b, previousA, previousB] = diagonal;
+    order[a].splice(order[a].indexOf(previousA), 0, b);
+    order[b].splice(order[b].indexOf(previousB), 0, a);
+    result = { embedding: { order: order.map((ring) => ring.map((to) => ({ to }))) } };
   }
   const outer =
     faceList.find((face) => face.length === 3 && face.includes(preferred)) ??

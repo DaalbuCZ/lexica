@@ -10,12 +10,37 @@ import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
 import { dragEdgeRoute, interactiveRoutes } from '../core/interactive-routes.js';
 import { visualMachine } from '../core/start-views.js';
 import { createLiveRouting } from './live-routing.js';
+import { repairDraggedRoutes } from '../core/incremental-layout.js';
+import { storeDrawingRoutes } from '../core/drawing-routes.js';
 export function createCanvasRenderer(context) {
   const liveRouting = createLiveRouting(context);
-  context.disposeRouting = () => liveRouting.dispose();
+  context.disposeRouting = () => {
+    liveRouting.dispose();
+    context.settleRoutes = null;
+  };
   let mapScene = null;
   let shownCache = null;
   let routeSnapshot = null;
+  context.settleRoutes = () => {
+    if (!routeSnapshot || routeSnapshot.group !== context.openGroup) return;
+    const shown = visualMachine(graphView(context.machine, context.openGroup)),
+      baseLabel = editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
+      label = (e) =>
+        e.originalIndices?.length > 1 ? `${e.originalIndices.length} transitions` : baseLabel(e);
+    if (
+      shown.edges.length !== routeSnapshot.routes.length ||
+      !shown.states.every((s) => routeSnapshot.nodes.has(s.id))
+    )
+      return;
+    const repair = repairDraggedRoutes(shown, label, routeSnapshot);
+    storeDrawingRoutes(
+      context.machine,
+      shown,
+      shown.edges.map(label),
+      repair.routes,
+      `${context.openGroup ?? 'main'}:${editorSettings.simplified}`,
+    );
+  };
   let overviewCache = null;
   let viewportMetrics, viewportVersion;
   let validationVersion = -1,
@@ -165,7 +190,7 @@ export function createCanvasRenderer(context) {
         (dragging || routeSnapshot?.manualVersion !== context.documentVersion) &&
         editorSettings.rerouteWhileDragging &&
         (dragging || liveRouting.started)
-          ? liveRouting.snapshot(shown, editorSettings.simplified)
+          ? liveRouting.snapshot(shown, editorSettings.simplified, routeSnapshot)
           : null,
       shownRoutes =
         manualEdit && routeSnapshot
@@ -178,26 +203,29 @@ export function createCanvasRenderer(context) {
                 label,
               )[0];
             })
-          : liveSnapshot
-            ? interactiveRoutes(shown, label, liveSnapshot)
-            : dragging
-              ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
-              : editorSettings.rerouteWhileDragging &&
-                  liveRouting.started &&
-                  routeSnapshot?.group === context.openGroup
-                ? interactiveRoutes(shown, label, routeSnapshot)
-                : routeSnapshot?.version === context.documentVersion &&
-                    routeSnapshot.group === context.openGroup &&
-                    routeSnapshot.simple === editorSettings.simplified &&
-                    visualMachine(shown).states.every((state) => {
-                      const old = routeSnapshot.nodes.get(state.id);
-                      return old?.x === state.x && old?.y === state.y;
-                    })
-                  ? routeSnapshot.routes
-                  : routeEdges(shown, label);
+          : !dragging && shown.drawingRoutes?.length
+            ? routeEdges(shown, label)
+            : liveSnapshot
+              ? interactiveRoutes(shown, label, liveSnapshot)
+              : dragging
+                ? interactiveRoutes(shown, label, context.drag?.moved ? routeSnapshot : null)
+                : editorSettings.rerouteWhileDragging &&
+                    liveRouting.started &&
+                    routeSnapshot?.group === context.openGroup
+                  ? interactiveRoutes(shown, label, routeSnapshot)
+                  : routeSnapshot?.version === context.documentVersion &&
+                      routeSnapshot.group === context.openGroup &&
+                      routeSnapshot.simple === editorSettings.simplified &&
+                      visualMachine(shown).states.every((state) => {
+                        const old = routeSnapshot.nodes.get(state.id);
+                        return old?.x === state.x && old?.y === state.y;
+                      })
+                    ? routeSnapshot.routes
+                    : routeEdges(shown, label);
     if (!dragging || manualEdit?.committing)
       routeSnapshot = {
         routes: shownRoutes,
+        comments: structuredClone(shown.comments ?? []),
         version: context.documentVersion,
         group: context.openGroup,
         simple: editorSettings.simplified,

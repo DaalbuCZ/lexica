@@ -800,11 +800,11 @@ export function createEditorController(
     async arrange(options) {
       const version = context.documentVersion;
       try {
-        const { machine: next, groups } = await calculateLayout(
-          context.machine,
-          context.openGroup,
-          options,
-        );
+        const {
+          machine: next,
+          groups,
+          metrics,
+        } = await calculateLayout(context.machine, context.openGroup, options);
         if (context.disposed) return;
         if (
           context.documentVersion !== version ||
@@ -814,6 +814,7 @@ export function createEditorController(
         )
           throw Error('The graph changed while arranging. Arrange again to apply the layout.');
         validate(next);
+        context.lastLayoutMetrics = metrics;
         checkpoint();
         context.machine = next;
         if (options.disregardGroups) context.openGroup = null;

@@ -706,6 +706,7 @@ export function createCanvasInteractions(context) {
       const moved = !!context.drag?.moved;
       context.drag = null;
       if (moved) {
+        context.settleRoutes?.();
         context.save();
         context.render();
       }

@@ -26,7 +26,7 @@ export function createLayoutTask(context) {
         else {
           try {
             applyLayout(original, data.machine, focus);
-            resolve({ machine: original, groups: data.groups });
+            resolve({ machine: original, groups: data.groups, metrics: data.metrics });
           } catch (error) {
             reject(error);
           }

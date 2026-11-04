@@ -11,6 +11,8 @@ import {
 } from './comments.js';
 import { destination, statePortalBox, enablePortal, portalBoxAtTip } from './portals.js';
 import { loopSlots } from './angular-space.js';
+import { corridorRoutes } from './corridor-routing.js';
+import { drawingRouteKey, savedRoutes } from './drawing-routes.js';
 // Each branch owns a vertical band so deeper subtrees never interleave.
 export function autoLayout(
   machine,
@@ -717,9 +719,14 @@ const routeCache = new Map();
 export function routeEdges(machine, labelFor = transitionLabel) {
   machine = visualMachine(machine);
   const labels = machine.edges.map(labelFor);
-  const key = JSON.stringify([machine.states, machine.edges, machine.comments, labels]);
+  const key = drawingRouteKey(machine, labels);
+  const saved = savedRoutes(machine, key);
+  if (saved) return saved;
   if (routeCache.has(key)) return routeCache.get(key);
-  const routes = computeRoutes(machine, labels);
+  const routes =
+    (machine.states.length > 12 || machine.routingPolicy === 'corridor'
+      ? corridorRoutes(machine, labels)
+      : null) ?? computeRoutes(machine, labels);
   routeCache.set(key, routes);
   if (routeCache.size > 4) routeCache.delete(routeCache.keys().next().value);
   return routes;

@@ -4,23 +4,46 @@ export function createLiveRouting(context) {
     busy = false,
     queued,
     result,
-    requested;
+    requested,
+    sentTopology,
+    sentNodes = new Map();
   const send = (request) => {
     busy = true;
-    worker.postMessage(request);
+    const nodes = new Map(request.machine.states.map((s) => [s.id, { x: s.x, y: s.y }]));
+    if (sentTopology === request.topology) {
+      const states = request.machine.states
+        .filter((s) => {
+          const old = sentNodes.get(s.id);
+          return !old || old.x !== s.x || old.y !== s.y;
+        })
+        .map(({ id, x, y }) => ({ id, x, y }));
+      worker.postMessage({
+        simple: request.simple,
+        topology: request.topology,
+        key: request.key,
+        patch: {
+          states,
+          comments: request.machine.comments,
+          startViews: request.machine.startViews,
+        },
+      });
+    } else worker.postMessage(request);
+    sentTopology = request.topology;
+    sentNodes = nodes;
   };
   return {
     get started() {
       return !!worker;
     },
-    snapshot(shown, simple) {
+    snapshot(shown, simple, base) {
       if (!worker) {
         worker = new Worker(new URL('../core/routing-worker.js', import.meta.url), {
           type: 'module',
         });
         worker.onmessage = ({ data }) => {
           busy = false;
-          if (!data.error) result = { ...data, nodes: new Map(data.nodes) };
+          if (!data.error && data.key === requested)
+            result = { ...data, nodes: new Map(data.nodes) };
           if (queued) {
             const next = queued;
             queued = null;
@@ -31,6 +54,8 @@ export function createLiveRouting(context) {
         worker.onerror = () => {
           busy = false;
           requested = null;
+          sentTopology = null;
+          sentNodes.clear();
         };
       }
       const machine = {
@@ -45,17 +70,26 @@ export function createLiveRouting(context) {
         machine.start,
         machine.startViews?.map((view) => view.targets),
         machine.states.map((s) => s.id),
-        machine.edges.map((e) => [e.from, e.to, e.portal]),
+        machine.edges,
+        context.openGroup,
       ]);
       const key = JSON.stringify([machine, simple]);
       if (requested !== key) {
         requested = key;
         // Snapshot now, rather than retaining references that the next pointer event mutates.
-        const request = { machine: structuredClone(machine), simple, topology, key };
+        const request = {
+          machine: structuredClone(machine),
+          simple,
+          topology,
+          key,
+          snapshot: base
+            ? { routes: base.routes, nodes: [...base.nodes], comments: base.comments }
+            : null,
+        };
         if (busy) queued = request;
         else send(request);
       }
-      return result?.topology === topology ? result : null;
+      return result?.topology === topology && result.key === key ? result : null;
     },
     dispose() {
       worker?.terminate();

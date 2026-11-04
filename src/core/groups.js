@@ -83,6 +83,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
         };
     return {
       start: ids.has(machine.start) ? machine.start : null,
+      drawingRoutes: machine.drawingRoutes,
+      routingPolicy: machine.routingPolicy,
       ...context,
       comments: (machine.comments ?? []).filter((comment) =>
         (comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some((id) =>
@@ -154,6 +156,8 @@ export function graphView(machine, focus = null, includeOutside = true) {
   }
   return {
     start: membership.get(machine.start) ?? machine.start,
+    drawingRoutes: machine.drawingRoutes,
+    routingPolicy: machine.routingPolicy,
     states,
     edges,
     comments: (machine.comments ?? []).filter(

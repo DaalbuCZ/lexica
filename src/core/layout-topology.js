@@ -12,6 +12,9 @@ export function layoutTopology(machine, disregardGroups = false) {
 }
 
 export function applyLayout(machine, drawing, focus) {
+  delete machine.drawingRoutes;
+  if(drawing.routingPolicy) machine.routingPolicy=drawing.routingPolicy;
+  else delete machine.routingPolicy;
   const members = focus
     ? new Set(machine.groups?.find((group) => group.id === focus)?.stateIds)
     : null;
