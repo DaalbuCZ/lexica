@@ -663,6 +663,55 @@ test('a corridor enters an accepting state from below without crossing its token
   }
 });
 
+test('crowded bent approaches try both normal ends and keep a clear single-end improvement', () => {
+  const states = [
+    ['s1', 896, 1421, 'IDENT'],
+    ['9a', 896, 1641, '_'],
+    ['e7', 896, 1201, 'IDENT'],
+    ['a3', 1140, 1201, 'S_STRING_START'],
+    ['f9', 1340, 1201, ''],
+    ['e2c', 1640, 1201, 'TRIPLE_S_STRING_START'],
+    ['e2e', 1096, 1861, ''],
+    ['00', 1340, 1861, '${'],
+    ['a1', 1296, 2061, 'STRING'],
+    ['s0', 512, 1531, ''],
+  ].map(([id, x, y, token]) => ({ id, x, y, token }));
+  const edges = [
+    [9, 0],
+    [0, 0],
+    [9, 1],
+    [1, 0],
+    [9, 2],
+    [2, 0],
+    [2, 3],
+    [3, 4],
+    [4, 5],
+    [9, 6],
+    [6, 0],
+    [6, 7],
+    [6, 1],
+    [6, 8],
+  ].map(([from, to], i) => ({ from: states[from].id, to: states[to].id, label: String(i) }));
+  const routes = corridorRoutes(
+    { states, edges },
+    edges.map((edge) => edge.label),
+  );
+  assert.ok(routes);
+  for (const [state, port, control] of [
+    [states[1], routes[3].p0, routes[3].c1],
+    [states[2], routes[5].p0, routes[5].c1],
+    [states[0], routes[5].p3, routes[5].c2],
+  ]) {
+    const dx = port.x - state.x,
+      dy = port.y - state.y;
+    const tx = control.x - port.x,
+      ty = control.y - port.y;
+    assert.ok(Math.abs(dx * ty - dy * tx) < 1e-6);
+    assert.ok(dx * tx + dy * ty > 0);
+  }
+  assert.equal(validateRouteSeparation(routes, { maxDepth: 24 }).status, 'clear');
+});
+
 test('a feasible start ring remains circular through aesthetic cleanup', () => {
   const m = {
     start: 'root',

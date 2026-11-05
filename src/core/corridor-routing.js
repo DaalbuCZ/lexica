@@ -305,25 +305,67 @@ function routeLanes(
     for (const [i, e] of machine.edges.entries()) {
       if (frozen.has(i) || (previous && !dirty?.has(i)) || e.from === e.to) continue;
       const route = routes[i];
-      const normalPort = (id, control, endpoint) => {
+      const normalEnds = (id, port, control) => {
         const state = nodes.get(id);
-        if (state.group || Math.hypot(control.x - state.x, control.y - state.y) <= 37)
-          return endpoint;
-        return nodePort(state, Math.atan2(control.y - state.y, control.x - state.x));
+        if (state.group) return [];
+        const dx = port.x - state.x,
+          dy = port.y - state.y;
+        const tx = control.x - port.x,
+          ty = control.y - port.y;
+        const reach = Math.hypot(tx, ty);
+        if (!reach || (Math.abs(dx * ty - dy * tx) < 1e-6 && dx * tx + dy * ty > 0)) return [];
+        const candidates = [];
+        if (Math.hypot(control.x - state.x, control.y - state.y) > 37)
+          candidates.push([
+            nodePort(state, Math.atan2(control.y - state.y, control.x - state.x)),
+            control,
+          ]);
+        // Preserve the port's order around a busy state and vary the handle
+        // length to find a normal approach that still clears its caption.
+        const radius = Math.hypot(dx, dy);
+        if (radius)
+          for (const scale of [1, 0.65, 0.35])
+            candidates.push([
+              port,
+              {
+                x: port.x + (dx / radius) * reach * scale,
+                y: port.y + (dy / radius) * reach * scale,
+              },
+            ]);
+        const angle = Math.atan2(dy, dx);
+        const toward = Math.atan2(control.y - state.y, control.x - state.x) - angle;
+        const turn = Math.atan2(Math.sin(toward), Math.cos(toward));
+        for (const fraction of [0.35, 0.7]) {
+          const direction = angle + turn * fraction;
+          const point = nodePort(state, direction);
+          candidates.push([
+            point,
+            {
+              x: point.x + Math.cos(direction) * reach * 0.65,
+              y: point.y + Math.sin(direction) * reach * 0.65,
+            },
+          ]);
+        }
+        return candidates;
       };
-      const p0 = normalPort(e.from, route.c1, route.p0);
-      const p3 = normalPort(e.to, route.c2, route.p3);
-      if (
-        Math.hypot(p0.x - route.p0.x, p0.y - route.p0.y) < 1e-6 &&
-        Math.hypot(p3.x - route.p3.x, p3.y - route.p3.y) < 1e-6
-      )
-        continue;
-      const candidate = { ...route, p0, p3 };
+      const starts = normalEnds(e.from, route.p0, route.c1);
+      const ends = normalEnds(e.to, route.p3, route.c2);
+      if (!starts.length && !ends.length) continue;
+      const start = [route.p0, route.c1],
+        end = [route.p3, route.c2];
+      const candidates = [
+        ...starts.flatMap((pair) => ends.map((other) => [pair, other])),
+        ...starts.map((pair) => [pair, end]),
+        ...ends.map((pair) => [start, pair]),
+      ];
       index.delete(i);
-      if (valid(candidate, e)) {
+      for (const [[p0, c1], [p3, c2]] of candidates) {
+        const candidate = { ...route, p0, c1, c2, p3 };
+        if (!valid(candidate, e)) continue;
         const center = curvePoint(candidate, 0.5);
         candidate.label = { ...route.label, x: center.x, y: center.y - 13 };
         routes[i] = finishRoute(candidate);
+        break;
       }
       index.set(i, routeBounds(routes[i], 2));
     }
