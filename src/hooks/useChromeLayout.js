@@ -22,6 +22,12 @@ export function useChromeLayout() {
     let measureTargets;
     const place = () => {
       frame = null;
+      const debuggerHeight = debuggerSlot.offsetHeight;
+      // Leave room for the tester heading, labels, and a usable editor row.
+      const minimum = debuggerHeight ? debuggerHeight + 168 + 'px' : '';
+      const style = document.body.style;
+      if (style.getPropertyValue('--docked-debugger-min-height') !== minimum)
+        style.setProperty('--docked-debugger-min-height', minimum);
       const gap = 16,
         row = 48,
         mapWidth = innerWidth <= 650 ? 112 : 170,
@@ -215,7 +221,7 @@ export function useChromeLayout() {
       if (frame == null) frame = requestAnimationFrame(place);
     };
     const resize = new ResizeObserver(schedule);
-    for (const el of [brand, toolbar, tester, crumbs, map]) resize.observe(el);
+    for (const el of [brand, toolbar, tester, crumbs, map, debuggerSlot]) resize.observe(el);
     const mutation = new MutationObserver((records) => {
       const next = document.body.classList.contains('tester-collapsed');
       if (next !== collapsed || records.some((r) => r.attributeName !== 'class')) {
@@ -240,6 +246,7 @@ export function useChromeLayout() {
     return () => {
       preview.removeEventListener('measure-dock-targets', provideTargets);
       resize.disconnect();
+      document.body.style.removeProperty('--docked-debugger-min-height');
       mutation.disconnect();
       window.removeEventListener('resize', schedule);
       cancelAnimationFrame(frame);

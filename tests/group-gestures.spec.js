@@ -337,3 +337,29 @@ test('comments connect in both drag directions and survive removal of their last
   await drag(points.note, points.state);
   await expect.poll(attachments).toEqual(['a']);
 });
+
+test('comment placement requires a visible connector before opening properties', async ({
+  page,
+}) => {
+  await setup(page, 'canvas', { ...machine, groups: [] });
+  await expect(page.locator('#app-loading')).toBeHidden();
+  const points = await page.locator('#canvas').evaluate((canvas) => {
+    const t = canvas.getContext('2d').getTransform();
+    const r = canvas.getBoundingClientRect();
+    const point = (x, y) => ({ x: r.left + t.e + x * t.a, y: r.top + t.f + y * t.d });
+    return { overlapping: point(0, 0), connected: point(0, -110) };
+  });
+  await page.getByRole('button', { name: 'Add comment', exact: true }).click();
+  await page.mouse.click(points.overlapping.x, points.overlapping.y);
+  await expect(page.locator('#comment-text')).toBeHidden();
+  await expect(page.locator('body')).toHaveClass(/placing-comment/);
+  await page.mouse.click(points.connected.x, points.connected.y);
+  await expect(page.locator('#comment-text')).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        JSON.parse(localStorage.getItem('lexica-machine')).comments.map((note) => note.nodeIds),
+      ),
+    )
+    .toEqual([['a']]);
+});

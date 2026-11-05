@@ -2180,7 +2180,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
-      labelGuides: false,
       pinchSensitivity: 2,
     },
   );
@@ -2195,7 +2194,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
-      labelGuides: false,
       pinchSensitivity: 1,
     },
   );
@@ -2212,7 +2210,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
-      labelGuides: false,
       pinchSensitivity: 1,
     },
   );
@@ -2847,12 +2844,17 @@ test('placement ghosts follow the cursor without changing the machine and predic
       y: 90,
     }),
     note = placementPreview(m, 'comment', {
-      x: 410,
+      x: 510,
       y: 150,
     });
   assert.equal(state.item.name, 'q4');
   assert.equal(state.item.x, 50);
-  assert.equal(note.item.x, 410);
+  assert.equal(note.item.x + commentLayout(note.item).w / 2, 510);
+  assert.equal(note.item.y + commentLayout(note.item).h / 2, 150);
+  for (const x of [300, 500])
+    assert.deepEqual(placementPreview(m, 'comment', { x, y: 145 }).item.nodeIds, ['s1']);
+  for (const x of [325, 475]) assert.equal(placementPreview(m, 'comment', { x, y: 145 }), null);
+  assert.equal(placementPreview({ states: [] }, 'comment', { x: 0, y: 0 }), null);
   assert.deepEqual(note.item.nodeIds, ['s1']);
   assert.equal(JSON.stringify(m), before);
   assert.equal(placementPreview(m, 'state', null), null);
@@ -4101,7 +4103,6 @@ test('label guides connect a label boundary to its own curve and omit labels on 
   assert.equal(guide.from.y, 39);
   assert.equal(labelGuide(route), guide);
   assert.equal(labelGuide({ ...route, label: { x: 50, y: 4, w: 40 } }), null);
-  assert.equal(readEditorSettings({ getItem: () => '{"labelGuides":true}' }).labelGuides, true);
 });
 
 test('label guides use the nearest left or right edge instead of a diagonal from the center', () => {

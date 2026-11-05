@@ -4,8 +4,8 @@ import { createGroupNavigation } from './group-navigation.js';
 import { createCanvasInteractions } from './canvas-interactions.js';
 import { createGraphCanvas } from '../core/canvas-graph.js';
 import { insertState } from '../core/transitions.js';
+import { commentPlacement } from '../core/placement.js';
 import {
-  makeComment,
   commentAnchors,
   commentNodeIds,
   commentLinks,
@@ -51,6 +51,7 @@ export function createEditorController(
   context.choose = choose;
   context.edgeSelected = edgeSelected;
   context.addComment = addComment;
+  context.commentPlacementView = commentPlacementView;
   context.checkpoint = checkpoint;
   context.point = point;
   context.markSelection = markSelection;
@@ -338,7 +339,10 @@ export function createEditorController(
     context.placingComment = type === 'comment';
     showProperties(false);
     document.body.classList.add('placing-' + type);
-    $('modehint').textContent = 'Click to place a ' + type + ' · Esc to cancel';
+    $('modehint').textContent =
+      type === 'comment'
+        ? 'Click where the comment shows a connection · Esc to cancel'
+        : 'Click to place a state · Esc to cancel';
     $('canvas').focus({
       preventScroll: true,
     });
@@ -346,27 +350,17 @@ export function createEditorController(
   function beginComment() {
     beginPlacement('comment');
   }
+  function commentPlacementView() {
+    const shown = graphView(context.machine, context.openGroup, false);
+    return { states: shown.states.filter((state) => !state.group) };
+  }
   function addComment(position) {
     if (!position) {
       beginComment();
       return;
     }
-    context.placingComment = false;
-    context.placementPoint = null;
-    document.body.classList.remove('placing-comment');
-    const c = makeComment(context.machine, position);
-    if (context.openGroup) {
-      const members =
-          context.machine.groups.find((g) => g.id === context.openGroup)?.stateIds ?? [],
-        state = context.machine.states
-          .filter((s) => members.includes(s.id))
-          .sort(
-            (a, b) =>
-              Math.hypot(a.x - position.x, a.y - position.y) -
-              Math.hypot(b.x - position.x, b.y - position.y),
-          )[0];
-      c.nodeIds = state ? [state.id] : [];
-    }
+    const c = commentPlacement(commentPlacementView(), position);
+    if (!c) return;
     checkpoint();
     (context.machine.comments ??= []).push(c);
     choose('comment', c.id);

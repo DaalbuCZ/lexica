@@ -550,13 +550,19 @@
   max-height: calc(100dvh - 110px);
   overflow: auto;
 }
+#tester-debugger-slot {
+  flex: none;
+}
+#tester-debugger-slot:not(:empty) {
+  margin-top: 10px;
+}
 #tester-debugger-slot .debugger-window {
   position: static;
   width: 100%;
   max-width: none;
-  max-height: 200px;
+  max-height: none;
+  overflow: visible;
   translate: none;
-  margin-bottom: var(--space-2);
 }
 .debugger-window .window-heading {
   margin-bottom: var(--space-3);

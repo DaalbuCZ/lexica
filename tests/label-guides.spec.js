@@ -47,21 +47,17 @@ test('solid guides and labels highlight with the selected transition', async ({
   // Explicit manual bends retain their offset label, exercising a visible guide.
   machine.states[1].y = machine.states[0].y;
   machine.edges[0].bend = { x: 0, y: 0 };
-  await page.addInitScript(
-    (machine) => localStorage.setItem('lexica-machine', JSON.stringify(machine)),
-    machine,
-  );
+  await page.addInitScript((machine) => {
+    localStorage.setItem('lexica-machine', JSON.stringify(machine));
+    localStorage.setItem('lexica-editor-settings', JSON.stringify({ labelGuides: false }));
+  }, machine);
   await page.goto('/');
   await expect(page.locator('#tokens .token')).toHaveCount(3);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
   const setting = page.getByLabel('Guides from labels to transitions', { exact: true });
-  await expect(setting).not.toBeChecked();
+  await expect(setting).toHaveCount(0);
   await expect(page.getByLabel('Labels on curves (experimental)', { exact: true })).toHaveCount(0);
-  await page.evaluate(() => {
-    window.canvasStrokes = [];
-  });
-  await setting.check();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -103,5 +99,5 @@ test('solid guides and labels highlight with the selected transition', async ({
   await expect(page.locator('#tokens .token')).toHaveCount(3);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
-  await expect(setting).toBeChecked();
+  await expect(setting).toHaveCount(0);
 });

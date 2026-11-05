@@ -130,7 +130,44 @@ test('debugger docks above the input and can be moved back out', async ({ page }
   await page.mouse.move(slot.x + slot.width / 2, slot.y + 10, { steps: 8 });
   await page.mouse.up();
   await expect(page.locator('#tester-debugger-slot #step-status')).toBeVisible();
+  const checkLayout = async (horizontal) => {
+    const input = await page.locator('.input-wrap').boundingBox();
+    const output = await page.locator('#tokens').boundingBox();
+    const panel = await page.locator('.tester').boundingBox();
+    const debuggerBox = await page.locator('#tester-debugger-slot .debugger-window').boundingBox();
+    expect(debuggerBox.y + debuggerBox.height).toBeLessThan(input.y);
+    expect(input.height).toBeCloseTo(output.height);
+    expect(output.y + output.height).toBeLessThan(panel.y + panel.height);
+    expect(input.height).toBeGreaterThan(40);
+    if (horizontal) expect(input.width).toBeCloseTo(output.width);
+    expect(
+      await page
+        .locator('#tester-debugger-slot .debugger-window')
+        .evaluate((el) => el.scrollHeight <= el.clientHeight),
+    ).toBe(true);
+  };
+  await checkLayout(false);
+  await page.locator('#tester-grip').press('ArrowDown');
+  await expect(page.locator('body')).toHaveAttribute('data-tester-dock', 'bottom');
+  await expect
+    .poll(async () => (await page.locator('.input-wrap').boundingBox()).height)
+    .toBeGreaterThan(40);
+  await checkLayout(true);
   await page.locator('#debugger-grip').press('ArrowUp');
   await expect(page.locator('body')).toHaveAttribute('data-debugger-dock', 'top');
   await expect(page.locator('#tester-debugger-slot #step-status')).toHaveCount(0);
+});
+
+test('token tooltip is centered over the pointer', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#tokens .token')).toHaveCount(3);
+  const input = await page.locator('#input').boundingBox();
+  const x = input.x + 20;
+  const y = input.y + 18;
+  await page.mouse.move(x, y);
+  const tooltip = page.locator('.input-token-hover');
+  await expect(tooltip).toBeVisible();
+  const box = await tooltip.boundingBox();
+  expect(box.x + box.width / 2).toBeCloseTo(x, 0);
+  expect(box.y + box.height).toBeLessThan(y);
 });

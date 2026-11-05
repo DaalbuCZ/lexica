@@ -291,9 +291,9 @@ export function Tester({ debuggerRef }) {
           onStop={toggle}
         />
       )}
+      <div id="tester-debugger-slot" />
       <div className="test-grid">
         <div>
-          <div id="tester-debugger-slot" />
           <div className="input-label">
             <label className="field-label" htmlFor="input">
               INPUT
@@ -316,8 +316,7 @@ export function Tester({ debuggerRef }) {
               <div
                 className={`input-token-hover ${hover.token.token === 'ERROR' ? 'token-hover-error' : tokenColorClass(hover.token.token)}`}
                 style={{
-                  position: 'fixed',
-                  left: Math.max(6, Math.min(innerWidth - 160, hover.x - 40)),
+                  '--hover-x': hover.x + 'px',
                   top: Math.max(6, hover.y - 40),
                 }}
                 aria-hidden="true"
