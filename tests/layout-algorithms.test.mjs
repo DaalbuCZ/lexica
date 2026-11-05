@@ -25,7 +25,7 @@ import { interactiveRoutes } from '../src/core/interactive-routes.js';
 import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthetics.js';
 import { transitionBundles } from '../src/core/graph-bundles.js';
 import { polishSubgroup } from '../src/core/subgroup-aesthetics.js';
-import { polishRadialBranches } from '../src/core/radial-aesthetics.js';
+import { polishRadialBranches, pullOuterBranches } from '../src/core/radial-aesthetics.js';
 import { simpleTransitionLabel } from '../src/core/editor-settings.js';
 
 test('radial assembly keeps a cyclic branch exit outside its cycles before late cleanup', () => {
@@ -710,6 +710,31 @@ test('crowded bent approaches try both normal ends and keep a clear single-end i
     assert.ok(dx * tx + dy * ty > 0);
   }
   assert.equal(validateRouteSeparation(routes, { maxDepth: 24 }).status, 'clear');
+});
+
+test('radial branch pulling translates a remote tail together and preserves clear routes', () => {
+  const states = [
+    ['root', 0, 0],
+    ['ring', 300, 0],
+    ['bend', 1050, 0],
+    ['tip', 1240, 0],
+    ['other', 0, -300],
+  ].map(([id, x, y]) => ({ id, x, y }));
+  const edges = [
+    ['root', 'ring'],
+    ['ring', 'bend'],
+    ['bend', 'tip'],
+    ['tip', 'bend'],
+    ['root', 'other'],
+  ].map(([from, to]) => ({ from, to, label: 'a' }));
+  const machine = { start: 'root', states, edges };
+  const result = pullOuterBranches(machine);
+  assert.deepEqual([result[0], result[1], result[4]], [states[0], states[1], states[4]]);
+  assert.ok(result[3].x < states[3].x - 400);
+  assert.ok(Math.abs(result[3].x - result[2].x - 190) < 1e-6);
+  assert.equal(result[3].y, result[2].y);
+  assert.equal(drawingClearance(result, edges).crossings, 0);
+  assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
 });
 
 test('radial orientation favors group nodes above the start without changing ring radii', () => {
