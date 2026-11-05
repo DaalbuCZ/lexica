@@ -4050,7 +4050,41 @@ import './tests/stack-automaton.test.mjs';
 
 import './tests/machine-file.test.mjs';
 
-import { labelGuide } from './src/core/label-guides.js';
+import { labelGuide, labelGuidesFor } from './src/core/label-guides.js';
+import { reflowRouteLabels } from './src/core/label-clearance.js';
+
+test('a displaced loop label moves up to keep its guide short and straight', () => {
+  const machine = {
+    states: [
+      { id: 'loop', x: 278, y: 117 },
+      { id: 'left', x: 102, y: 170 },
+      { id: 'below', x: 269, y: 321 },
+    ],
+    edges: [
+      { from: 'loop', to: 'loop' },
+      { from: 'left', to: 'below', bend: true },
+    ],
+  };
+  const label = { x: 227, y: 252, w: 100 };
+  const routes = reflowRouteLabels(machine, [
+    {
+      p0: { x: 309, y: 127 },
+      c1: { x: 390, y: 161 },
+      c2: { x: 270, y: 244 },
+      p3: { x: 276, y: 150 },
+      label,
+    },
+    {
+      p0: { x: 520, y: -50 },
+      c1: { x: 410, y: 100 },
+      c2: { x: 330, y: 220 },
+      p3: { x: 285, y: 290 },
+      label: { x: 385, y: 215, w: 200 },
+    },
+  ]);
+  assert.ok(routes[0].label.y < label.y - 20);
+  assert.equal(labelGuidesFor(machine, routes)[0]?.points.length, 2);
+});
 import { curvePoint as routedCurvePoint } from './src/core/route-geometry.js';
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {

@@ -2,6 +2,7 @@ import { groupWidth, tokenCaption } from './labels.js';
 import { curvePoint, curveAvoidsBox, routeBounds } from './route-geometry.js';
 import { SpatialIndex } from './spatial-index.js';
 import { commentLayout } from './comments.js';
+import { segmentHitsBox } from './label-guides.js';
 
 export const renderedLabelBox = (l) => ({
   left: l.x - l.w / 2,
@@ -51,13 +52,14 @@ export function reflowRouteLabels(
   for (const i of [...dirty].sort((a, b) => routes[b].label.w - routes[a].label.w || a - b)) {
     const route = routes[i];
     if (machine.edges[i]?.bend) continue;
+    const loop = machine.edges[i]?.from === machine.edges[i]?.to;
     let best = route.label,
       bestCost = Infinity;
-    const offer = (label, preference, gap) => {
+    const offer = (label, preference, gap, anchor) => {
       const box = renderedLabelBox(label),
         padded = expand(box, 4),
         near = expand(box, Math.max(8, gap));
-      const cost =
+      let cost =
         obstacles.query(padded).length * 100000 +
         captions.query(padded).length * 10000 +
         wires.query(near).reduce((sum, j) => {
@@ -66,12 +68,42 @@ export function reflowRouteLabels(
           return sum + (!curveAvoidsBox(routes[j], near) ? 250 : 0);
         }, 0) +
         preference;
+      // A displaced loop label is easier to follow when its guide can run
+      // straight to the loop. Keep on-curve placements and clearance first.
+      if (loop && !placement && anchor && cost < bestCost && curveAvoidsBox(route, box)) {
+        const sides = [
+          { x: box.left, y: label.y - 4, faces: anchor.x <= box.left },
+          { x: box.right, y: label.y - 4, faces: anchor.x >= box.right },
+          { x: label.x, y: box.top, faces: anchor.y <= box.top },
+          { x: label.x, y: box.bottom, faces: anchor.y >= box.bottom },
+        ];
+        const shortest = sides.reduce((best, side) => {
+          if (!side.faces) return best;
+          const length = Math.hypot(side.x - anchor.x, side.y - anchor.y);
+          if (length >= best) return best;
+          const span = {
+            left: Math.min(side.x, anchor.x),
+            right: Math.max(side.x, anchor.x),
+            top: Math.min(side.y, anchor.y),
+            bottom: Math.max(side.y, anchor.y),
+          };
+          for (const index of [obstacles, captions])
+            if (
+              index
+                .query(span)
+                .some((key) => segmentHitsBox(side, anchor, index.items.get(key).box))
+            )
+              return best;
+          return length;
+        }, Infinity);
+        cost += Math.min(shortest, 200);
+      }
       if (cost < bestCost) {
         bestCost = cost;
         best = label;
       }
     };
-    if (machine.edges[i]?.from === machine.edges[i]?.to) offer(route.label, 30, 8);
+    if (loop) offer(route.label, 30, 8, curvePoint(route, 0.5));
     for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88]) {
       if (bestCost === 0) break;
       const p = curvePoint(route, t),
@@ -87,16 +119,22 @@ export function reflowRouteLabels(
       offer({ ...route.label, x: p.x, y: p.y + 4 }, Math.abs(t - 0.5) * 20, 8);
       for (const gap of [5, 14, 30, 55]) {
         if (bestCost < gap * 2) break;
-        for (const side of [-1, 1]) {
-          const offset = (half + gap) * side;
+        const offsets = [
+          { x: -nx * (half + gap), y: -ny * (half + gap) },
+          { x: nx * (half + gap), y: ny * (half + gap) },
+        ];
+        if (loop && !placement && t === 0.5)
+          offsets.push({ x: 0, y: -12 - gap }, { x: 0, y: 12 + gap });
+        for (const offset of offsets) {
           offer(
-            { ...route.label, x: p.x + nx * offset, y: p.y + ny * offset + 4 },
+            { ...route.label, x: p.x + offset.x, y: p.y + offset.y + 4 },
             30 +
               gap * 2 +
               Math.abs(t - 0.5) * 20 +
-              Math.hypot(p.x + nx * offset - route.label.x, p.y + ny * offset + 4 - route.label.y) *
+              Math.hypot(p.x + offset.x - route.label.x, p.y + offset.y + 4 - route.label.y) *
                 0.035,
             gap,
+            p,
           );
         }
       }
