@@ -53,21 +53,25 @@ export function reflowRouteLabels(
     const route = routes[i];
     if (machine.edges[i]?.bend) continue;
     const loop = machine.edges[i]?.from === machine.edges[i]?.to;
+    const searchLoopPocket = loop && !placement;
     let best = route.label,
-      bestCost = Infinity;
-    const offer = (label, preference, gap, anchor) => {
+      bestCost = Infinity,
+      bestNeedsDetour = false;
+    const offer = (label, preference, gap, anchor, tight = false) => {
       const box = renderedLabelBox(label),
-        padded = expand(box, 4),
+        padded = tight ? box : expand(box, 4),
         near = expand(box, Math.max(8, gap));
+      let needsDetour = false;
       let cost =
         obstacles.query(padded).length * 100000 +
         captions.query(padded).length * 10000 +
         wires.query(near).reduce((sum, j) => {
           if (j === i) return sum;
           if (!curveAvoidsBox(routes[j], padded)) return sum + 2000;
-          return sum + (!curveAvoidsBox(routes[j], near) ? 250 : 0);
+          return sum + (!curveAvoidsBox(routes[j], near) ? (tight ? 8 : 250) : 0);
         }, 0) +
         preference;
+      if (tight && cost >= 2000) return;
       // A displaced loop label is easier to follow when its guide can run
       // straight to the loop. Keep on-curve placements and clearance first.
       if (loop && !placement && anchor && cost < bestCost && curveAvoidsBox(route, box)) {
@@ -96,15 +100,18 @@ export function reflowRouteLabels(
               return best;
           return length;
         }, Infinity);
+        needsDetour = !Number.isFinite(shortest);
         cost += Math.min(shortest, 200);
       }
       if (cost < bestCost) {
         bestCost = cost;
         best = label;
+        bestNeedsDetour = needsDetour;
       }
     };
     if (loop) offer(route.label, 30, 8, curvePoint(route, 0.5));
-    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88]) {
+    const samples = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88];
+    for (const t of samples) {
       if (bestCost === 0) break;
       const p = curvePoint(route, t),
         a = curvePoint(route, t - 0.01),
@@ -123,7 +130,7 @@ export function reflowRouteLabels(
           { x: -nx * (half + gap), y: -ny * (half + gap) },
           { x: nx * (half + gap), y: ny * (half + gap) },
         ];
-        if (loop && !placement && t === 0.5)
+        if (searchLoopPocket && t === 0.5)
           offsets.push({ x: 0, y: -12 - gap }, { x: 0, y: 12 + gap });
         for (const offset of offsets) {
           offer(
@@ -135,6 +142,23 @@ export function reflowRouteLabels(
                 0.035,
             gap,
             p,
+          );
+        }
+      }
+    }
+    // A narrow pocket can still fit a loop label with its edge on the curve.
+    // Keep the full label box clear, and only trade padding for a guide-free fit.
+    if (searchLoopPocket && bestNeedsDetour) {
+      for (let step = 3; step <= 17; step++) {
+        const t = step / 20;
+        const p = curvePoint(route, t);
+        for (const shift of [0, -0.2, 0.2, -0.4, 0.4]) {
+          offer(
+            { ...route.label, x: p.x + shift * route.label.w, y: p.y + 4 },
+            28 + Math.abs(t - 0.5) * 20 + Math.abs(shift) * 12,
+            8,
+            null,
+            true,
           );
         }
       }

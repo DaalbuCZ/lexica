@@ -4085,6 +4085,78 @@ test('a displaced loop label moves up to keep its guide short and straight', () 
   assert.ok(routes[0].label.y < label.y - 20);
   assert.equal(labelGuidesFor(machine, routes)[0]?.points.length, 2);
 });
+
+test('a loop label can sit off-center on the curve in a narrow pocket', () => {
+  const point = (x, y) => ({ x: x / 1.15, y: y / 1.15 });
+  const route = (points, x, y, width) => {
+    const [p0, c1, c2, p3] = points.map(([x, y]) => point(x, y));
+    return { p0, c1, c2, p3, label: { ...point(x, y + 4), w: width / 1.15 } };
+  };
+  const machine = {
+    states: [
+      { id: 'text', ...point(335, 83), token: 'STRING' },
+      { id: 'escaped', ...point(110, 150) },
+      { id: 'not', ...point(318, 342) },
+      { id: 'comparison', ...point(631, 265) },
+    ],
+    edges: [
+      { from: 'text', to: 'text' },
+      { from: 'text', to: 'escaped', bend: true },
+      { from: 'escaped', to: 'text', bend: true },
+      { from: 'comparison', to: 'not', bend: true },
+    ],
+  };
+  const routes = [
+    route(
+      [
+        [375, 97],
+        [463, 136],
+        [356, 233],
+        [333, 125],
+      ],
+      270,
+      254,
+      124,
+    ),
+    route(
+      [
+        [305, 111],
+        [269, 149],
+        [181, 170],
+        [150, 159],
+      ],
+      233,
+      153,
+      33,
+    ),
+    route(
+      [
+        [145, 127],
+        [181, 97],
+        [239, 60],
+        [293, 73],
+      ],
+      230,
+      116,
+      66,
+    ),
+    route(
+      [
+        [572, -13],
+        [497, 93],
+        [415, 195],
+        [345, 306],
+      ],
+      416,
+      203,
+      264,
+    ),
+  ];
+  assert.ok(labelGuidesFor(machine, routes)[0]?.points.length > 2);
+  const placed = reflowRouteLabels(machine, routes.slice());
+  assert.ok(placed[0].label.y < routes[3].label.y - 24);
+  assert.equal(labelGuide(placed[0]), null);
+});
 import { curvePoint as routedCurvePoint } from './src/core/route-geometry.js';
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {
