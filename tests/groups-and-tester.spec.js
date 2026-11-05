@@ -12,6 +12,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   machine.stack = { alphabet: ['S', 'OPEN'], initial: 'S' };
   const group = createGroup(machine, new Set(['s1', 's2']), 'Tokens');
   await page.addInitScript((machine) => {
+    if (localStorage.getItem('lexica-machine')) return;
     localStorage.setItem('lexica-machine', JSON.stringify(machine));
     localStorage.setItem(
       'lexica-editor-settings',
@@ -71,6 +72,14 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.getByRole('button', { name: 'Remove rule 2', exact: true }).click();
   await page.getByRole('button', { name: 'Remove rule 1', exact: true }).click();
   await page.getByRole('button', { name: 'Close properties', exact: true }).click();
+  await page.reload();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('lexica-editor-settings')).stackRulesOpen,
+      ),
+    )
+    .toBe(true);
   await page.locator('#toolbar-grip').focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('body')).toHaveAttribute('data-toolbar-dock', 'right');

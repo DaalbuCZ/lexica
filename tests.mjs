@@ -2176,6 +2176,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'overlay',
       simplified: true,
+      stackRulesOpen: false,
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
@@ -2189,6 +2190,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'overlay',
       simplified: true,
+      stackRulesOpen: false,
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
@@ -2204,6 +2206,7 @@ test('simplified settings restore safely without changing graph preferences', ()
     {
       groupPresentation: 'overlay',
       simplified: true,
+      stackRulesOpen: false,
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
@@ -3977,16 +3980,16 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
   };
   const before = structuredClone(m);
   const text = toAcademic(m);
-  assert.match(text, /M = \(Q, Σ, R, s, F\)/);
+  assert.match(text, /M = \(Q, Sigma, R, s, F\)/);
   assert.match(text, /Q = \{q0, q1\}/);
-  assert.match(text, /Σ = \{"a"…"c"\}/);
-  assert.match(text, /q0 A1 → q1/);
+  assert.match(text, /Sigma = \{"a"\.\."c"\}/);
+  assert.match(text, /q0 A1 -> q1/);
   assert.match(text, /s = q0/);
   assert.match(text, /F = \{q1\}/);
   assert.deepEqual(m, before);
   m.edges[0].label = 'a';
   m.edges[0].invert = true;
-  assert.match(toAcademic(m), /"b"…U\+007F/);
+  assert.match(toAcademic(m), /"b"\.\.0x7F/);
   assert.throws(() => {
     m.edges[0].label = '\\u{1F600}';
     toAcademic(m);

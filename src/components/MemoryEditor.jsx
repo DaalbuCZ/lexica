@@ -1,5 +1,5 @@
-import { Button, IconButton, Field, Select } from './ui.jsx';
-import { Copy, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
+import { IconButton, Field, Select } from './ui.jsx';
+import { Copy, ClipboardPaste, Plus, Trash2, ArrowRight, X } from 'lucide-react';
 import { useStudio } from '../state/studio.js';
 import { stackDefinition, copyStackRules, pasteStackRules } from '../core/memory.js';
 let ruleClipboard = '';
@@ -10,9 +10,6 @@ export function StackAlphabet({ heading = true }) {
   return (
     <>
       {heading && <h2 className="property-name">Stack alphabet</h2>}
-      <p className="prop-note">
-        One stack, with values from this enum (Γ). Names use ASCII letters, digits and underscores.
-      </p>
       <Field
         label="Enum values"
         value={stack.alphabet.join(', ')}
@@ -42,10 +39,6 @@ export function StackAlphabet({ heading = true }) {
           </option>
         ))}
       </Select>
-      <p className="prop-note">
-        The stack starts with the selected symbol. Sequences are written bottom to top; the
-        rightmost symbol is on top. Remove a symbol from transition rules before removing it here.
-      </p>
     </>
   );
 }
@@ -69,88 +62,93 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
     if (state.scene.selection.type !== 'edge' || state.scene.selection.index !== index) return;
     state.controller.update((next) => pasteStackRules(next.edges[index], text));
   };
-  const Container = simple ? 'details' : 'section';
+  const open = useStudio((s) => s.settings.stackRulesOpen);
+  const Container = 'details';
   return (
-    <Container id="memory-rules" className={`simple-memory ${simple ? 'compact-memory' : ''}`}>
-      {simple ? <summary>Stack rules</summary> : <h3>Stack rules</h3>}
+    <Container
+      id="memory-rules"
+      open={!!open}
+      onToggle={(event) => {
+        const value = event.currentTarget.open;
+        if (useStudio.getState().settings.stackRulesOpen !== value)
+          useStudio.setState((s) => ({ settings: { ...s.settings, stackRulesOpen: value } }));
+      }}
+      className={`simple-memory ${simple ? 'compact-memory' : ''}`}
+    >
+      <summary>Stack rules</summary>
       <div className="simple-memory-content">
-        <p className="prop-note">
-          Match the top symbol and replace it atomically. An empty replacement (ε) pops it. The last
-          replacement symbol becomes the top.
-        </p>
-        {!rules.length && (
-          <p className="prop-note">
-            No explicit rules: preserve any top symbol. An empty stack blocks the transition.
-          </p>
-        )}
+        {!rules.length && <p className="prop-note">Any top → same top</p>}
         {rules.map((rule, i) => (
           <section className="memory-rule-section" key={i}>
             {i > 0 && <p className="stack-rule-or">OR</p>}
-            <Select
-              label={`Top symbol ${i + 1}`}
-              value={rule.top}
-              onChange={(top) =>
-                edit((e) => {
-                  e.stackRules[i].top = top;
-                })
-              }
-            >
-              {alphabet.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
-            <div className="stack-replacement">
-              <span>Replace with {rule.replace.length ? '(bottom → top)' : 'ε (pop)'}</span>
-              {rule.replace.map((symbol, j) => (
-                <div className="stack-symbol-row" key={j}>
-                  <Select
-                    label={`Replacement ${i + 1}, symbol ${j + 1}`}
-                    value={symbol}
-                    onChange={(value) =>
-                      edit((e) => {
-                        e.stackRules[i].replace[j] = value;
-                      })
-                    }
-                  >
-                    {alphabet.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </Select>
-                  <IconButton
-                    icon={Trash2}
-                    label={`Remove replacement ${i + 1}, symbol ${j + 1}`}
-                    onClick={() =>
-                      edit((e) => {
-                        e.stackRules[i].replace.splice(j, 1);
-                      })
-                    }
-                  />
-                </div>
-              ))}
-              <Button
-                onClick={() =>
+            <div className="stack-rule-row">
+              <Select
+                label={`Top symbol ${i + 1}`}
+                value={rule.top}
+                onChange={(top) =>
                   edit((e) => {
-                    e.stackRules[i].replace.push(initial);
+                    e.stackRules[i].top = top;
                   })
                 }
               >
-                Add replacement symbol
-              </Button>
+                {alphabet.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+              <ArrowRight size={14} aria-hidden="true" />
+              <div className="stack-replacement" title="Replacement: bottom to top">
+                {!rule.replace.length && <span title="Pop top">ε</span>}
+                {rule.replace.map((symbol, j) => (
+                  <div className="stack-symbol-row" key={j}>
+                    <Select
+                      label={`Replacement ${i + 1}, symbol ${j + 1}`}
+                      value={symbol}
+                      onChange={(value) =>
+                        edit((e) => {
+                          e.stackRules[i].replace[j] = value;
+                        })
+                      }
+                    >
+                      {alphabet.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </Select>
+                    <IconButton
+                      icon={X}
+                      label={`Remove replacement ${i + 1}, symbol ${j + 1}`}
+                      onClick={() =>
+                        edit((e) => {
+                          e.stackRules[i].replace.splice(j, 1);
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+                <IconButton
+                  icon={Plus}
+                  label={`Add replacement symbol ${i + 1}`}
+                  onClick={() =>
+                    edit((e) => {
+                      e.stackRules[i].replace.push(initial);
+                    })
+                  }
+                />
+              </div>
+              <IconButton
+                icon={Trash2}
+                label={`Remove rule ${i + 1}`}
+                className="danger"
+                onClick={() =>
+                  edit((e) => {
+                    e.stackRules.splice(i, 1);
+                  })
+                }
+              />
             </div>
-            <Button
-              className="danger"
-              onClick={() =>
-                edit((e) => {
-                  e.stackRules.splice(i, 1);
-                })
-              }
-            >
-              Remove rule {i + 1}
-            </Button>
           </section>
         ))}
         <div className="memory-rule-tools">

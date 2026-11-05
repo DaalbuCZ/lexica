@@ -7,6 +7,7 @@ export function readEditorSettings(storage) {
     return {
       groupPresentation: saved.groupPresentation === 'canvas' ? 'canvas' : 'overlay',
       simplified: saved.simplified !== false,
+      stackRulesOpen: saved.stackRulesOpen === true,
       followDebugState: saved.followDebugState !== false,
       rerouteWhileDragging: true,
       colorEdges: saved.colorEdges !== false,
@@ -16,6 +17,7 @@ export function readEditorSettings(storage) {
     return {
       groupPresentation: 'overlay',
       simplified: true,
+      stackRulesOpen: false,
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,

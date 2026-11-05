@@ -1,7 +1,7 @@
 import { destination, isAccepting, matcher, validate } from './lexer.js';
 import { isStackMachine, stackDefinition, stackRules } from './memory.js';
 
-// IFJ, Modely pro regulární jazyky, slide 7: M = (Q, Σ, R, s, F).
+// IFJ, Modely pro regulární jazyky, slide 7: M = (Q, Sigma, R, s, F).
 // All input sets are restricted to ASCII.
 const characterSets = new Map();
 function rangesFor(edge, limit = 128) {
@@ -25,14 +25,14 @@ function rangesFor(edge, limit = 128) {
 function symbol(code) {
   return code >= 33 && code <= 126
     ? JSON.stringify(String.fromCodePoint(code))
-    : 'U+' + code.toString(16).toUpperCase().padStart(4, '0');
+    : '0x' + code.toString(16).toUpperCase().padStart(2, '0');
 }
 function set(ranges) {
   return ranges.length
     ? '{' +
-        ranges.map(([a, b]) => (a === b ? symbol(a) : `${symbol(a)}…${symbol(b)}`)).join(', ') +
+        ranges.map(([a, b]) => (a === b ? symbol(a) : `${symbol(a)}..${symbol(b)}`)).join(', ') +
         '}'
-    : '∅';
+    : '{}';
 }
 export function toAcademic(machine) {
   validate(machine);
@@ -61,17 +61,17 @@ export function toAcademic(machine) {
     }
     return extended
       ? stackRules(machine, edge).map(
-          (rule) => `  ${rule.top} ${from} ${input} → ${rule.replace.join(' ') || 'ε'} ${to}`,
+          (rule) => `  ${rule.top} ${from} ${input} -> ${rule.replace.join(' ') || 'eps'} ${to}`,
         )
-      : [`  ${from} ${input} → ${to}`];
+      : [`  ${from} ${input} -> ${to}`];
   });
   return [
-    extended ? 'M = (Q, Σ, Γ, R, s, S, F)' : 'M = (Q, Σ, R, s, F)',
+    extended ? 'M = (Q, Sigma, Gamma, R, s, S, F)' : 'M = (Q, Sigma, R, s, F)',
     `Q = {${[...names.values()].join(', ')}}`,
-    `Σ = ${set(alphabet)}`,
+    `Sigma = ${set(alphabet)}`,
     ...[...aliases].map(([value, name]) => `${name} = ${value}`),
-    ...(extended ? [`Γ = {${stack.alphabet.join(', ')}}`, `S = ${stack.initial}`] : []),
-    rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = ∅',
+    ...(extended ? [`Gamma = {${stack.alphabet.join(', ')}}`, `S = ${stack.initial}`] : []),
+    rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = {}',
     `s = ${names.get(machine.start)}`,
     `F = {${machine.states
       .filter(isAccepting)
@@ -81,21 +81,21 @@ export function toAcademic(machine) {
     'State names:',
     ...machine.states.map(
       (state) =>
-        `${names.get(state.id)} = ${JSON.stringify(state.name)} (id ${JSON.stringify(state.id)})`,
+        `${names.get(state.id)} = ${JSON.stringify(state.name).replace(/[^\x20-\x7e]/g, (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'))}`,
     ),
     '',
-    'Input domain: ASCII (0–127).',
-    'U+XXXX denotes an ASCII code; … includes every code between the endpoints.',
+    'Input domain: ASCII (0-127).',
+    '0xNN denotes an ASCII code; .. includes every code between the endpoints.',
     ...(extended
       ? [
-          'IFJ stack rules: A p a → w q, where A ∈ Γ, a ∈ Σ, and w ∈ Γ*.',
+          'IFJ stack rules: A p a -> w q, where A in Gamma, a in Sigma, and w in Gamma*.',
           'A rule replaces the top A with w. Stack sequences are bottom to top (rightmost on top).',
           'Every transition consumes one ASCII character; epsilon input transitions are not supported.',
           'An input alias abbreviates one rule per character; rules are alternatives (OR).',
-          'Initial configuration: S s x. Acceptance: S s x ⇒* w f, f ∈ F (all input consumed).',
-          'No rule applies to an empty stack. Omitted stack rules expand to A → A for every A ∈ Γ.',
+          'Initial configuration: S s x. Acceptance: S s x =>* w f, f in F (all input consumed).',
+          'No rule applies to an empty stack. Omitted stack rules expand to A -> A for every A in Gamma.',
         ]
-      : ['p A → q abbreviates one rule for each character in A.']),
+      : ['p A -> q abbreviates one rule for each character in A.']),
     'Groups and portals are flattened.',
     'This describes the automaton graph; token names, skip flags and longest-match tokenization are not part of M.',
     '',
