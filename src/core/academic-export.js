@@ -23,8 +23,11 @@ function rangesFor(edge, limit = 128) {
   return ranges;
 }
 function symbol(code) {
+  if (code === 32) return '" "';
+  const whitespace = { 9: 't', 10: 'n', 11: 'v', 12: 'f', 13: 'r' };
+  if (whitespace[code]) return '"' + String.fromCharCode(92) + whitespace[code] + '"';
   return code >= 33 && code <= 126
-    ? JSON.stringify(String.fromCodePoint(code))
+    ? String.fromCodePoint(code)
     : '0x' + code.toString(16).toUpperCase().padStart(2, '0');
 }
 function set(ranges) {

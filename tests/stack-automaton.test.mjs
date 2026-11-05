@@ -91,8 +91,8 @@ test('IFJ export uses stack rules and ASCII input with no epsilon transitions', 
     text = toAcademic(m);
   assert.match(text, /M = \(Q, Σ, Γ, R, s, S, F\)/);
   assert.match(text, /Γ = \{S, OPEN\}/);
-  assert.match(text, /OPEN q0 "\)" → ε q1/);
-  assert.match(text, /S q0 "\(" → S OPEN q1/);
+  assert.match(text, /OPEN q0 \) → ε q1/);
+  assert.match(text, /S q0 \( → S OPEN q1/);
   assert.match(text, /ASCII/);
   m.edges[0].label = '';
   assert.throws(() => tokenize(m, '('), /empty/);
@@ -145,7 +145,16 @@ test('scientific aliases include original expressions and inversion', () => {
   m.edges[0].label = '[1-9]';
   m.edges[1].label = '[123456789]';
   const text = toAcademic(m);
-  assert.ok(text.includes('A1 = {"1".."9"} // [1-9]; [123456789]'));
+  assert.ok(text.includes('A1 = {1..9} // [1-9]; [123456789]'));
   m.edges[0].invert = true;
   assert.ok(toAcademic(m).includes('// not ([1-9])'));
+});
+
+test('scientific symbols show punctuation literally and quote whitespace', () => {
+  const m = stackMachine();
+  m.edges = [{ from: 'a', to: 'b', label: '["\\\\nrt ]' }];
+  const text = toAcademic(m);
+  assert.ok(text.includes('{" ", ", \\, n, r, t}'));
+  m.edges[0].label = '\\t';
+  assert.ok(toAcademic(m).includes('{"\\t"}'));
 });
