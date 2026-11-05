@@ -4065,10 +4065,29 @@ test('label guides connect a label boundary to its own curve and omit labels on 
     label: { x: 50, y: 54, w: 40 },
   };
   const guide = labelGuide(route);
-  assert.ok(Math.abs(guide.to.x - 50) < 0.1);
+  assert.ok(guide.to.x >= 28 && guide.to.x <= 72);
+  assert.equal(guide.from.x, guide.to.x);
   assert.equal(guide.to.y, 0);
   assert.equal(guide.from.y, 37);
   assert.equal(labelGuide(route), guide);
   assert.equal(labelGuide({ ...route, label: { x: 50, y: 4, w: 40 } }), null);
   assert.equal(readEditorSettings({ getItem: () => '{"labelGuides":true}' }).labelGuides, true);
+});
+
+test('label guides use the nearest left or right edge instead of a diagonal from the center', () => {
+  for (const side of [-1, 1]) {
+    const x = side * 100;
+    const route = {
+      p0: { x, y: 30 },
+      c1: { x, y: 40 },
+      c2: { x, y: 50 },
+      p3: { x, y: 60 },
+      label: { x: 0, y: 54, w: 100 },
+    };
+    const guide = labelGuide(route);
+    assert.equal(guide.from.x, side * 52);
+    assert.equal(guide.to.x, x);
+    assert.equal(guide.from.y, guide.to.y);
+    assert.equal(Math.hypot(guide.to.x - guide.from.x, guide.to.y - guide.from.y), 48);
+  }
 });
