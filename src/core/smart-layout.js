@@ -832,10 +832,27 @@ export function smartArrange(machine, focus = null, options = {}) {
   return result.groups;
 }
 
-export function solveLayout(topology, focus = null, options = {}, progress = () => {}) {
+export function solveLayout(
+  topology,
+  focus = null,
+  options = {},
+  progress = () => {},
+  capture = null,
+) {
+  const record = (phase, machine) => {
+    if (capture) capture(phase, structuredClone(machine));
+  };
   if (!focus) {
-    const components = solveComponents(topology, options, solveLayout, progress);
-    if (components) return components;
+    const components = solveComponents(
+      topology,
+      options,
+      (...args) => solveLayout(...args, capture),
+      progress,
+    );
+    if (components) {
+      record('packing', components.machine);
+      return components;
+    }
   }
   const started = performance.now(),
     metrics = {};
@@ -850,6 +867,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
   };
   progress(0.08, 'Placing states');
   const count = arrangeTopology(machine, focus, options);
+  record('placement', machine);
   progress(0.38, 'Refining the layout');
   metrics.placementMs = performance.now() - started;
   const refineStarted = performance.now();
@@ -977,6 +995,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
     if (options.mode !== 'circle') improve(null);
   }
   metrics.refinementMs = performance.now() - refineStarted;
+  record('refinement', machine);
   const routingStarted = performance.now();
   progress(0.58, 'Checking transition routes');
   if ((options.mode ?? 'circle') === 'circle') {
@@ -1053,6 +1072,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
     }
   }
   metrics.routingVerificationMs = performance.now() - routingStarted;
+  record('routing', machine);
   if (options.mode === 'tree' || machine.groups?.length || focus) {
     const align = (id) => {
       const view = graphView(machine, id),
@@ -1089,6 +1109,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
       if (options.mode === 'tree') align(null);
     }
   }
+  record('alignment', machine);
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');
   placeCommentsAfterLayout(graphView(machine));

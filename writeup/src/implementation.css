@@ -1,0 +1,68 @@
+.implementation-guide pre {
+  margin: 1.3rem 0;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--panel);
+  overflow-x: auto;
+  font-size: 0.86rem;
+  line-height: 1.65;
+  tab-size: 2;
+}
+.implementation-guide pre code {
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+.guide-contents {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  padding-block: 1.5rem;
+  border-block: 1px solid var(--line);
+}
+.guide-contents a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.guide-note {
+  font-size: 0.9rem;
+}
+.guide-table {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+.guide-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.guide-table th,
+.guide-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  min-width: 8rem;
+}
+.guide-table th {
+  color: var(--accent);
+}
+.implementation-guide details {
+  border: 1px solid var(--line);
+  padding: 1rem;
+  border-radius: 0.65rem;
+  margin: 1.5rem 0;
+}
+.implementation-guide summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.implementation-guide li {
+  margin-block: 0.6rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.implementation-guide section {
+  scroll-margin-top: 1.5rem;
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Implementing graph layout · Lexica</title>
+    <meta
+      name="description"
+      content="Data structures, explained pseudocode, and optimization notes for Lexica’s layout solver."
+    />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('lexica-theme') === 'light' ? 'light' : 'dark';
+      } catch {
+        document.documentElement.dataset.theme = 'dark';
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/implementation.jsx"></script>
+  </body>
+</html>
