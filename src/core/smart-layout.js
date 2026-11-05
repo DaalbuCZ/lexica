@@ -15,7 +15,7 @@ import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
 import { placementCorridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
-import { circularStartRing } from './radial-ring.js';
+import { circularStartRing, orientGroupsUp } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
@@ -1005,6 +1005,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
           { ...view, states: accepted },
           { stats: (metrics.radialAesthetics = {}) },
         );
+      if (!id && machine.groups?.length) accepted = orientGroupsUp({ ...view, states: accepted });
       const positions = new Map(accepted.map((s) => [s.id, s]));
       for (const s of view.states) {
         const p = positions.get(s.id);

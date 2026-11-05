@@ -1,5 +1,5 @@
 import { drawingClearance } from './planar-layout.js';
-import { placementCorridorRoutes } from './corridor-routing.js';
+import { corridorRoutes, placementCorridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 
 // Rebalance the first ring without inheriting the unequal radii of local
@@ -204,4 +204,46 @@ export function circularStartRing(machine) {
       }
     }
   return best ?? machine.states;
+}
+
+// Rotate the overview as a unit so the first ring and branch spacing stay intact.
+export function orientGroupsUp(machine) {
+  const root = machine.states.find((state) => state.id === machine.start);
+  if (!root) return machine.states;
+  let x = 0,
+    y = 0;
+  for (const state of machine.states) {
+    if (!state.group || state === root) continue;
+    const dx = state.x - root.x,
+      dy = state.y - root.y;
+    const radius = Math.hypot(dx, dy);
+    if (radius) {
+      x += dx / radius;
+      y += dy / radius;
+    }
+  }
+  if (Math.hypot(x, y) < 1e-6) return machine.states;
+  const ideal = -Math.PI / 2 - Math.atan2(y, x);
+  const labels = machine.edges.map(simpleTransitionLabel);
+  for (const offset of [
+    0,
+    Math.PI / 12,
+    -Math.PI / 12,
+    Math.PI / 6,
+    -Math.PI / 6,
+    Math.PI / 4,
+    -Math.PI / 4,
+  ]) {
+    const angle = ideal + offset;
+    const cos = Math.cos(angle),
+      sin = Math.sin(angle);
+    if (x * sin + y * cos >= y - 1e-6) continue;
+    const states = machine.states.map((state) => {
+      const dx = state.x - root.x,
+        dy = state.y - root.y;
+      return { ...state, x: root.x + dx * cos - dy * sin, y: root.y + dx * sin + dy * cos };
+    });
+    if (corridorRoutes({ ...machine, states, comments: [] }, labels)) return states;
+  }
+  return machine.states;
 }

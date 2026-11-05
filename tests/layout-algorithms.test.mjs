@@ -14,7 +14,7 @@ import { createLiveRouting } from '../src/editor/live-routing.js';
 import { compactAesthetics } from '../src/core/aesthetic-layout.js';
 import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
 import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
-import { circularStartRing } from '../src/core/radial-ring.js';
+import { circularStartRing, orientGroupsUp } from '../src/core/radial-ring.js';
 import { createViewport } from '../src/editor/viewport.js';
 import { canvasTransform } from '../src/core/canvas-graph.js';
 import { solveLayout } from '../src/core/smart-layout.js';
@@ -710,6 +710,23 @@ test('crowded bent approaches try both normal ends and keep a clear single-end i
     assert.ok(dx * tx + dy * ty > 0);
   }
   assert.equal(validateRouteSeparation(routes, { maxDepth: 24 }).status, 'clear');
+});
+
+test('radial orientation favors group nodes above the start without changing ring radii', () => {
+  const m = {
+    start: 'root',
+    states: [
+      { id: 'root', x: 0, y: 0 },
+      { id: 'group', name: 'Group', group: true, x: 0, y: 240 },
+      { id: 'accept', token: 'TOKEN', x: 0, y: -240 },
+      { id: 'other', x: 240, y: 0 },
+    ],
+    edges: ['group', 'accept', 'other'].map((to) => ({ from: 'root', to, label: 'a' })),
+  };
+  const states = orientGroupsUp(m);
+  assert.ok(states.find((s) => s.id === 'group').y < -239);
+  assert.ok(states.find((s) => s.id === 'accept').y > 239);
+  for (const s of states.slice(1)) assert.ok(Math.abs(Math.hypot(s.x, s.y) - 240) < 1e-6);
 });
 
 test('a feasible start ring remains circular through aesthetic cleanup', () => {
