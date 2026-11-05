@@ -3,7 +3,6 @@ import { Search } from 'lucide-react';
 import { isAccepting } from '../core/lexer.js';
 import { tokenColorClass } from '../core/token-colors.js';
 import { useStudio } from '../state/studio.js';
-import { Modal } from './ui.jsx';
 
 function matchScore(text, query) {
   if (text === query) return 0;
@@ -22,23 +21,23 @@ function matchScore(text, query) {
 // https://www.interior.dev/docs/command-palette
 export function StatePaletteHost() {
   const open = useStudio((state) => state.dialog?.type === 'state-search');
-  return open ? <StatePalette onClose={() => useStudio.setState({ dialog: null })} /> : null;
-}
-
-function StatePalette({ onClose }) {
+  const onClose = () => useStudio.setState({ dialog: null });
   const machine = useStudio((state) => state.scene.machine);
+  const version = useStudio((state) => state.scene.version);
   const controller = useStudio((state) => state.controller);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(null);
+  const [scrollTop, setScrollTop] = useState(0);
   const listId = useId(),
-    activeRow = useRef(null),
+    dialog = useRef(null),
+    list = useRef(null),
     picked = useRef(false);
   const items = useMemo(() => {
     const groups = new Map(
       (machine.groups ?? []).flatMap((group) => group.stateIds.map((id) => [id, group.name])),
     );
     return machine.states.map((state) => ({ state, group: groups.get(state.id) }));
-  }, [machine]);
+  }, [machine, version]);
   const results = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (!terms.length) return items;
@@ -62,9 +61,32 @@ function StatePalette({ onClose }) {
     0,
     results.findIndex(({ state }) => state.id === highlight),
   );
+  // The list shows up to six fixed-height rows. Keep only a small window
+  // mounted so opening the palette does not lay out the whole machine.
+  const rowHeight = 38;
+  const first = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+  const rows = results.slice(first, first + 10).map((item, i) => ({ item, index: first + i }));
+  if (results[active] && !rows.some(({ index }) => index === active))
+    rows.push({ item: results[active], index: active });
+  const scrollTo = (top) => {
+    const element = list.current;
+    if (!element) return;
+    element.scrollTop = top;
+    setScrollTop(element.scrollTop);
+  };
   useLayoutEffect(() => {
-    activeRow.current?.scrollIntoView({ block: 'nearest' });
-  }, [active, results]);
+    const panel = dialog.current;
+    if (open) {
+      if (!panel.open) panel.showModal();
+    } else if (panel.open) {
+      panel.close();
+      if (picked.current) document.getElementById('canvas')?.focus({ preventScroll: true });
+      picked.current = false;
+      setQuery('');
+      setHighlight(null);
+      scrollTo(0);
+    }
+  }, [open]);
   const choose = (item) => {
     if (!item) return;
     picked.current = true;
@@ -81,17 +103,33 @@ function StatePalette({ onClose }) {
       const next =
         (active + (event.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length;
       setHighlight(results[next].state.id);
+      const element = list.current;
+      if (!element) return;
+      const top = next * rowHeight;
+      if (top < element.scrollTop) scrollTo(top);
+      else if (top + rowHeight > element.scrollTop + element.clientHeight)
+        scrollTo(top + rowHeight - element.clientHeight);
     }
   };
   return (
-    <Modal
-      title="Command palette"
-      className="state-palette"
-      onClose={onClose}
-      onCloseAutoFocus={(event) => {
-        if (!picked.current) return;
+    <dialog
+      ref={dialog}
+      className="react-dialog state-palette"
+      aria-label="Command palette"
+      onCancel={(event) => {
         event.preventDefault();
-        document.getElementById('canvas')?.focus({ preventScroll: true });
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const box = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < box.left ||
+          event.clientX > box.right ||
+          event.clientY < box.top ||
+          event.clientY > box.bottom
+        )
+          onClose();
       }}
     >
       <div className="state-palette-search">
@@ -110,6 +148,7 @@ function StatePalette({ onClose }) {
           onChange={(event) => {
             setQuery(event.target.value);
             setHighlight(null);
+            scrollTo(0);
           }}
           onKeyDown={keyDown}
         />
@@ -126,9 +165,17 @@ function StatePalette({ onClose }) {
           role="listbox"
           aria-label="Matching states"
           id={listId}
+          ref={list}
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           onMouseDown={(event) => event.preventDefault()}
         >
-          {results.map((item, i) => {
+          <li
+            aria-hidden="true"
+            role="presentation"
+            className="state-palette-spacer"
+            style={{ height: results.length * rowHeight }}
+          />
+          {rows.map(({ item, index: i }) => {
             const { state, group } = item;
             const color =
               isAccepting(state) && !state.skip
@@ -138,7 +185,9 @@ function StatePalette({ onClose }) {
               <li
                 key={state.id}
                 id={`${listId}-${i}`}
-                ref={i === active ? activeRow : null}
+                style={{ top: i * rowHeight }}
+                aria-posinset={i + 1}
+                aria-setsize={results.length}
                 role="option"
                 aria-selected={i === active}
                 onPointerMove={() => setHighlight(state.id)}
@@ -162,6 +211,6 @@ function StatePalette({ onClose }) {
           <kbd>↵</kbd> Go to state
         </span>
       </div>
-    </Modal>
+    </dialog>
   );
 }

@@ -188,11 +188,20 @@ export function createViewport(context) {
       y: (available.top + available.bottom - size.height) / 2,
     };
     const placed = center ? centered : placeFloatingRect(centered, size, available, obstacles, 12);
-    const target = {
-      ...start,
-      x: start.x + (screen.x - placed.x - size.width / 2) / scale,
-      y: start.y + (screen.y - placed.y - size.height / 2) / scale,
-    };
+    // Search jumps use a fixed scale of 1.15 screen pixels per graph unit.
+    const searchScale = 1.15;
+    const target = center
+      ? {
+          x: x - ((available.left + available.right) / 2 - area.left) / searchScale,
+          y: y - ((available.top + available.bottom) / 2 - area.top) / searchScale,
+          width: area.width / searchScale,
+          height: area.height / searchScale,
+        }
+      : {
+          ...start,
+          x: start.x + (screen.x - placed.x - size.width / 2) / scale,
+          y: start.y + (screen.y - placed.y - size.height / 2) / scale,
+        };
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setView(target);
       return;
@@ -206,6 +215,8 @@ export function createViewport(context) {
         ...start,
         x: start.x + (target.x - start.x) * ease,
         y: start.y + (target.y - start.y) * ease,
+        width: start.width + (target.width - start.width) * ease,
+        height: start.height + (target.height - start.height) * ease,
       });
       if (progress < 1) context.cameraFrame = requestAnimationFrame(tick);
     };

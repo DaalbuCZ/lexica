@@ -1096,23 +1096,15 @@ body.connecting-outside-group .group-overlay {
   }
 }
 
-.react-dialog.state-palette {
+dialog.react-dialog.state-palette {
   width: 520px;
+  margin: 0;
   padding: 0;
   overflow: hidden;
-}
-.react-dialog.state-palette[data-state='open'] {
   animation: none;
 }
-.state-palette .dialog-heading {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.state-palette .dialog-heading button {
-  display: none;
+dialog.state-palette::backdrop {
+  background: #17201f66;
 }
 .state-palette-search,
 .state-palette-footer {
@@ -1148,19 +1140,22 @@ body.connecting-outside-group .group-overlay {
   height: min(calc(var(--palette-rows) * 38px + 10px), 48vh);
 }
 .state-palette-results ul {
+  position: relative;
   height: 100%;
   margin: 0;
-  padding: 5px;
+  padding: 0;
   overflow: auto;
   list-style: none;
   overscroll-behavior: contain;
 }
-.state-palette-results li {
+.state-palette-results [role='option'] {
+  position: absolute;
+  left: 5px;
+  right: 5px;
   display: flex;
   align-items: center;
   gap: 12px;
   height: 36px;
-  margin-bottom: 2px;
   padding: 0 10px;
   border-radius: 8px;
   cursor: pointer;

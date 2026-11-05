@@ -273,6 +273,7 @@ for (const presentation of ['canvas', 'overlay'])
     await setup(page, presentation, m);
     await expect(page.locator('#app-loading')).toBeHidden();
     const search = page.getByRole('combobox', { name: 'Find a state' });
+    await page.locator('#zoom-out').click();
     await page.keyboard.press('Control+p');
     await expect(search).toBeFocused();
     await search.fill('group target');
@@ -293,9 +294,15 @@ for (const presentation of ['canvas', 'overlay'])
         );
       }, state);
     await expect.poll(() => distance(m.states.find((s) => s.id === 'b'))).toBeLessThan(2);
+    const zoom = () =>
+      page
+        .locator('#canvas')
+        .evaluate((canvas) => canvas.getContext('2d').getTransform().a / devicePixelRatio);
+    await expect.poll(zoom).toBeCloseTo(1.15, 4);
     await page.keyboard.press('Control+p');
     await search.fill('End');
     await search.press('Enter');
     await expect(page.locator('.group-navigation [data-current]')).toHaveCount(0);
     await expect.poll(() => distance(m.states.find((s) => s.id === 'end'))).toBeLessThan(2);
+    await expect.poll(zoom).toBeCloseTo(1.15, 4);
   });

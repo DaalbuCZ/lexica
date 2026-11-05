@@ -195,6 +195,22 @@ test('combined group transitions drag, persist, undo and open only on double cli
 });
 
 test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'lexica-machine',
+      JSON.stringify({
+        start: 's0',
+        states: Array.from({ length: 40 }, (_, i) => ({
+          id: 's' + i,
+          name: 'State ' + i,
+          token: '',
+          x: i * 30,
+          y: 0,
+        })),
+        edges: [],
+      }),
+    );
+  });
   let release;
   let intercepted = false;
   const ready = new Promise((resolve) => {
@@ -218,6 +234,16 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
       .locator('.state-palette')
       .evaluate((el) => getComputedStyle(el).animationName);
     expect(animation).toBe('none');
+    const list = page.getByRole('listbox', { name: 'Matching states' });
+    await expect(list.getByRole('option')).toHaveCount(10);
+    const search = page.getByRole('combobox', { name: 'Find a state' });
+    await search.press('ArrowUp');
+    await expect(list.getByRole('option', { name: 'State 39 Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await search.press('Escape');
+    await expect(search).toBeHidden();
   } finally {
     release();
   }
