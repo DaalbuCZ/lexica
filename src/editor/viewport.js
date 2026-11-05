@@ -6,7 +6,7 @@ import { createGroupWindow } from './group-window.js';
 import { visibleViewport, measureVisibleViewport } from './visible-viewport.js';
 export function createViewport(context) {
   const { positionGroupPanel } = createGroupWindow(context);
-  function floatingObstacles(exclude) {
+  function floatingObstacles(exclude, groupInterior = false) {
     return [
       document.querySelector('.brand'),
       document.querySelector('.top-actions'),
@@ -14,7 +14,9 @@ export function createViewport(context) {
       document.querySelector('.minimap'),
       document.querySelector('.canvas-status'),
       document.querySelector('.inspector'),
-      context.groupPanel,
+      groupInterior
+        ? context.groupPanel.querySelector('.group-overlay-heading')
+        : context.groupPanel,
       document.querySelector('.tester'),
       document.querySelector('.debugger-window'),
     ]
@@ -82,7 +84,8 @@ export function createViewport(context) {
         width: panel.offsetWidth,
         height: panel.offsetHeight,
       },
-      obstacles = floatingObstacles(panel);
+      // The group canvas hosts the selection, so only its header is in the way.
+      obstacles = floatingObstacles(panel, !!context.overviewView);
     const anchor = box
         ? {
             x: (box.left + box.right) / 2,
