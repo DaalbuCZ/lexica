@@ -532,7 +532,7 @@ export function createEditorController(
     context.placingComment = false;
     context.placingState = false;
     context.placementPoint = null;
-    document.body.classList.remove('placing-comment', 'placing-state');
+    document.body.classList.remove('placing-comment', 'placing-state', 'connecting-outside-group');
     context.source = null;
     context.connectPoint = null;
     context.rightStart = null;
@@ -550,6 +550,7 @@ export function createEditorController(
     context.source = null;
     context.connectPoint = null;
     context.rightStart = null;
+    document.body.classList.remove('connecting-outside-group');
     $('modehint').textContent = '';
     changed();
     showProperties(true);
@@ -560,25 +561,20 @@ export function createEditorController(
   function insertBetween(to, position) {
     checkpoint();
     const state = insertState(context.machine, context.source, to, position);
+    if (context.openGroup)
+      context.machine.groups
+        .find((group) => group.id === context.openGroup)
+        ?.stateIds.push(state.id);
     context.source = null;
     context.connectPoint = null;
     context.rightStart = null;
+    document.body.classList.remove('connecting-outside-group');
     $('modehint').textContent = '';
     choose('state', state.id);
     changed();
-    if (to == null) {
-      context.source = state.id;
-      context.connectPoint = {
-        x: state.x,
-        y: state.y,
-      };
-      $('modehint').textContent =
-        'Click the next destination · Ctrl-drag to insert another state · Esc to finish';
-      draw();
-    } else {
-      showProperties(true);
-    }
+    showProperties(true);
   }
+
   function connectComment(commentId, nodeId) {
     checkpoint();
     connectCommentNode(context.machine, commentId, nodeId);

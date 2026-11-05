@@ -8,7 +8,8 @@ export function readEditorSettings(storage) {
       groupPresentation: saved.groupPresentation === 'canvas' ? 'canvas' : 'overlay',
       simplified: saved.simplified !== false,
       followDebugState: saved.followDebugState !== false,
-      rerouteWhileDragging: saved.rerouteWhileDragging === true,
+      rerouteWhileDragging: true,
+      colorEdges: saved.colorEdges !== false,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {
@@ -16,7 +17,8 @@ export function readEditorSettings(storage) {
       groupPresentation: 'overlay',
       simplified: true,
       followDebugState: true,
-      rerouteWhileDragging: false,
+      rerouteWhileDragging: true,
+      colorEdges: true,
       pinchSensitivity: 1,
     };
   }

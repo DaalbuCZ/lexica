@@ -26,7 +26,15 @@ export function useAnchoredPanel(panel, anchorId) {
       if (dock === 'bottom') top = toolbar.top - height - 14;
       panel.style.left = Math.max(12, Math.min(left, innerWidth - width - 12)) + 'px';
       panel.style.top = Math.max(12, Math.min(top, innerHeight - height - 12)) + 'px';
-      panel.style.transformOrigin = `${box.left + box.width / 2 - parseFloat(panel.style.left)}px ${box.top + box.height / 2 - parseFloat(panel.style.top)}px`;
+      const x = Math.max(
+        0,
+        Math.min(width, box.left + box.width / 2 - parseFloat(panel.style.left)),
+      );
+      const y = Math.max(
+        0,
+        Math.min(height, box.top + box.height / 2 - parseFloat(panel.style.top)),
+      );
+      panel.style.transformOrigin = `${dock === 'left' ? 0 : dock === 'right' ? width : x}px ${dock === 'top' ? 0 : dock === 'bottom' ? height : y}px`;
     };
     place();
     const observer = new ResizeObserver(place);

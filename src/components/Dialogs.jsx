@@ -52,6 +52,8 @@ export function Dialogs() {
       return <GroupDialog {...props} />;
     case 'move-group':
       return <MoveGroupDialog {...props} />;
+    case 'outside-group-target':
+      return <OutsideGroupTargetDialog {...props} />;
     case 'group-target':
       return <GroupTargetDialog {...props} />;
     case 'combined-transition':
@@ -307,7 +309,7 @@ function LayoutDialog({ onClose, dialog }) {
       anchorId={dialog.anchorId}
     >
       <Select id="layout-mode" label="Layout" value={mode} onChange={setMode}>
-        <option value="auto">Auto (tree below 10 nodes, otherwise radial)</option>
+        <option value="auto">Auto</option>
         <option value="tree">Tree</option>
         <option value="circle">Radial</option>
       </Select>
@@ -559,6 +561,57 @@ function ShortcutsDialog({ onClose }) {
             ))}
           </section>
         ))}
+      </div>
+    </Modal>
+  );
+}
+
+function OutsideGroupTargetDialog({ dialog, onClose }) {
+  const [query, setQuery] = useState('');
+  const machine = useStudio((s) => s.scene.machine),
+    controller = useStudio((s) => s.controller);
+  const members = new Set(
+    machine.groups?.find((group) => group.id === dialog.groupId)?.stateIds ?? [],
+  );
+  const states = machine.states.filter(
+    (state) =>
+      !members.has(state.id) && state.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+  );
+  return (
+    <Modal title="Connect outside this group" onClose={onClose} className="group-dialog">
+      <TextField.Root
+        autoFocus
+        aria-label="Search states"
+        placeholder="Search states by name"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <div className="outside-state-list">
+        {states.map((state) => (
+          <Button
+            key={state.id}
+            onClick={() => {
+              controller.connect(dialog.from, state.id);
+              onClose();
+            }}
+          >
+            <span
+              style={{
+                color:
+                  state.token && !state.skip && state.accepting !== false
+                    ? `var(--token-accent-${tokenColorClass(state.token).slice(-1)})`
+                    : undefined,
+              }}
+            >
+              {state.name}
+            </span>
+            <small>
+              {machine.groups?.find((group) => group.stateIds.includes(state.id))?.name ??
+                'Overview'}
+            </small>
+          </Button>
+        ))}
+        {!states.length && <p>No matching states outside this group.</p>}
       </div>
     </Modal>
   );

@@ -1048,30 +1048,50 @@ summary,
   }
 }
 
-/* The tester retains its edge while expanding into the canvas. */
-body:not(.resizing-tester) .tester {
-  transition:
-    width 180ms ease,
-    height 180ms ease;
-}
-body:not(.tester-collapsed) .tester .test-grid {
+/* Reveal the final-size contents from the dock edge; never resize text mid-animation. */
+body:not(.tester-collapsed) .tester {
   animation: tester-reveal 180ms ease-out;
+}
+body[data-tester-dock='bottom'] {
+  --tester-clip: inset(100% 0 0 0);
+}
+body[data-tester-dock='top'] {
+  --tester-clip: inset(0 0 100% 0);
+}
+body[data-tester-dock='left'] {
+  --tester-clip: inset(0 100% 0 0);
+}
+body[data-tester-dock='right'] {
+  --tester-clip: inset(0 0 0 100%);
 }
 @keyframes tester-reveal {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    clip-path: var(--tester-clip);
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    clip-path: inset(0);
   }
 }
+body.connecting-outside-group .group-overlay {
+  box-shadow:
+    0 0 0 100vmax #60aaff30,
+    0 0 0 2px #80bdff;
+}
+.outside-state-list {
+  display: grid;
+  gap: 6px;
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 12px;
+}
+.outside-state-list button {
+  justify-content: space-between;
+}
+.outside-state-list small {
+  color: var(--muted);
+}
 @media (prefers-reduced-motion: reduce) {
-  body .tester {
-    transition: none;
-  }
-  body .tester .test-grid {
+  body:not(.tester-collapsed) .tester {
     animation: none;
   }
 }

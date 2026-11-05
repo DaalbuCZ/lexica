@@ -204,3 +204,47 @@ test('touch opening, background panning and closing do not leave a phantom finge
     expect((await transform(page, '#canvas')).scale).toBeCloseTo(main.scale, 5);
   }
 });
+
+test('Ctrl-drag inserts inside the group and offers a searchable destination outside', async ({
+  page,
+}) => {
+  await setup(page);
+  const proxy = await groupPoint(page);
+  await page.mouse.dblclick(proxy.x, proxy.y);
+  await expect(page.locator('.group-overlay')).toBeVisible();
+  const point = (x, y) =>
+    page.locator('#canvas').evaluate(
+      (canvas, [x, y]) => {
+        const t = canvas.getContext('2d').getTransform(),
+          r = canvas.getBoundingClientRect();
+        return { x: r.left + t.e + x * t.a, y: r.top + t.f + y * t.d };
+      },
+      [x, y],
+    );
+  const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')));
+  const drag = async (to) => {
+    const from = await point(0, 0);
+    await page.keyboard.down('Control');
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 5 });
+    await expect(page.locator('body')).toHaveClass(/connecting-outside-group/);
+    await page.mouse.up();
+    await page.keyboard.up('Control');
+    await expect(page.locator('body')).not.toHaveClass(/connecting-outside-group/);
+  };
+  await drag(await point(80, 35));
+  await expect.poll(async () => (await read()).groups[0].stateIds.length).toBe(3);
+  const close = page.getByRole('button', { name: 'Close properties' });
+  if (await close.isVisible()) await close.click();
+  const bounds = await page.locator('.group-overlay').boundingBox();
+  await drag({ x: bounds.x + bounds.width / 2, y: bounds.y - 20 });
+  const picker = page.getByRole('dialog', { name: 'Connect outside this group' });
+  await expect(picker).toBeVisible();
+  await picker.getByRole('textbox', { name: 'Search states' }).fill('END');
+  await picker.getByRole('button', { name: 'End Overview' }).click();
+  await expect
+    .poll(async () => (await read()).edges.some((e) => e.from === 'a' && e.to === 'end'))
+    .toBe(true);
+  expect((await read()).states).toHaveLength(5);
+});

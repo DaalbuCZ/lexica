@@ -2,7 +2,7 @@ import { placementPreview } from '../core/placement.js';
 import { graphBounds } from '../core/canvas-graph.js';
 import { editorSettings, simpleTransitionLabel } from '../core/editor-settings.js';
 import { transitionLabel } from '../core/labels.js';
-import { transitionError } from '../core/lexer.js';
+import { transitionError, destination } from '../core/lexer.js';
 import { routeEdges } from '../core/layout.js';
 import { graphView, groupFor } from '../core/groups.js';
 import { tokenColorClass } from '../core/token-colors.js';
@@ -216,6 +216,21 @@ export function createCanvasRenderer(context) {
           );
         return tokenColors.get(name);
       },
+      edgeColor = (edge, index) => {
+        if (!editorSettings.colorEdges) return null;
+        const indices = edge.originalIndices ?? [edge.originalIndex ?? index];
+        const colors = indices.map((i) => {
+          try {
+            const target = destination(context.machine, context.machine.edges[i]);
+            return target.accepting !== false && target.token && !target.skip
+              ? tokenColor(target.token)
+              : null;
+          } catch {
+            return null;
+          }
+        });
+        return colors.every((color) => color === colors[0]) ? colors[0] : null;
+      },
       baseLabel = editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
       label = (edge) =>
         edge.originalIndices?.length > 1
@@ -322,6 +337,7 @@ export function createCanvasRenderer(context) {
           invalidEdges,
           label,
           tokenColor,
+          edgeColor,
           selectedStates: new Set(),
           selectedComments: new Set(),
           selectedCommentLinks: new Set(),
@@ -339,6 +355,7 @@ export function createCanvasRenderer(context) {
       routes: shownRoutes,
       invalidEdges,
       tokenColor,
+      edgeColor,
       selectedStates: new Set([
         ...context.selectedStates,
         ...(context.machine.groups ?? [])
@@ -366,8 +383,12 @@ export function createCanvasRenderer(context) {
       label,
       placement: placementPreview(
         context.machine,
-        context.placingState ? 'state' : context.placingComment ? 'comment' : null,
-        context.placementPoint,
+        context.placingState || context.rightStart?.insert
+          ? 'state'
+          : context.placingComment
+            ? 'comment'
+            : null,
+        context.rightStart?.insert ? context.connectPoint : context.placementPoint,
       ),
     });
   }

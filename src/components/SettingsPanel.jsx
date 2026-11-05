@@ -51,10 +51,10 @@ export function SettingsPanel({ dialog, onClose }) {
             onChange={(simplified) => change({ simplified })}
           />
           <Check
-            id="reroute-while-dragging"
-            label="Recalculate paths while dragging"
-            checked={settings.rerouteWhileDragging}
-            onChange={(rerouteWhileDragging) => change({ rerouteWhileDragging })}
+            id="color-edges"
+            label="Color transitions by target state"
+            checked={settings.colorEdges}
+            onChange={(colorEdges) => change({ colorEdges })}
           />
           <Check
             id="label-boxes"

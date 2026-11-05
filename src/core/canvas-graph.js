@@ -255,6 +255,7 @@ export function createGraphCanvas(canvas, minimap) {
       errorStates = new Set([...failureStates, ...(trace?.token === 'ERROR' ? traceStates : [])]),
       current = trace?.kind ? (trace.state ?? trace.traceStates?.at(-1)) : null,
       currentEdge = trace?.kind === 'character' ? trace.traceEdges?.at(-1) : null;
+    const edgeColors = scene.edgeColor ? machine.edges.map(scene.edgeColor) : [];
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = c.noteLine;
     ctx.setLineDash([6 / transform().scale, 5 / transform().scale]);
@@ -280,13 +281,15 @@ export function createGraphCanvas(canvas, minimap) {
         active = currentEdge === index;
       ctx.strokeStyle = bad
         ? c.error
-        : active
-          ? c.step
-          : traceEdges.has(index)
-            ? c.trace
-            : edgeSelected(e, i)
-              ? c.green
-              : c.edge;
+        : edgeColors[i]
+          ? edgeColors[i]
+          : active
+            ? c.step
+            : traceEdges.has(index)
+              ? c.trace
+              : edgeSelected(e, i)
+                ? c.green
+                : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
       ctx.stroke(paths[i]);
       arrow(ctx, r, ctx.strokeStyle);
@@ -421,17 +424,19 @@ export function createGraphCanvas(canvas, minimap) {
           (trace?.token === 'ERROR' && traceEdges.has(index)),
         color = bad
           ? c.error
-          : currentEdge === index
-            ? c.step
-            : traceEdges.has(index)
-              ? c.traceText
-              : c.text;
+          : edgeColors[i]
+            ? edgeColors[i]
+            : currentEdge === index
+              ? c.step
+              : traceEdges.has(index)
+                ? c.traceText
+                : c.text;
       ctx.font = '11px "IBM Plex Mono",monospace';
       ctx.textAlign = 'center';
       const text = labelFor(e) || '⚠ empty';
       if (e.groupEdge || (machine.labelBoxes && e.label)) {
         ctx.fillStyle = c.panel;
-        ctx.strokeStyle = bad ? c.error : c.edge;
+        ctx.strokeStyle = bad ? c.error : (edgeColors[i] ?? c.edge);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.roundRect(r.label.x - r.label.w / 2, r.label.y - 15, r.label.w, 22, 3);

@@ -2322,7 +2322,8 @@ test('simplified settings restore safely without changing graph preferences', ()
       groupPresentation: 'overlay',
       simplified: true,
       followDebugState: true,
-      rerouteWhileDragging: false,
+      rerouteWhileDragging: true,
+      colorEdges: true,
       pinchSensitivity: 2,
     },
   );
@@ -2334,7 +2335,8 @@ test('simplified settings restore safely without changing graph preferences', ()
       groupPresentation: 'overlay',
       simplified: true,
       followDebugState: true,
-      rerouteWhileDragging: false,
+      rerouteWhileDragging: true,
+      colorEdges: true,
       pinchSensitivity: 1,
     },
   );
@@ -2348,7 +2350,8 @@ test('simplified settings restore safely without changing graph preferences', ()
       groupPresentation: 'overlay',
       simplified: true,
       followDebugState: true,
-      rerouteWhileDragging: false,
+      rerouteWhileDragging: true,
+      colorEdges: true,
       pinchSensitivity: 1,
     },
   );
@@ -4520,13 +4523,35 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
   assert.match(text, /M = \(Q, Σ, R, s, F\)/);
   assert.match(text, /Q = \{q0, q1\}/);
   assert.match(text, /Σ = \{"a"…"c"\}/);
-  assert.match(text, /q0 a → q1/);
+  assert.match(text, /q0 A1 → q1/);
   assert.match(text, /s = q0/);
   assert.match(text, /F = \{q1\}/);
   assert.deepEqual(m, before);
   m.edges[0].label = 'a';
   m.edges[0].invert = true;
   assert.match(toAcademic(m), /"b"…U\+10FFFF/);
+  m.edges[0].label = '[a-c]';
+  m.edges[0].invert = false;
+  m.cells = [
+    { name: 'n', initial: 2 },
+    { name: 'items', type: 'stack', initial: [4] },
+  ];
+  m.edges[0].guards = [
+    { cell: 'n', op: 'odd' },
+    { cell: 'items', op: '==', value: 4 },
+  ];
+  m.edges[0].guardMode = 'any';
+  m.edges[0].effects = [
+    { cell: 'items', op: 'pop' },
+    { cell: 'n', op: 'add', value: 1 },
+  ];
+  m.edges.push({ from: 'b', to: 'b', label: '[a-c]' });
+  const extended = toAcademic(m);
+  assert.match(extended, /μ₀ = \{n = 2, items = \[4\]\}/);
+  assert.match(extended, /q0 A1 \[n odd ∨ top\(items\) == 4\] \/ items pop; n \+= 1 → q1/);
+  assert.match(extended, /q1 A1 → q1/);
+  m.edges[0].effectDisabled = true;
+  assert.doesNotMatch(toAcademic(m), /items pop/);
   m.start = null;
   assert.throws(() => toAcademic(m), /start state/);
 });

@@ -151,7 +151,7 @@ export function Tester({ debuggerRef }) {
     sync();
   };
   const focusSelection = () => {
-    if (analysis.pending || session.current) return;
+    if (analysis.pending || session.current || document.activeElement !== inputRef.current) return;
     const area = inputRef.current;
     const matches = tokensAtSelection(
       visible,
@@ -170,6 +170,19 @@ export function Tester({ debuggerRef }) {
         : null,
     );
   };
+  const clearSelectionTrace = () => {
+    if (session.current) return;
+    setActiveOffsets((offsets) => (offsets.size ? new Set() : offsets));
+    clearHover();
+    controller?.setTrace(null);
+  };
+  useEffect(() => {
+    const clearOutside = (event) => {
+      if (!event.target.closest?.('.tester, .debugger-window')) clearSelectionTrace();
+    };
+    document.addEventListener('pointerdown', clearOutside, true);
+    return () => document.removeEventListener('pointerdown', clearOutside, true);
+  }, [controller]);
   const selectToken = (token) => {
     session.current = null;
     setFrame(null);
@@ -343,6 +356,7 @@ export function Tester({ debuggerRef }) {
                 });
               }}
               onSelect={focusSelection}
+              onBlur={clearSelectionTrace}
               onClick={seek}
               onKeyUp={(e) => {
                 if (!e.altKey && e.key.startsWith('Arrow')) seek();

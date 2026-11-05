@@ -1,4 +1,5 @@
 import { destination, isAccepting, matcher, validate } from './lexer.js';
+import { memoryRuleLabel, stackCell } from './memory.js';
 
 // IFJ, Modely pro regulární jazyky, slide 7: M = (Q, Σ, R, s, F).
 // Enumerate the finite Unicode input domain, compressing consecutive symbols.
@@ -36,16 +37,18 @@ function set(ranges) {
 export function toAcademic(machine) {
   validate(machine);
   if (!machine.start) throw Error('Choose a start state before exporting a finite automaton.');
-  if (
-    machine.edges.some(
-      (e) =>
-        (!e.guardDisabled && (e.guard || e.guards?.length)) ||
-        (!e.effectDisabled && (e.effect || e.effects?.length)),
-    )
-  )
-    throw Error(
-      'The academic finite automaton format cannot represent memory conditions or actions.',
-    );
+  const extended =
+    machine.machineType !== 'fsm' &&
+    (machine.machineType === 'extended' ||
+      machine.cells?.length ||
+      machine.edges.some((e) => e.guard || e.guards?.length || e.effect || e.effects?.length));
+  const cells = new Map((machine.cells ?? []).map((cell) => [cell.name, cell]));
+  const guardText = (guard) => {
+    const label = memoryRuleLabel(guard);
+    return stackCell(cells.get(guard.cell)) && !['empty', 'notEmpty'].includes(guard.op)
+      ? label.replace(guard.cell, `top(${guard.cell})`)
+      : label;
+  };
   const names = new Map(machine.states.map((state, i) => [state.id, `q${i}`]));
   const sets = machine.edges.map(rangesFor);
   const alphabet = [];
@@ -54,18 +57,45 @@ export function toAcademic(machine) {
     if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
     else alphabet.push([a, b]);
   }
+  const aliases = new Map();
   const rules = machine.edges.flatMap((edge, i) => {
     const from = names.get(edge.from),
       to = names.get(destination(machine, edge).id);
     if (!sets[i].length) return [];
-    if (sets[i].length === 1 && sets[i][0][0] === sets[i][0][1])
-      return [`  ${from} ${symbol(sets[i][0][0])} → ${to}`];
-    return [`  ${from} a → ${to}  for each a ∈ ${set(sets[i])}`];
+    let input;
+    if (sets[i].length === 1 && sets[i][0][0] === sets[i][0][1]) input = symbol(sets[i][0][0]);
+    else {
+      const value = set(sets[i]);
+      if (!aliases.has(value)) aliases.set(value, `A${aliases.size + 1}`);
+      input = aliases.get(value);
+    }
+    const guards =
+      !extended || edge.guardDisabled
+        ? []
+        : [...(edge.guard ? [edge.guard] : []), ...(edge.guards ?? [])];
+    const actions =
+      !extended || edge.effectDisabled
+        ? []
+        : [...(edge.effect ? [edge.effect] : []), ...(edge.effects ?? [])];
+    const condition = guards.length
+      ? ` [${guards.map(guardText).join(edge.guardMode === 'any' ? ' ∨ ' : ' ∧ ')}]`
+      : '';
+    const effect = actions.length ? ` / ${actions.map(memoryRuleLabel).join('; ')}` : '';
+    return [`  ${from} ${input}${condition}${effect} → ${to}`];
   });
   return [
-    'M = (Q, Σ, R, s, F)',
+    extended
+      ? 'M = (Q, Σ, R, s, F, C, μ₀) — IFJ notation extended with memory'
+      : 'M = (Q, Σ, R, s, F)',
     `Q = {${[...names.values()].join(', ')}}`,
     `Σ = ${set(alphabet)}`,
+    ...[...aliases].map(([value, name]) => `${name} = ${value}`),
+    ...(extended
+      ? [
+          `C = {${[...cells.values()].map((cell) => `${cell.name}: ${stackCell(cell) ? 'stack' : 'counter'}`).join(', ')}}`,
+          `μ₀ = {${[...cells.values()].map((cell) => `${cell.name} = ${JSON.stringify(cell.initial ?? (stackCell(cell) ? [] : 0))}`).join(', ')}}`,
+        ]
+      : []),
     rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = ∅',
     `s = ${names.get(machine.start)}`,
     `F = {${machine.states
@@ -80,8 +110,16 @@ export function toAcademic(machine) {
     ),
     '',
     'Notation: U+XXXX denotes a Unicode character; … includes every code point between the endpoints.',
-    'Character sets abbreviate individual rules pa → q. Groups and portals are flattened.',
-    'This describes the automaton graph; token names, skip flags and lexer match priority are not part of M.',
+    'p A [guard] / actions → q abbreviates one rule for each character in A. Omitted guard = true; omitted actions = identity.',
+    ...(extended
+      ? [
+          'Guards read memory before the transition. Actions run left to right, atomically. A failed pop disables the transition.',
+          'Stacks are listed bottom to top; comparisons use top(stack) and fail on an empty stack. Counters are safe integers.',
+          'μ₀ initializes memory for the input. Successful tokens carry memory forward. Disabled memory rules are omitted.',
+        ]
+      : []),
+    'Groups and portals are flattened.',
+    'This describes the automaton graph; token names, skip flags and longest-match tokenization are not part of M.',
     '',
   ].join('\n');
 }

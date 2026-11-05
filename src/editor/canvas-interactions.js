@@ -148,6 +148,8 @@ export function createCanvasInteractions(context) {
       } else {
         context.showProperties(false);
         context.$('canvas').setPointerCapture(e.pointerId);
+        context.pan = null;
+        context.drag = null;
         context.source = id;
         context.connectPoint = context.point(e);
         context.rightStart = {
@@ -155,7 +157,12 @@ export function createCanvasInteractions(context) {
           x: e.clientX,
           y: e.clientY,
           insert: e.ctrlKey,
+          pointerId: e.pointerId,
         };
+        document.body.classList.toggle(
+          'connecting-outside-group',
+          !!(e.ctrlKey && context.overviewView),
+        );
         context.$('modehint').textContent = 'Choose a destination state or group · Esc to cancel';
         context.draw();
       }
@@ -182,6 +189,11 @@ export function createCanvasInteractions(context) {
     document.body.classList.add('panning');
   }
   function install() {
+    context.scope.signal.addEventListener(
+      'abort',
+      () => document.body.classList.remove('connecting-outside-group'),
+      { once: true },
+    );
     let resetBendKey = 'bend';
     const resetBendOnRightClick = createBendReset(
       (e) => {
@@ -630,7 +642,10 @@ export function createCanvasInteractions(context) {
         return;
       }
       if (context.source || context.commentSource) {
-        if (context.rightStart && e.ctrlKey) context.rightStart.insert = true;
+        if (context.rightStart && e.ctrlKey) {
+          context.rightStart.insert = true;
+          document.body.classList.toggle('connecting-outside-group', !!context.overviewView);
+        }
         context.connectPoint = context.point(e);
         context.queueDraw();
         return;
@@ -712,6 +727,26 @@ export function createCanvasInteractions(context) {
         context.render();
         return;
       }
+      const connection = context.rightStart;
+      const canvas = context.$('canvas');
+      if (connection?.pointerId != null && canvas.hasPointerCapture(connection.pointerId))
+        canvas.releasePointerCapture(connection.pointerId);
+      document.body.classList.remove('connecting-outside-group');
+      if (connection?.insert && context.overviewView && context.openGroup) {
+        const box = context.groupPanel.getBoundingClientRect();
+        if (
+          e.clientX < box.left ||
+          e.clientX > box.right ||
+          e.clientY < box.top ||
+          e.clientY > box.bottom
+        ) {
+          const from = context.source,
+            groupId = context.openGroup;
+          context.cancelConnect();
+          context.onDialog({ type: 'outside-group-target', from, groupId });
+          return;
+        }
+      }
       if (
         context.rightStart &&
         Math.hypot(e.clientX - context.rightStart.x, e.clientY - context.rightStart.y) > 6
@@ -744,6 +779,7 @@ export function createCanvasInteractions(context) {
           else context.add(p.x, p.y, context.source);
         }
       }
+      if (connection?.insert && context.source) context.cancelConnect();
       context.rightStart = null;
       const moved = !!context.drag?.moved;
       context.drag = null;
@@ -809,6 +845,7 @@ export function createCanvasInteractions(context) {
       context.mapTransform = null;
     };
     context.listen(context.overviewCanvas, 'pointerdown', (event) => {
+      if (context.rightStart) return;
       if (!event.isPrimary || ![0, 1].includes(event.button)) return;
       if (event.button === 1) event.preventDefault();
       context.outsideGroupPress = {

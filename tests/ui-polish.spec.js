@@ -35,9 +35,11 @@ test('fresh defaults, canvas focus, centered dialogs and IFJ export', async ({
   await expect(page.locator('body')).toHaveAttribute('data-tester-dock', 'right');
   await expect(page.locator('body')).toHaveClass(/simplified-view/);
   await expect(page.locator('#group-selection, #toggle-properties')).toHaveCount(0);
-  await page.locator('#input').focus();
+  await page.locator('#tokens .token').first().click();
+  await expect(page.locator('#tokens .token').first()).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#canvas').click({ position: { x: 700, y: 120 } });
   await expect(page.locator('#input')).not.toBeFocused();
+  await expect(page.locator('#tokens [aria-pressed=true]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('default-layout.png') });
   for (const name of ['Settings', 'Import', 'Export']) {
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -106,17 +108,26 @@ test('tool windows animate from each docked trigger and tester expands', async (
     await page.locator('#layout-toggle').click();
     const dialog = page.locator('.tool-panel');
     await expect(dialog).toBeVisible();
-    const origin = await dialog.evaluate((el) => {
-      const button = document.getElementById('layout-toggle').getBoundingClientRect();
-      const [x, y] = el.style.transformOrigin.split(' ').map(parseFloat);
-      return [
-        parseFloat(el.style.left) + x - button.left - button.width / 2,
-        parseFloat(el.style.top) + y - button.top - button.height / 2,
-      ];
+    const gap = await dialog.evaluate(async (el) => {
+      const dock = document.body.dataset.toolbarDock;
+      const tile = document.querySelector('.toolbar').getBoundingClientRect();
+      const frames = [];
+      for (let i = 0; i < 8; i++) {
+        const box = el.getBoundingClientRect();
+        frames.push(
+          {
+            left: box.left - tile.right,
+            right: tile.left - box.right,
+            top: box.top - tile.bottom,
+            bottom: tile.top - box.bottom,
+          }[dock],
+        );
+        await new Promise(requestAnimationFrame);
+      }
+      return Math.min(...frames);
     });
-    expect(Math.abs(origin[0])).toBeLessThan(1);
-    expect(Math.abs(origin[1])).toBeLessThan(1);
-    await expect(page.locator('#layout-mode')).toHaveText(/Auto/);
+    expect(gap).toBeGreaterThanOrEqual(0);
+    await expect(page.locator('#layout-mode')).toHaveText('Auto');
     await expect(page.locator('#layout-density')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Close Arrange graph' }).click();
     await expect(dialog).toHaveCount(0);
@@ -125,9 +136,9 @@ test('tool windows animate from each docked trigger and tester expands', async (
   await expect(page.locator('body')).toHaveClass(/tester-collapsed/);
   await page.locator('#toggle-tester').click();
   await expect(page.locator('.test-grid')).toBeVisible();
-  expect(
-    await page.locator('.test-grid').evaluate((el) => getComputedStyle(el).animationName),
-  ).toBe('tester-reveal');
+  expect(await page.locator('.tester').evaluate((el) => getComputedStyle(el).animationName)).toBe(
+    'tester-reveal',
+  );
 });
 
 test('combined group transitions drag, persist, undo and open only on double click', async ({
