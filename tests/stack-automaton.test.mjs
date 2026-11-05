@@ -43,7 +43,7 @@ test('one enum stack replaces top atomically, OR alternatives work, empty stack 
   assert.deepEqual(m, before);
   assert.match(toTikz(m), / OR /);
   assert.ok(toTikz(m).includes('\\ensuremath{\\rightarrow}'));
-  assert.ok(toTikz(m).includes('\\ensuremath{\\varepsilon}'));
+  assert.ok(toTikz(m).includes('(pop)'));
 });
 test('enum validates alphabet, initial symbol and every replacement', () => {
   for (const change of [
@@ -157,4 +157,39 @@ test('scientific symbols show punctuation literally and quote whitespace', () =>
   assert.ok(text.includes('{" ", ", \\, n, r, t}'));
   m.edges[0].label = '\\t';
   assert.ok(toAcademic(m).includes('{"\\t"}'));
+});
+
+import {
+  renameStackSymbol,
+  removeStackSymbol,
+  memoryRuleLabel,
+  stackAction,
+  setStackAction,
+} from '../src/core/memory.js';
+test('enum renaming updates initial symbol and every top and replacement atomically', () => {
+  const m = stackMachine();
+  renameStackSymbol(m, 0, 'BASE');
+  assert.equal(m.stack.initial, 'BASE');
+  assert.equal(m.edges[0].stackRules[0].top, 'BASE');
+  assert.deepEqual(m.edges[0].stackRules[0].replace, ['BASE', 'OPEN']);
+  assert.throws(() => renameStackSymbol(m, 0, 'OPEN'), /unique/);
+  assert.throws(() => removeStackSymbol(m, 0), /transition rules/);
+  m.stack.alphabet.push('UNUSED');
+  removeStackSymbol(m, 2);
+  assert.deepEqual(m.stack.alphabet, ['BASE', 'OPEN']);
+});
+test('stack action shorthand preserves keep, pop, replace, and push semantics', () => {
+  const r = { top: 'S', replace: ['S'] };
+  assert.equal(memoryRuleLabel(r), 'S → (keep)');
+  for (const [action, replacement, label] of [
+    ['pop', [], 'S → (pop)'],
+    ['keep', ['S'], 'S → (keep)'],
+    ['push:S', ['S', 'S'], 'S → (push) S'],
+    ['replace:OPEN', ['OPEN'], 'S → OPEN'],
+  ]) {
+    setStackAction(r, action);
+    assert.deepEqual(r.replace, replacement);
+    assert.equal(stackAction(r), action);
+    assert.equal(memoryRuleLabel(r), label);
+  }
 });

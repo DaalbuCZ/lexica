@@ -9,7 +9,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
 }, testInfo) => {
   const machine = example();
   machine.machineType = 'extended';
-  machine.stack = { alphabet: ['S', 'OPEN'], initial: 'S' };
+  machine.stack = { alphabet: ['BOTTOM', 'INTERPOLATION_EXPR'], initial: 'BOTTOM' };
   const group = createGroup(machine, new Set(['s1', 's2']), 'Tokens');
   await page.addInitScript((machine) => {
     if (localStorage.getItem('lexica-machine')) return;
@@ -68,6 +68,18 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await expect(page.locator('.stack-rule-or')).toHaveText('OR');
   await expect(page.getByLabel('Combine conditions', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Epsilon input (ε)')).toHaveCount(0);
+  await page.getByLabel('Stack action 1', { exact: true }).click();
+  await expect(page.getByRole('option', { name: 'BOTTOM', exact: true })).toHaveCount(0);
+  await page.getByRole('option', { name: '(pop)', exact: true }).click();
+  await expect(page.getByLabel('Stack action 1', { exact: true })).toHaveText('(pop)');
+  await page.getByLabel('Stack action 1', { exact: true }).click();
+  await page.getByRole('option', { name: '(keep)', exact: true }).click();
+  await page.getByLabel('Stack action 2', { exact: true }).click();
+  await page.getByRole('option', { name: 'push INTERPOLATION_EXPR', exact: true }).click();
+  const overflowing = await page
+    .locator('.stack-rule-row')
+    .evaluateAll((rows) => rows.some((row) => row.scrollWidth > row.clientWidth + 1));
+  expect(overflowing).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('stack-rules.png') });
   await page.getByRole('button', { name: 'Remove rule 2', exact: true }).click();
   await page.getByRole('button', { name: 'Remove rule 1', exact: true }).click();

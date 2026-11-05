@@ -49,9 +49,15 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   await expect(page.locator('#tokens .token')).toHaveCount(5);
   await page.getByRole('button', { name: 'Manage stack alphabet', exact: true }).click();
   const memory = page.getByRole('dialog', { name: 'Stack alphabet', exact: true });
-  await expect(memory.getByLabel('Enum values', { exact: true })).toHaveValue('S');
-  await memory.getByLabel('Enum values', { exact: true }).fill('S, OPEN, BLOCK');
-  await memory.getByLabel('Enum values', { exact: true }).press('Enter');
+  await expect(memory.getByLabel('Enum value 1', { exact: true })).toHaveValue('S');
+  for (const [i, name] of [
+    [2, 'OPEN'],
+    [3, 'BLOCK'],
+  ]) {
+    await memory.getByRole('button', { name: 'Add enum value', exact: true }).click();
+    await memory.getByLabel(`Enum value ${i}`, { exact: true }).fill(name);
+    await memory.getByLabel(`Enum value ${i}`, { exact: true }).press('Enter');
+  }
   await memory.getByLabel('Initial stack symbol (S)', { exact: true }).click();
   await page.getByRole('option', { name: 'BLOCK', exact: true }).click();
   await expect(memory.getByLabel('Initial stack symbol (S)', { exact: true })).toHaveText('BLOCK');
