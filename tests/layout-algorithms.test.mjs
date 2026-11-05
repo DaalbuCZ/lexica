@@ -1,3 +1,4 @@
+import { graphView } from '../src/core/groups.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { feasibleRadial } from '../src/core/feasible-layout.js';
@@ -561,7 +562,7 @@ test('almost horizontal transitions align exactly when feasible and retain clear
   assert.equal(alignHorizontal(blocked)[1].y, 12);
 });
 
-test('radial auto groups keeps the arranged machine when a view exceeds the corridor budget', () => {
+test('radial auto groups keeps a circular start ring with long captions and group names', () => {
   const m = {
     start: 'root',
     states: [{ id: 'root', name: 'Root', token: '', x: 0, y: 0 }],
@@ -594,10 +595,19 @@ test('radial auto groups keeps the arranged machine when a view exceeds the corr
   });
   assert.ok(result.groups > 0);
   assert.deepEqual(result.machine.edges, m.edges);
-  assert.ok(
-    result.machine.states.every((state) => Number.isFinite(state.x) && Number.isFinite(state.y)),
+  const overview = graphView(result.machine);
+  const root = overview.states.find((state) => state.id === overview.start);
+  const neighbors = new Set(
+    overview.edges
+      .filter((edge) => edge.from === root.id && edge.to !== root.id)
+      .map((edge) => edge.to),
   );
-  assert.ok(result.machine.states.some((state) => state.x !== 0 || state.y !== 0));
+  const radii = overview.states
+    .filter((state) => neighbors.has(state.id))
+    .map((state) => Math.hypot(state.x - root.x, state.y - root.y));
+  assert.ok(radii.length >= 3);
+  assert.ok(Math.min(...radii) > 0);
+  assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6, `Start ring radii: ${radii}`);
 });
 
 test('a corridor enters an accepting state from below without crossing its token caption', () => {

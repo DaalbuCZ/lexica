@@ -1,6 +1,6 @@
 import { polishSubgroup } from './subgroup-aesthetics.js';
 import { drawingClearance } from './planar-layout.js';
-import { corridorRoutes } from './corridor-routing.js';
+import { placementCorridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 
 // Work in outward-facing branch frames, but certify against the complete
@@ -126,7 +126,8 @@ export function polishRadialBranches(machine, { maxRoutes = 32, stats = {} } = {
         )
           return false;
         checked++;
-        if (!corridorRoutes({ ...machine, states: next, comments: [] }, labels)) return false;
+        if (!placementCorridorRoutes({ ...machine, states: next, comments: [] }, labels))
+          return false;
         accepted = next;
         stats.accepted++;
         return true;

@@ -1,5 +1,5 @@
 import { drawingClearance } from './planar-layout.js';
-import { corridorRoutes } from './corridor-routing.js';
+import { placementCorridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 import { cycleAnalysis, cycleScore, cycleProposals } from './cycle-aesthetics.js';
 
@@ -174,7 +174,7 @@ export function compactAesthetics(
           edges.every((e) => distance(e) >= e.minimum - 1e-6)
         ) {
           routeChecks++;
-          if (corridorRoutes({ ...machine, states, comments: [] }, labels)) {
+          if (placementCorridorRoutes({ ...machine, states, comments: [] }, labels)) {
             best = next;
             changed = true;
             break;

@@ -6,8 +6,17 @@ import { renderedLabelBox, reflowRouteLabels } from './label-clearance.js';
 import { bundleLanes, transitionBundles } from './graph-bundles.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
-export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
-  const hasCaptions = machine.states.some((state) => tokenCaption(state));
+// Radial placement uses the same fixed footprint as its straight-line
+// clearance checks. Caption and group-label geometry belong to final routing.
+export function placementCorridorRoutes(machine, labels) {
+  return corridorRoutes(machine, labels, { placement: true });
+}
+export function corridorRoutes(
+  machine,
+  labels,
+  { previous = null, dirty = null, onFailure, placement = false } = {},
+) {
+  const hasCaptions = !placement && machine.states.some((state) => tokenCaption(state));
   // Captions should guide routing, but a failed decoration must not invalidate
   // a route that clears the actual nodes and other transitions.
   for (const avoidCaptions of hasCaptions ? [true, false] : [false]) {
@@ -18,13 +27,18 @@ export function corridorRoutes(machine, labels, { previous = null, dirty = null,
         onFailure: !avoidCaptions && laneScale === 1 ? onFailure : undefined,
         laneScale,
         avoidCaptions,
+        placement,
       });
       if (routes) return routes;
     }
   }
   return null;
 }
-function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale, avoidCaptions }) {
+function routeLanes(
+  machine,
+  labels,
+  { previous, dirty, onFailure, laneScale, avoidCaptions, placement },
+) {
   const nodes = new Map(machine.states.map((s) => [s.id, s])),
     bundles = new Map(),
     routes = previous ? [...previous] : [],
@@ -33,7 +47,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale, av
     captions = new SpatialIndex();
   const frozen = new Set();
   for (const s of machine.states) {
-    const half = s.group ? groupWidth(s) / 2 + 10 : 46;
+    const half = !placement && s.group ? groupWidth(s) / 2 + 10 : 46;
     obstacles.set(s.id, { left: s.x - half, right: s.x + half, top: s.y - 46, bottom: s.y + 46 });
     const caption = avoidCaptions ? tokenCaption(s) : null;
     if (caption) captions.set(s.id, caption);
@@ -104,7 +118,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale, av
         }
       }
     const s = nodes.get(id);
-    for (const p of ring) ports.set(p.key, nodePort(s, p.angle));
+    for (const p of ring) ports.set(p.key, nodePort(s, p.angle, placement));
   }
   let conflict;
   const valid = (r, e) => {

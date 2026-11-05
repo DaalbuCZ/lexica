@@ -34,7 +34,11 @@ export function alignHorizontal(machine) {
         cycleScore(motifs, nodes) <= motifCost + 1
       ) {
         checked++;
-        const routes = routeEdges({ ...machine, states, comments: [] }, simpleTransitionLabel);
+        const routes = routeEdges(
+          { ...machine, states, comments: [] },
+          simpleTransitionLabel,
+          true,
+        );
         if (validateRouteSeparation(routes, { maxDepth: 24, maxPairs: 512 }).status === 'clear')
           break;
       }

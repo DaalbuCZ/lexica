@@ -40,12 +40,13 @@ export function groupWidth(state) {
   );
 }
 
-export function nodePort(state, angle) {
+export function nodePort(state, angle, placement = false) {
   const x = Math.cos(angle),
     y = Math.sin(angle);
-  const distance = state.group
-    ? Math.min((groupWidth(state) / 2 + 1) / Math.abs(x), 37 / Math.abs(y))
-    : 37;
+  const distance =
+    !placement && state.group
+      ? Math.min((groupWidth(state) / 2 + 1) / Math.abs(x), 37 / Math.abs(y))
+      : 37;
   return { x: state.x + x * distance, y: state.y + y * distance };
 }
 

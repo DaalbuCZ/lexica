@@ -1,5 +1,5 @@
 import { drawingClearance } from './planar-layout.js';
-import { corridorRoutes } from './corridor-routing.js';
+import { placementCorridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 import { cycleAnalysis, insideCycle } from './cycle-aesthetics.js';
 
@@ -86,7 +86,7 @@ export function polishSubgroup(
     const left = Math.min(...states.filter((s) => !s.outside).map((s) => s.x));
     if (states.some((s) => s.outside && s.x > left - 140)) return;
     checked++;
-    if (!corridorRoutes({ ...machine, states, comments: [] }, labels)) return;
+    if (!placementCorridorRoutes({ ...machine, states, comments: [] }, labels)) return;
     if (!acceptCandidate(states)) return;
     best = states;
     bestCost = next;

@@ -574,11 +574,16 @@ function intersects(a, b, c, d) {
   const turn = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
   return turn(a, b, c) * turn(a, b, d) < -1e-8 && turn(c, d, a) * turn(c, d, b) < -1e-8;
 }
-export function crossingPairs(machine, routed = false, labelFor = transitionLabel) {
+export function crossingPairs(
+  machine,
+  routed = false,
+  labelFor = transitionLabel,
+  placement = false,
+) {
   machine = visualMachine(machine);
   const segments = visibleSegments(machine),
     pairs = [],
-    routes = routed ? routeEdges(machine, labelFor) : null,
+    routes = routed ? routeEdges(machine, labelFor, placement) : null,
     paths = routed
       ? new Map(
           segments.map((e) => [
@@ -719,11 +724,12 @@ export function loopAngles(machine, state, index) {
   ];
 }
 const routeCache = new Map();
-export function routeEdges(machine, labelFor = transitionLabel) {
+export function routeEdges(machine, labelFor = transitionLabel, placement = false) {
   machine = visualMachine(machine);
   const labels = machine.edges.map(labelFor);
-  const key = drawingRouteKey(machine, labels);
-  const saved = savedRoutes(machine, key);
+  const geometryKey = drawingRouteKey(machine, labels);
+  const key = placement ? 'placement:' + geometryKey : geometryKey;
+  const saved = placement ? null : savedRoutes(machine, key);
   if (saved) return saved;
   if (routeCache.has(key)) return routeCache.get(key);
   const routes =
@@ -732,9 +738,9 @@ export function routeEdges(machine, labelFor = transitionLabel) {
     transitionBundles(machine, (e) => e.portal == null && e.from !== e.to).some(
       (b) => b.indices.length > 1,
     )
-      ? corridorRoutes(machine, labels)
-      : null) ?? computeRoutes(machine, labels);
-  clearNodeLabels(machine, routes);
+      ? corridorRoutes(machine, labels, { placement })
+      : null) ?? computeRoutes(machine, labels, placement);
+  clearNodeLabels(machine, routes, placement);
   routeCache.set(key, routes);
   if (routeCache.size > 4) routeCache.delete(routeCache.keys().next().value);
   return routes;
@@ -760,7 +766,7 @@ export function loopDragBend(center, apex, initial, current, bend) {
     y: bend.y + Math.sin(startAngle + angle) * radius - v.y,
   };
 }
-export function applyBend(route, edge, start, end) {
+export function applyBend(route, edge, start, end, placement = false) {
   if (!edge.bend) return;
   if (start === end) {
     const apex = sample(route, 0.5),
@@ -795,7 +801,7 @@ export function applyBend(route, edge, start, end) {
     p.y += (edge.bend.y * 4) / 3;
   }
   const attach = (point, control, state) => {
-    if (state.group) {
+    if (!placement && state.group) {
       Object.assign(point, nodePort(state, Math.atan2(control.y - state.y, control.x - state.x)));
       return;
     }
@@ -814,7 +820,7 @@ export function applyBend(route, edge, start, end) {
   route.label.x = center.x;
   route.label.y = center.y - 13;
 }
-function computeRoutes(machine, labels) {
+function computeRoutes(machine, labels, placement) {
   const captions = machine.states.flatMap((s) =>
     s.group
       ? [
@@ -840,7 +846,7 @@ function computeRoutes(machine, labels) {
     {
       x: s.x,
       y: s.y,
-      w: s.group ? groupWidth(s) + 18 : 90,
+      w: !placement && s.group ? groupWidth(s) + 18 : 90,
       h: 90,
     },
     ...(s.portal ? [statePortalBox(s)] : []),
@@ -1016,8 +1022,8 @@ function computeRoutes(machine, labels) {
         };
         const startAngle = Math.atan2(mid.y - a.y, mid.x - a.x),
           endAngle = Math.atan2(mid.y - b.y, mid.x - b.x);
-        const p0 = nodePort(a, startAngle),
-          p3 = nodePort(b, endAngle);
+        const p0 = nodePort(a, startAngle, placement),
+          p3 = nodePort(b, endAngle, placement);
         c = {
           p0,
           p3,
@@ -1066,8 +1072,8 @@ function computeRoutes(machine, labels) {
               (s) =>
                 s !== a &&
                 s !== b &&
-                s.x >= left - (s.group ? groupWidth(s) / 2 + 9 : 65) &&
-                s.x <= right + (s.group ? groupWidth(s) / 2 + 9 : 65) &&
+                s.x >= left - (!placement && s.group ? groupWidth(s) / 2 + 9 : 65) &&
+                s.x <= right + (!placement && s.group ? groupWidth(s) / 2 + 9 : 65) &&
                 s.y >= top - 65 &&
                 s.y <= bottom + 65,
             )
@@ -1086,7 +1092,7 @@ function computeRoutes(machine, labels) {
         const p = sample(c, t);
         for (const s of nearby)
           if (
-            s.group
+            !placement && s.group
               ? Math.abs(p.x - s.x) < groupWidth(s) / 2 + 9 && Math.abs(p.y - s.y) < 45
               : (p.x - s.x) ** 2 + (p.y - s.y) ** 2 < 65 ** 2
           )
@@ -1138,7 +1144,7 @@ function computeRoutes(machine, labels) {
         break;
     }
     if (e.bend) best.unbent = structuredClone(best);
-    applyBend(best, e, a, b);
+    applyBend(best, e, a, b, placement);
     best.d = `M ${best.p0.x} ${best.p0.y} C ${best.c1.x} ${best.c1.y}, ${best.c2.x} ${best.c2.y}, ${best.p3.x} ${best.p3.y}`;
     routes[i] = best;
     reserved.push(best.label);

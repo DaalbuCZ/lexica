@@ -16,12 +16,17 @@ const expand = (box, n) => ({
   bottom: box.bottom + n,
 });
 
-export function reflowRouteLabels(machine, routes, dirty = new Set(routes.keys())) {
+export function reflowRouteLabels(
+  machine,
+  routes,
+  dirty = new Set(routes.keys()),
+  placement = false,
+) {
   const obstacles = new SpatialIndex(),
     captions = new SpatialIndex(),
     wires = new SpatialIndex();
   machine.states.forEach((s, i) => {
-    const half = s.group ? groupWidth(s) / 2 + 11 : 47;
+    const half = !placement && s.group ? groupWidth(s) / 2 + 11 : 47;
     obstacles.set(i, { left: s.x - half, right: s.x + half, top: s.y - 47, bottom: s.y + 47 });
     const caption = tokenCaption(s);
     if (caption) obstacles.set('token:' + i, caption);
@@ -101,6 +106,6 @@ export function reflowRouteLabels(machine, routes, dirty = new Set(routes.keys()
   return routes;
 }
 
-export function clearNodeLabels(machine, routes) {
-  return reflowRouteLabels(machine, routes);
+export function clearNodeLabels(machine, routes, placement = false) {
+  return reflowRouteLabels(machine, routes, undefined, placement);
 }

@@ -1,6 +1,5 @@
-import { groupWidth } from './labels.js';
 import { simpleTransitionLabel } from './editor-settings.js';
-import { autoLayout, crossingPairs, routeEdges } from './layout.js';
+import { autoLayout, crossingPairs as findCrossings, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
 import { destination } from './portals.js';
 import { commentAnchors, positionComments, placeCommentsAfterLayout } from './comments.js';
@@ -14,15 +13,17 @@ import { layeredLayout } from './layered-layout.js';
 import { regularizeAngles } from './angular-layout.js';
 import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
-import { corridorRoutes } from './corridor-routing.js';
+import { placementCorridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
-import { circularStartRing, hasCircularStartRing } from './radial-ring.js';
+import { circularStartRing } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
 import { validateRouteSeparation } from './layout-validation.js';
 import { polishSubgroup } from './subgroup-aesthetics.js';
 import { polishRadialBranches } from './radial-aesthetics.js';
+const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
+
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
   const children = new Map(machine.states.map((s) => [s.id, new Set()])),
@@ -217,7 +218,7 @@ function place(machine, focus, options) {
       for (const scale of [1, 1.4, 2]) {
         feasible.states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
         if (
-          corridorRoutes(
+          placementCorridorRoutes(
             { ...copy, states: feasible.states, comments: [] },
             copy.edges.map(simpleTransitionLabel),
           )
@@ -226,8 +227,6 @@ function place(machine, focus, options) {
           break;
         }
       }
-      // The placement already cleared the straight-line geometry. Keep it
-      // when the optional corridor search cannot improve it.
       if (!routed) feasible.states = original;
     }
     const positions = new Map(feasible.states.map((s) => [s.id, s]));
@@ -980,33 +979,21 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
     const certify = (id) => {
       const view = graphView(machine, id),
         baseline = drawingClearance(view.states, view.edges);
-      if (view.edges.some((e) => e.portal != null || e.bend)) return;
-      // A compact seed may cross even when its circular arrangement routes.
-      const recoveredRing = !id && baseline.crossings ? circularStartRing(view) : view.states;
-      if (baseline.crossings && recoveredRing === view.states) return;
-      const original = recoveredRing.map((s) => ({ ...s }));
+      if (baseline.crossings || view.edges.some((e) => e.portal != null || e.bend)) return;
+      const original = view.states.map((s) => ({ ...s }));
       let accepted;
-      const scales = [1, 1.25, 1.6, 2, 3];
-      const groupScale = Math.max(
-        1,
-        ...original.filter((s) => s.group).map((s) => groupWidth(s) / 88),
-      );
-      if (groupScale > 3) scales.push(groupScale, groupScale * 1.5);
-      for (const scale of scales) {
+      for (const scale of [1, 1.25, 1.6, 2, 3]) {
         const states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
-        if (corridorRoutes({ ...view, states }, view.edges.map(simpleTransitionLabel))) {
+        if (placementCorridorRoutes({ ...view, states }, view.edges.map(simpleTransitionLabel))) {
           accepted = states;
           break;
         }
       }
-      // A difficult subgroup must not discard placement for the whole machine.
-      // The renderer can still use its ordinary routing fallback for this view.
       if (!accepted) return;
       let preserveStartRing = false;
       if (!id) {
         const ring = circularStartRing({ ...view, states: accepted });
-        preserveStartRing =
-          ring !== accepted || hasCircularStartRing({ ...view, states: accepted });
+        preserveStartRing = ring !== accepted;
         accepted = ring;
       }
       accepted = compactAesthetics(
@@ -1063,7 +1050,7 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
           fixedIds: view.states.filter((s) => s.outside || s.group).map((s) => s.id),
         });
         if (
-          validateRouteSeparation(routeEdges({ ...view, states }, simpleTransitionLabel), {
+          validateRouteSeparation(routeEdges({ ...view, states }, simpleTransitionLabel, true), {
             maxDepth: 24,
             maxPairs: 512,
           }).status === 'clear'
