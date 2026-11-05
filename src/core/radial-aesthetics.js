@@ -195,15 +195,19 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
   for (let sweep = 0; sweep < 2 && checked < maxRoutes && attempts < 160; sweep++) {
     const before = states;
     const triedRegions = new Set();
-    for (const { id } of candidates) {
+    for (const { id, directed } of candidates.flatMap(({ id }) => [
+      { id, directed: false },
+      { id, directed: true },
+    ])) {
       if (checked >= maxRoutes || attempts >= 160) break;
       const depth = depths.get(id);
       // A depth cut keeps the earlier layers fixed. Explore the whole connected
-      // piece beyond the cut, including cycles and peers with another attachment.
+      // piece beyond the cut, or just its directed successors when same-depth
+      // predecessors pin the head. Both candidates check every attachment.
       const region = new Set([id]);
       let tooLarge = false;
       for (const member of region) {
-        for (const next of adjacent.get(member)) {
+        for (const next of (directed ? outgoing : adjacent).get(member)) {
           if (!(depths.get(next) >= depth) || region.has(next)) continue;
           if (region.size >= 24) {
             tooLarge = true;
@@ -260,7 +264,26 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
       if (region.size > 1) {
         const pivot = nodes.get(id),
           axis = Math.atan2(pivot.y - root.y, pivot.x - root.x);
-        const translations = pulls ? [0.85, 0.6, 0.35, 0.18, 0] : [0];
+        const translations = [{ x: 0, y: 0 }];
+        if (pulls) {
+          // A mirrored head can clear its neighbor only after the stem swings sideways.
+          for (const swing of [
+            0,
+            Math.PI / 12,
+            -Math.PI / 12,
+            Math.PI / 6,
+            -Math.PI / 6,
+            Math.PI / 4,
+            -Math.PI / 4,
+            Math.PI / 3,
+            -Math.PI / 3,
+          ])
+            for (const fraction of [1, 0.85, 0.7, 0.55, 0.4, 0.25, 0.12])
+              translations.push({
+                x: (dx * Math.cos(swing) - dy * Math.sin(swing)) * fraction,
+                y: (dx * Math.sin(swing) + dy * Math.cos(swing)) * fraction,
+              });
+        }
         for (const mirror of [false, true])
           for (const angle of [
             0,
@@ -273,7 +296,7 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
             Math.PI,
           ]) {
             if (!mirror && !angle) continue;
-            for (const fraction of translations) {
+            for (const translation of translations) {
               const move = new Map();
               for (const member of region) {
                 const state = nodes.get(member),
@@ -283,8 +306,8 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
                 const localY = (-x * Math.sin(axis) + y * Math.cos(axis)) * (mirror ? -1 : 1);
                 const heading = axis + angle;
                 move.set(member, {
-                  x: localX * Math.cos(heading) - localY * Math.sin(heading) - x + dx * fraction,
-                  y: localX * Math.sin(heading) + localY * Math.cos(heading) - y + dy * fraction,
+                  x: localX * Math.cos(heading) - localY * Math.sin(heading) - x + translation.x,
+                  y: localX * Math.sin(heading) + localY * Math.cos(heading) - y + translation.y,
                 });
               }
               move.reoriented = true;
