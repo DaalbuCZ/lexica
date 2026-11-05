@@ -19,18 +19,27 @@ export function validateStack(m) {
         e.stackRules.some(
           (r) =>
             !r ||
-            !stack.alphabet.includes(r.top) ||
+            (r.top !== '*' && !stack.alphabet.includes(r.top)) ||
             !Array.isArray(r.replace) ||
-            r.replace.some((s) => !stack.alphabet.includes(s)),
+            r.replace.some((s) => !stack.alphabet.includes(s) && !(r.top === '*' && s === '*')),
         ))
     )
       throw Error('Stack rules must use symbols from the memory enum.');
 }
-// Omitted rules mean A -> A for every symbol, never for an empty stack.
-export const stackRules = (m, e) =>
-  e.stackRules?.length
-    ? e.stackRules
-    : stackDefinition(m).alphabet.map((top) => ({ top, replace: [top] }));
+// Any is shorthand only: execution and scientific export see concrete IFJ rules.
+// A '*' in an Any replacement denotes the matched top, preserving keep/push semantics.
+export function stackRules(machine, edge) {
+  const alphabet = stackDefinition(machine).alphabet;
+  if (!edge.stackRules?.length) return alphabet.map((top) => ({ top, replace: [top] }));
+  return edge.stackRules.flatMap((rule) =>
+    rule.top === '*'
+      ? alphabet.map((top) => ({
+          top,
+          replace: rule.replace.map((symbol) => (symbol === '*' ? top : symbol)),
+        }))
+      : [rule],
+  );
+}
 function actionLabel(rule) {
   const action = stackAction(rule);
   if (action === 'keep') return '';
@@ -40,7 +49,7 @@ function actionLabel(rule) {
   return 'replace ' + rule.replace.join(' ');
 }
 export const memoryRuleLabel = (rule) =>
-  rule.top + (actionLabel(rule) ? ' → ' + actionLabel(rule) : '');
+  (rule.top === '*' ? '(any)' : rule.top) + (actionLabel(rule) ? ' → ' + actionLabel(rule) : '');
 export function renameStackSymbol(machine, index, name) {
   const stack = (machine.stack ??= structuredClone(stackDefinition(machine)));
   name = name.trim();
@@ -92,7 +101,8 @@ export function stackRuleSuffix(edge) {
     const action = actionLabel(rule);
     if (!groups.has(action)) groups.set(action, []);
     const tops = groups.get(action);
-    if (!tops.includes(rule.top)) tops.push(rule.top);
+    const top = rule.top === '*' ? '(any)' : rule.top;
+    if (!tops.includes(top)) tops.push(top);
   }
   return groups.size
     ? ' · ' +

@@ -220,3 +220,28 @@ test('graph labels group matching actions and omit keep without changing scienti
   assert.ok(scientific.includes('OPEN q0 ( → OPEN OPEN q1'));
   assert.ok(!scientific.includes('push OPEN'));
 });
+
+test('Any expands to concrete stack symbols for execution and scientific export', () => {
+  const m = stackMachine();
+  const before = toAcademic(m),
+    tokens = tokenize(m, '(())x');
+  m.edges[0].stackRules = [{ top: '*', replace: ['*', 'OPEN'] }];
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · (any) → push OPEN');
+  assert.deepEqual(tokenize(m, '(())x'), tokens);
+  assert.equal(toAcademic(m), before);
+  m.edges[0].stackRules = [{ top: '*', replace: ['*'] }];
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · (any)');
+  assert.deepEqual(tokenize(m, '(')[0].memoryAfter.stack, ['S']);
+  setStackAction(m.edges[0].stackRules[0], 'replace:OPEN');
+  assert.deepEqual(tokenize(m, '(')[0].memoryAfter.stack, ['OPEN']);
+  setStackAction(m.edges[0].stackRules[0], 'pop');
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · (any) → pop');
+  assert.deepEqual(
+    tokenize(m, '((').map((t) => t.token),
+    ['TOKEN', 'ERROR'],
+  );
+  m.edges[0].stackRules.push({ top: 'S', replace: ['S'] });
+  assert.throws(() => tokenize(m, '('), /Ambiguous/);
+  m.edges[0].stackRules = [{ top: 'S', replace: ['*'] }];
+  assert.throws(() => validate(m), /enum/);
+});

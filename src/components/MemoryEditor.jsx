@@ -114,7 +114,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
             <div className="stack-rule-row">
               <Select
                 label={`Top symbol ${i + 1}`}
-                title={rule.top}
+                title={rule.top === '*' ? 'Any' : rule.top}
                 value={rule.top}
                 onChange={(top) =>
                   edit((e) => {
@@ -126,6 +126,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
                   })
                 }
               >
+                <option value="*">Any</option>
                 {alphabet.map((s) => (
                   <option key={s} value={s}>
                     {s}

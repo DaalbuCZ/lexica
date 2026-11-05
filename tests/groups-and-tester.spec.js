@@ -82,6 +82,14 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   expect(overflowing).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('stack-rules.png') });
   await page.getByRole('button', { name: 'Remove rule 2', exact: true }).click();
+  await page.getByLabel('Top symbol 1', { exact: true }).click();
+  await page.getByRole('option', { name: 'Any', exact: true }).click();
+  await expect(page.getByLabel('Top symbol 1', { exact: true })).toHaveText('Any');
+  await expect(page.getByLabel('Stack action 1', { exact: true })).toHaveText('(keep)');
+  await page.getByLabel('Stack action 1', { exact: true }).click();
+  await page.getByRole('option', { name: 'push INTERPOLATION_EXPR', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('any-stack-rule.png') });
+
   await page.getByRole('button', { name: 'Remove rule 1', exact: true }).click();
   await page.getByRole('button', { name: 'Close properties', exact: true }).click();
   await page.reload();
