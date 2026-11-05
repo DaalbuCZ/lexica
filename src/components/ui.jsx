@@ -48,7 +48,7 @@ export function Button({ className = '', type = 'button', ...props }) {
     />
   );
 }
-export function Modal({ title, children, onClose, className = '', anchorId }) {
+export function Modal({ title, children, onClose, className = '', anchorId, onCloseAutoFocus }) {
   const [panel, setPanel] = useState(null);
   const open = useStudio((s) => !!s.dialog);
   useAnchoredPanel(panel, anchorId);
@@ -67,6 +67,7 @@ export function Modal({ title, children, onClose, className = '', anchorId }) {
             ref={setPanel}
             className={`react-dialog animated-window ${anchorId ? 'tool-panel' : ''} ${className}`}
             aria-describedby={undefined}
+            onCloseAutoFocus={onCloseAutoFocus}
             onInteractOutside={(event) => {
               // The trigger toggles itself; other outside clicks/focus dismiss the tool.
               if (

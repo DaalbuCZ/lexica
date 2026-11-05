@@ -263,3 +263,39 @@ test('a long group name paints at full size and the wider node can be opened', a
   await expect(page.locator('.group-overlay')).toBeVisible();
   await expect(page.locator('#group-overlay-title')).toHaveValue(m.groups[0].name);
 });
+
+for (const presentation of ['canvas', 'overlay'])
+  test(`Ctrl+P finds and centers a state across groups in ${presentation} mode`, async ({
+    page,
+  }) => {
+    const m = structuredClone(machine);
+    m.states.find((s) => s.id === 'b').token = 'TARGET';
+    await setup(page, presentation, m);
+    await expect(page.locator('#app-loading')).toBeHidden();
+    const search = page.getByRole('combobox', { name: 'Find a state' });
+    await page.keyboard.press('Control+p');
+    await expect(search).toBeFocused();
+    await search.fill('group target');
+    const target = page.getByRole('option', { name: 'B Group' });
+    await expect(target).toHaveAttribute('aria-selected', 'true');
+    await expect(target.locator('.state-palette-name')).toHaveAttribute('style', /--token-accent/);
+    await search.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Command palette' })).toHaveCount(0);
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(1);
+    const distance = (state) =>
+      page.locator('#canvas').evaluate((canvas, state) => {
+        const t = canvas.getContext('2d').getTransform();
+        const canvasBox = canvas.getBoundingClientRect();
+        const wrap = document.querySelector('.canvas-wrap').getBoundingClientRect();
+        return Math.hypot(
+          canvasBox.left + t.e + t.a * state.x - (wrap.left + wrap.width / 2),
+          canvasBox.top + t.f + t.d * state.y - (wrap.top + wrap.height / 2),
+        );
+      }, state);
+    await expect.poll(() => distance(m.states.find((s) => s.id === 'b'))).toBeLessThan(2);
+    await page.keyboard.press('Control+p');
+    await search.fill('End');
+    await search.press('Enter');
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(0);
+    await expect.poll(() => distance(m.states.find((s) => s.id === 'end'))).toBeLessThan(2);
+  });

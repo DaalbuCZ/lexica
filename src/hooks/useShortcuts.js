@@ -4,6 +4,23 @@ export function useShortcuts(debuggerRef) {
   useEffect(() => {
     const keydown = (event) => {
       const { controller, dialog, contextMenu, scene, propertiesOpen } = useStudio.getState();
+      if (
+        controller &&
+        !event.defaultPrevented &&
+        !event.shiftKey &&
+        !event.altKey &&
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'p' &&
+        (!dialog || dialog.anchorId || dialog.type === 'state-search')
+      ) {
+        event.preventDefault();
+        if (!event.repeat)
+          useStudio.setState({
+            contextMenu: null,
+            dialog: dialog?.type === 'state-search' ? null : { type: 'state-search' },
+          });
+        return;
+      }
       if (!controller || (dialog && !dialog.anchorId) || contextMenu || event.defaultPrevented)
         return;
       if (event.key === 'Escape' && dialog) {

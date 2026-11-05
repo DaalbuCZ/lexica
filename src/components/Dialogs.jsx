@@ -1,3 +1,4 @@
+import { StatePalette } from './StatePalette.jsx';
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TextField, TextArea } from '@radix-ui/themes';
@@ -32,6 +33,8 @@ export function Dialogs() {
     onClose: close,
   };
   switch (dialog.type) {
+    case 'state-search':
+      return <StatePalette onClose={close} />;
     case 'settings':
       return <SettingsPanel {...props} />;
     case 'import':
@@ -504,6 +507,7 @@ function GroupTargetDialog({ dialog, onClose }) {
 }
 const shortcuts = {
   Canvas: [
+    ['Find a state', 'Ctrl / ⌘ P'],
     ['Select tool', 'V'],
     ['Pan tool', 'H'],
     ['Temporary pan', 'Space'],

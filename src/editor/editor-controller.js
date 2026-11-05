@@ -15,7 +15,13 @@ import {
 } from '../core/comments.js';
 import { copySelection, pasteSelection } from '../core/selection.js';
 import { validate, isAccepting, setAccepting } from '../core/lexer.js';
-import { createGroup, dissolveGroup, graphView, initializeGroupPositions } from '../core/groups.js';
+import {
+  createGroup,
+  dissolveGroup,
+  graphView,
+  groupFor,
+  initializeGroupPositions,
+} from '../core/groups.js';
 import { listenScope } from './events.js';
 import { editorSettings } from '../core/editor-settings.js';
 import { createLayoutTask } from './layout-task.js';
@@ -713,6 +719,17 @@ export function createEditorController(
       choose(type, id);
       render();
       showProperties(true);
+    },
+    revealState(id) {
+      if (!context.machine.states.some((state) => state.id === id)) return;
+      const group = groupFor(context.machine, id);
+      if (group && group.id !== context.openGroup) openGroupById(group.id);
+      else if (!group && context.openGroup) closeGroup(false, false);
+      cancelConnect(false);
+      showProperties(false);
+      choose('state', id);
+      render();
+      followState(id, true);
     },
     selectAll() {
       const shown = graphView(context.machine, context.openGroup);

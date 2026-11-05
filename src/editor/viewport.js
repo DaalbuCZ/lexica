@@ -140,7 +140,7 @@ export function createViewport(context) {
     context.queueDraw();
     if (!document.body.classList.contains('properties-hidden')) showProperties(true);
   }
-  function followState(id) {
+  function followState(id, center = false) {
     cancelAnimationFrame(context.cameraFrame);
     const state = context.machine.states.find((s) => s.id === id);
     if (!state) return;
@@ -169,6 +169,7 @@ export function createViewport(context) {
       y = state.y + offset.y,
       margin = Math.min(130 / scale, visible.width / 4, visible.height / 4);
     if (
+      !center &&
       !covered &&
       x >= visible.x + margin &&
       x <= visible.x + visible.width - margin &&
@@ -182,16 +183,11 @@ export function createViewport(context) {
       right: area.left + transform.x + (visible.x + visible.width) * scale,
       bottom: area.top + transform.y + (visible.y + visible.height) * scale,
     };
-    const placed = placeFloatingRect(
-      {
-        x: (available.left + available.right - size.width) / 2,
-        y: (available.top + available.bottom - size.height) / 2,
-      },
-      size,
-      available,
-      obstacles,
-      12,
-    );
+    const centered = {
+      x: (available.left + available.right - size.width) / 2,
+      y: (available.top + available.bottom - size.height) / 2,
+    };
+    const placed = center ? centered : placeFloatingRect(centered, size, available, obstacles, 12);
     const target = {
       ...start,
       x: start.x + (screen.x - placed.x - size.width / 2) / scale,

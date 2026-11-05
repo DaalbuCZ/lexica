@@ -1095,3 +1095,108 @@ body.connecting-outside-group .group-overlay {
     animation: none;
   }
 }
+
+.react-dialog.state-palette {
+  width: 520px;
+  padding: 0;
+  overflow: hidden;
+}
+.state-palette .dialog-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.state-palette .dialog-heading button {
+  display: none;
+}
+.state-palette-search,
+.state-palette-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  color: var(--muted);
+}
+.state-palette-search {
+  border-bottom: 1px solid var(--line);
+}
+.state-palette-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  outline: none;
+  padding: 4px 0;
+}
+.state-palette kbd,
+.state-palette-search [role='status'] {
+  font-size: 11px;
+}
+.state-palette kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.state-palette-results {
+  position: relative;
+  height: min(calc(var(--palette-rows) * 38px + 10px), 48vh);
+}
+.state-palette-results ul {
+  height: 100%;
+  margin: 0;
+  padding: 5px;
+  overflow: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+.state-palette-results li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  margin-bottom: 2px;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.state-palette-results li[aria-selected='true'] {
+  background: var(--accent-a4);
+}
+.state-palette-name,
+.state-palette-group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.state-palette-name {
+  flex: 1;
+  font-weight: 600;
+}
+.state-palette-group {
+  max-width: 45%;
+  color: var(--muted);
+  font-size: 12px;
+}
+.state-palette-results p {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  pointer-events: none;
+  color: var(--muted);
+}
+.state-palette-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .state-palette-results li {
+    transition: none;
+  }
+}
