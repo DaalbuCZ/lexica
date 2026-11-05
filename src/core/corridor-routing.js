@@ -7,18 +7,24 @@ import { bundleLanes, transitionBundles } from './graph-bundles.js';
 
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 export function corridorRoutes(machine, labels, { previous = null, dirty = null, onFailure } = {}) {
-  for (const laneScale of [2, 1.5, 1]) {
-    const routes = routeLanes(machine, labels, {
-      previous,
-      dirty,
-      onFailure: laneScale === 1 ? onFailure : undefined,
-      laneScale,
-    });
-    if (routes) return routes;
+  const hasCaptions = machine.states.some((state) => tokenCaption(state));
+  // Captions should guide routing, but a failed decoration must not invalidate
+  // a route that clears the actual nodes and other transitions.
+  for (const avoidCaptions of hasCaptions ? [true, false] : [false]) {
+    for (const laneScale of [2, 1.5, 1]) {
+      const routes = routeLanes(machine, labels, {
+        previous,
+        dirty,
+        onFailure: !avoidCaptions && laneScale === 1 ? onFailure : undefined,
+        laneScale,
+        avoidCaptions,
+      });
+      if (routes) return routes;
+    }
   }
   return null;
 }
-function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) {
+function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale, avoidCaptions }) {
   const nodes = new Map(machine.states.map((s) => [s.id, s])),
     bundles = new Map(),
     routes = previous ? [...previous] : [],
@@ -29,7 +35,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
   for (const s of machine.states) {
     const half = s.group ? groupWidth(s) / 2 + 10 : 46;
     obstacles.set(s.id, { left: s.x - half, right: s.x + half, top: s.y - 46, bottom: s.y + 46 });
-    const caption = tokenCaption(s);
+    const caption = avoidCaptions ? tokenCaption(s) : null;
     if (caption) captions.set(s.id, caption);
   }
   for (const [i, e] of machine.edges.entries()) {
@@ -199,7 +205,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
         }
         // An approach from below can cross the target's caption even with a
         // wide mid-curve bend. Try entering or leaving at a side port.
-        if (!chosen) {
+        if (!chosen && avoidCaptions) {
           const aCaption = b.y > a.y ? tokenCaption(a) : null;
           const bCaption = a.y > b.y ? tokenCaption(b) : null;
           for (const side of [1, -1]) {

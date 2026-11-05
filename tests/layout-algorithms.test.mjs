@@ -561,6 +561,45 @@ test('almost horizontal transitions align exactly when feasible and retain clear
   assert.equal(alignHorizontal(blocked)[1].y, 12);
 });
 
+test('radial auto groups keeps the arranged machine when a view exceeds the corridor budget', () => {
+  const m = {
+    start: 'root',
+    states: [{ id: 'root', name: 'Root', token: '', x: 0, y: 0 }],
+    edges: [],
+  };
+  let seed = 1;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+  for (let branch = 0; branch < 7; branch++) {
+    const key = (index) => `s${branch}_${index}`;
+    for (let index = 0; index < 6; index++) {
+      const id = key(index);
+      const token = random() < 0.6 ? 'TOKEN_' + 'X'.repeat(20 + Math.floor(random() * 250)) : '';
+      m.states.push({ id, name: id, token, x: 0, y: 0 });
+      m.edges.push({
+        from: index ? key(Math.floor(random() * index)) : m.start,
+        to: id,
+        label: String.fromCharCode(97 + branch),
+      });
+      if (index > 1 && random() < 0.4)
+        m.edges.push({ from: id, to: key(Math.floor(random() * index)), label: 'x' });
+    }
+  }
+  const result = solveLayout(layoutTopology(m), null, {
+    mode: 'circle',
+    smartGroups: true,
+    spacing: 0.5,
+  });
+  assert.ok(result.groups > 0);
+  assert.deepEqual(result.machine.edges, m.edges);
+  assert.ok(
+    result.machine.states.every((state) => Number.isFinite(state.x) && Number.isFinite(state.y)),
+  );
+  assert.ok(result.machine.states.some((state) => state.x !== 0 || state.y !== 0));
+});
+
 test('a corridor enters an accepting state from below without crossing its token caption', () => {
   const machine = {
     states: [

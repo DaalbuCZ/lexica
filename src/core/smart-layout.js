@@ -1,3 +1,4 @@
+import { groupWidth } from './labels.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 import { autoLayout, crossingPairs, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
@@ -225,10 +226,9 @@ function place(machine, focus, options) {
           break;
         }
       }
-      if (!routed)
-        throw Error(
-          'Could not find clear routes within the layout budget. The drawing was left unchanged.',
-        );
+      // The placement already cleared the straight-line geometry. Keep it
+      // when the optional corridor search cannot improve it.
+      if (!routed) feasible.states = original;
     }
     const positions = new Map(feasible.states.map((s) => [s.id, s]));
     for (const state of shown.states) {
@@ -986,17 +986,22 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
       if (baseline.crossings && recoveredRing === view.states) return;
       const original = recoveredRing.map((s) => ({ ...s }));
       let accepted;
-      for (const scale of [1, 1.25, 1.6, 2, 3]) {
+      const scales = [1, 1.25, 1.6, 2, 3];
+      const groupScale = Math.max(
+        1,
+        ...original.filter((s) => s.group).map((s) => groupWidth(s) / 88),
+      );
+      if (groupScale > 3) scales.push(groupScale, groupScale * 1.5);
+      for (const scale of scales) {
         const states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
         if (corridorRoutes({ ...view, states }, view.edges.map(simpleTransitionLabel))) {
           accepted = states;
           break;
         }
       }
-      if (!accepted)
-        throw Error(
-          'Could not route the planar view within the layout budget. The drawing was left unchanged.',
-        );
+      // A difficult subgroup must not discard placement for the whole machine.
+      // The renderer can still use its ordinary routing fallback for this view.
+      if (!accepted) return;
       let preserveStartRing = false;
       if (!id) {
         const ring = circularStartRing({ ...view, states: accepted });
