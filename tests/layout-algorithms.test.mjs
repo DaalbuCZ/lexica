@@ -761,6 +761,28 @@ test('radial pulling moves a tail attached through two different upstream nodes'
   assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
 });
 
+test('radial pulling closes a gap within a tail whose stem has a short attachment', () => {
+  const states = [
+    ['root', -300, 0],
+    ['ring', 0, 0],
+    ['stem', 0, 175],
+    ['tip', 900, 0],
+  ].map(([id, x, y]) => ({ id, x, y }));
+  const edges = [
+    ['root', 'ring'],
+    ['ring', 'stem'],
+    ['ring', 'tip'],
+    ['stem', 'tip'],
+  ].map(([from, to]) => ({ from, to, label: 'a' }));
+  const machine = { start: 'root', states, edges };
+  const result = pullOuterBranches(machine);
+  assert.deepEqual(result.slice(0, 2), states.slice(0, 2));
+  assert.ok(Math.hypot(result[2].x - states[2].x, result[2].y - states[2].y) < 60);
+  assert.ok(result[3].x < 500);
+  assert.equal(drawingClearance(result, edges).crossings, 0);
+  assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
+});
+
 test('radial orientation favors group nodes above the start without changing ring radii', () => {
   const m = {
     start: 'root',

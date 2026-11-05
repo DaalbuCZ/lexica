@@ -190,100 +190,160 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
   let states = machine.states;
   let checked = 0,
     attempts = 0;
-  const triedRegions = new Set();
-  for (const { id } of candidates) {
-    if (checked >= maxRoutes || attempts >= 160) break;
-    const depth = depths.get(id);
-    // A depth cut keeps the earlier layers fixed. Explore the whole connected
-    // piece beyond the cut, including cycles and peers with another attachment.
-    const region = new Set([id]);
-    let tooLarge = false;
-    for (const member of region) {
-      for (const next of adjacent.get(member)) {
-        if (!(depths.get(next) >= depth) || region.has(next)) continue;
-        if (region.size >= 24) {
-          tooLarge = true;
-          break;
-        }
-        region.add(next);
-      }
-      if (tooLarge) break;
-    }
-    if (tooLarge) continue;
-    const key = JSON.stringify([...region].sort());
-    if (triedRegions.has(key)) continue;
-    triedRegions.add(key);
-
-    const nodes = new Map(states.map((state) => [state.id, state]));
-    const boundary = machine.edges.flatMap((edge, i) => {
-      const fromInside = region.has(edge.from);
-      if (fromInside === region.has(edge.to)) return [];
-      const inside = nodes.get(fromInside ? edge.from : edge.to);
-      const outside = nodes.get(fromInside ? edge.to : edge.from);
-      const dx = outside.x - inside.x,
-        dy = outside.y - inside.y;
-      const length = Math.hypot(dx, dy);
-      const minimum = Math.max(175, labels[i].length * 7 + 110);
-      return [{ dx, dy, length, minimum }];
-    });
-    let dx = 0,
-      dy = 0,
-      pulls = 0;
-    for (const edge of boundary) {
-      const spare = edge.length - edge.minimum;
-      if (spare <= 24) continue;
-      dx += (edge.dx * spare) / edge.length;
-      dy += (edge.dy * spare) / edge.length;
-      pulls++;
-    }
-    if (!pulls) continue;
-    dx /= pulls;
-    dy /= pulls;
-    if (Math.hypot(dx, dy) < 24) continue;
-    const boundaryLength = boundary.reduce((sum, edge) => sum + edge.length, 0);
-    const moves = [0.85, 0.6, 0.35, 0.18].flatMap((fraction) =>
-      [0, Math.PI / 12, -Math.PI / 12].map((angle) => ({ fraction, angle })),
-    );
-    for (const { fraction, angle } of moves) {
+  for (let sweep = 0; sweep < 2 && checked < maxRoutes && attempts < 160; sweep++) {
+    const before = states;
+    const triedRegions = new Set();
+    for (const { id } of candidates) {
       if (checked >= maxRoutes || attempts >= 160) break;
-      const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * fraction,
-        y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * fraction;
-      let total = 0,
-        fits = true;
-      for (const edge of boundary) {
-        const length = Math.hypot(edge.dx - x, edge.dy - y);
-        if (
-          length < Math.min(edge.length, edge.minimum) - 1e-6 ||
-          length > edge.length + Math.max(12, edge.length * 0.08)
-        ) {
-          fits = false;
-          break;
+      const depth = depths.get(id);
+      // A depth cut keeps the earlier layers fixed. Explore the whole connected
+      // piece beyond the cut, including cycles and peers with another attachment.
+      const region = new Set([id]);
+      let tooLarge = false;
+      for (const member of region) {
+        for (const next of adjacent.get(member)) {
+          if (!(depths.get(next) >= depth) || region.has(next)) continue;
+          if (region.size >= 24) {
+            tooLarge = true;
+            break;
+          }
+          region.add(next);
         }
-        total += length;
+        if (tooLarge) break;
       }
-      if (!fits || total >= boundaryLength - 1e-6) continue;
-      const next = states.map((state) =>
-        region.has(state.id) ? { ...state, x: state.x + x, y: state.y + y } : state,
-      );
-      if (
-        next.some(
-          (state) => region.has(state.id) && radius(state) >= radius(nodes.get(state.id)) - 1e-6,
+      if (tooLarge) continue;
+      const key = JSON.stringify([...region].sort());
+      if (triedRegions.has(key)) continue;
+      triedRegions.add(key);
+
+      const nodes = new Map(states.map((state) => [state.id, state]));
+      const boundary = machine.edges.flatMap((edge, i) => {
+        const fromInside = region.has(edge.from);
+        if (fromInside === region.has(edge.to)) return [];
+        const inside = nodes.get(fromInside ? edge.from : edge.to);
+        const outside = nodes.get(fromInside ? edge.to : edge.from);
+        const dx = outside.x - inside.x,
+          dy = outside.y - inside.y;
+        const length = Math.hypot(dx, dy);
+        const minimum = Math.max(175, labels[i].length * 7 + 110);
+        return [{ inside: inside.id, dx, dy, length, minimum }];
+      });
+      let dx = 0,
+        dy = 0,
+        pulls = 0;
+      for (const edge of boundary) {
+        const spare = edge.length - edge.minimum;
+        if (spare <= 24) continue;
+        dx += (edge.dx * spare) / edge.length;
+        dy += (edge.dy * spare) / edge.length;
+        pulls++;
+      }
+      const boundaryLength = boundary.reduce((sum, edge) => sum + edge.length, 0);
+      const moves = [];
+      if (pulls && Math.hypot(dx, dy) >= 24 * pulls) {
+        dx /= pulls;
+        dy /= pulls;
+        for (const fraction of [0.85, 0.6, 0.35, 0.18])
+          for (const angle of [0, Math.PI / 12, -Math.PI / 12]) {
+            const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * fraction;
+            const y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * fraction;
+            moves.push(new Map([...region].map((id) => [id, { x, y }])));
+          }
+      }
+
+      // A short boundary edge can pin the stem while long gaps remain inside
+      // the tail. Slide the outer side of a gap inward, keeping nearby states
+      // together and keeping their spacing across the branch.
+      const tip = [...region]
+        .map((id) => nodes.get(id))
+        .reduce((a, b) => (radius(a) > radius(b) ? a : b));
+      const ux = (tip.x - root.x) / radius(tip),
+        uy = (tip.y - root.y) / radius(tip);
+      const projected = [...region]
+        .map((id) => {
+          const state = nodes.get(id);
+          return { id, position: (state.x - root.x) * ux + (state.y - root.y) * uy };
+        })
+        .sort((a, b) => a.position - b.position);
+      const gaps = projected
+        .slice(1)
+        .map((point, i) => ({
+          i: i + 1,
+          spare: point.position - projected[i].position - 190,
+        }))
+        .filter((gap) => gap.spare > 40)
+        .sort((a, b) => b.spare - a.spare)
+        .slice(0, 3);
+      for (const { i, spare } of gaps)
+        for (const fraction of [0.95, 0.65, 0.35]) {
+          const x = -ux * spare * fraction,
+            y = -uy * spare * fraction;
+          moves.push(new Map(projected.slice(i).map(({ id }) => [id, { x, y }])));
+        }
+
+      if (gaps.length > 1) {
+        for (const fraction of [0.85, 0.5]) {
+          const move = new Map();
+          projected.forEach(({ id }, i) => {
+            const distance = gaps.reduce(
+              (sum, gap) => (i >= gap.i ? sum + gap.spare * fraction : sum),
+              0,
+            );
+            if (distance) move.set(id, { x: -ux * distance, y: -uy * distance });
+          });
+          moves.push(move);
+        }
+      }
+
+      // Try the move that brings the tip in farthest first. Tightening a gap
+      // may leave boundary length unchanged, but may not stretch it overall.
+      const tipRadius = (move) => {
+        const shift = move.get(tip.id);
+        return shift ? Math.hypot(tip.x + shift.x - root.x, tip.y + shift.y - root.y) : radius(tip);
+      };
+      moves.sort((a, b) => tipRadius(a) - tipRadius(b));
+      for (const move of moves) {
+        if (checked >= maxRoutes || attempts >= 160) break;
+        let total = 0,
+          fits = true;
+        for (const edge of boundary) {
+          const shift = move.get(edge.inside);
+          const length = shift ? Math.hypot(edge.dx - shift.x, edge.dy - shift.y) : edge.length;
+          if (
+            length < Math.min(edge.length, edge.minimum) - 1e-6 ||
+            length > edge.length + Math.max(12, edge.length * 0.08)
+          ) {
+            fits = false;
+            break;
+          }
+          total += length;
+        }
+        if (!fits || total > boundaryLength + 1e-6) continue;
+        const next = states.map((state) => {
+          const shift = move.get(state.id);
+          return shift ? { ...state, x: state.x + shift.x, y: state.y + shift.y } : state;
+        });
+        if (
+          next.some(
+            (state) => move.has(state.id) && radius(state) >= radius(nodes.get(state.id)) - 1e-6,
+          )
         )
-      )
-        continue;
-      attempts++;
-      const clearance = drawingClearance(next, machine.edges);
-      if (
-        clearance.crossings ||
-        clearance.node < Math.min(175, baseline.node) - 1e-6 ||
-        clearance.wire < Math.min(70, baseline.wire) - 1e-6
-      )
-        continue;
-      checked++;
-      if (!placementCorridorRoutes({ ...machine, states: next, comments: [] }, labels)) continue;
-      states = next;
-      break;
+          continue;
+        attempts++;
+        const clearance = drawingClearance(next, machine.edges);
+        if (
+          clearance.crossings ||
+          clearance.node < Math.min(175, baseline.node) - 1e-6 ||
+          clearance.wire < Math.min(70, baseline.wire) - 1e-6
+        )
+          continue;
+        checked++;
+        if (!placementCorridorRoutes({ ...machine, states: next, comments: [] }, labels)) continue;
+        states = next;
+        break;
+      }
     }
+    if (states === before) break;
   }
   return states;
 }
