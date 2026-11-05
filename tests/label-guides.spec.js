@@ -36,3 +36,40 @@ test('label guides default off and persist when enabled', async ({ page }, testI
   await expect(page.locator('#tokens .token')).toHaveCount(3);
   expect(await page.evaluate(() => window.labelGuideDashes)).toBe(0);
 });
+
+test('experimental on-curve labels persist and remain selectable', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    window.drawnLabels = {};
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...rest) {
+      if (this.canvas.id === 'canvas') {
+        const t = this.getTransform(),
+          box = this.canvas.getBoundingClientRect();
+        window.drawnLabels[text] = {
+          x: box.left + (t.a * x + t.c * y + t.e) / devicePixelRatio,
+          y: box.top + (t.b * x + t.d * y + t.f) / devicePixelRatio,
+        };
+      }
+      return original.call(this, text, x, y, ...rest);
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('#tokens .token')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+  const setting = page.getByLabel('Labels on curves (experimental)', { exact: true });
+  await expect(setting).not.toBeChecked();
+  const old = await page.evaluate(() => window.drawnLabels['a-zA-Z_']);
+  await setting.check();
+  await expect.poll(() => page.evaluate(() => window.drawnLabels['a-zA-Z_'])).not.toEqual(old);
+  await page.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('labels-on-curves.png') });
+  const point = await page.evaluate(() => window.drawnLabels['a-zA-Z_']);
+  await page.mouse.dblclick(point.x, point.y - 4);
+  await expect(page.getByLabel('Characters and ranges', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#tokens .token')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+  await expect(setting).toBeChecked();
+});

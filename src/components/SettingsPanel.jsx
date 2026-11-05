@@ -64,6 +64,12 @@ export function SettingsPanel({ dialog, onClose }) {
             onChange={(labelGuides) => change({ labelGuides })}
           />
           <Check
+            id="labels-on-curve"
+            label="Labels on curves (experimental)"
+            checked={settings.labelsOnCurve}
+            onChange={(labelsOnCurve) => change({ labelsOnCurve })}
+          />
+          <Check
             id="label-boxes"
             label="Label backgrounds"
             checked={machine.labelBoxes}

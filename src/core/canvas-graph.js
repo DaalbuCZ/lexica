@@ -1,4 +1,4 @@
-import { labelGuide } from './label-guides.js';
+import { labelGuide, labelOnCurve } from './label-guides.js';
 import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
@@ -230,7 +230,7 @@ export function createGraphCanvas(canvas, minimap) {
     return palette;
   }
   function draw(next) {
-    scene = next;
+    scene = next.labelsOnCurve ? { ...next, routes: next.routes.map(labelOnCurve) } : next;
     const {
         routes,
         selectedStates,
@@ -293,7 +293,7 @@ export function createGraphCanvas(canvas, minimap) {
                 ? c.green
                 : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
-      if (scene.labelGuides) {
+      if (scene.labelGuides && !scene.labelsOnCurve) {
         const guide = labelGuide(r);
         if (guide) {
           ctx.save();
@@ -450,7 +450,7 @@ export function createGraphCanvas(canvas, minimap) {
       ctx.font = '11px "IBM Plex Mono",monospace';
       ctx.textAlign = 'center';
       const text = labelFor(e) || '⚠ empty';
-      if (e.groupEdge || (machine.labelBoxes && e.label)) {
+      if (scene.labelsOnCurve || e.groupEdge || (machine.labelBoxes && e.label)) {
         ctx.fillStyle = c.panel;
         ctx.strokeStyle = bad ? c.error : (edgeColors[i] ?? c.edge);
         ctx.lineWidth = 1;

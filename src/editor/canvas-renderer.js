@@ -339,6 +339,7 @@ export function createCanvasRenderer(context) {
           tokenColor,
           edgeColor,
           labelGuides: editorSettings.labelGuides,
+          labelsOnCurve: editorSettings.labelsOnCurve,
           selectedStates: new Set(),
           selectedComments: new Set(),
           selectedCommentLinks: new Set(),
@@ -358,6 +359,7 @@ export function createCanvasRenderer(context) {
       tokenColor,
       edgeColor,
       labelGuides: editorSettings.labelGuides,
+      labelsOnCurve: editorSettings.labelsOnCurve,
       selectedStates: new Set([
         ...context.selectedStates,
         ...(context.machine.groups ?? [])

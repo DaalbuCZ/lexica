@@ -2181,6 +2181,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
+      labelsOnCurve: false,
       pinchSensitivity: 2,
     },
   );
@@ -2196,6 +2197,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
+      labelsOnCurve: false,
       pinchSensitivity: 1,
     },
   );
@@ -2213,6 +2215,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
+      labelsOnCurve: false,
       pinchSensitivity: 1,
     },
   );
@@ -4055,7 +4058,7 @@ import './tests/stack-automaton.test.mjs';
 
 import './tests/machine-file.test.mjs';
 
-import { labelGuide } from './src/core/label-guides.js';
+import { labelGuide, labelOnCurve } from './src/core/label-guides.js';
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {
     p0: { x: 0, y: 0 },
@@ -4065,10 +4068,10 @@ test('label guides connect a label boundary to its own curve and omit labels on 
     label: { x: 50, y: 54, w: 40 },
   };
   const guide = labelGuide(route);
-  assert.ok(guide.to.x >= 28 && guide.to.x <= 72);
-  assert.equal(guide.from.x, guide.to.x);
+  assert.equal(guide.from.x, 50);
+  assert.ok(Math.abs(guide.to.x - 50) < 0.1);
   assert.equal(guide.to.y, 0);
-  assert.equal(guide.from.y, 37);
+  assert.equal(guide.from.y, 39);
   assert.equal(labelGuide(route), guide);
   assert.equal(labelGuide({ ...route, label: { x: 50, y: 4, w: 40 } }), null);
   assert.equal(readEditorSettings({ getItem: () => '{"labelGuides":true}' }).labelGuides, true);
@@ -4085,9 +4088,27 @@ test('label guides use the nearest left or right edge instead of a diagonal from
       label: { x: 0, y: 54, w: 100 },
     };
     const guide = labelGuide(route);
-    assert.equal(guide.from.x, side * 52);
+    assert.equal(guide.from.x, side * 50);
     assert.equal(guide.to.x, x);
-    assert.equal(guide.from.y, guide.to.y);
-    assert.equal(Math.hypot(guide.to.x - guide.from.x, guide.to.y - guide.from.y), 48);
+    assert.equal(guide.from.y, 50);
+    assert.ok(Math.abs(guide.to.y - 50) < 0.1);
+    assert.ok(
+      Math.abs(Math.hypot(guide.to.x - guide.from.x, guide.to.y - guide.from.y) - 50) < 0.01,
+    );
   }
+});
+
+test('on-curve labels are display copies centered on the curve, preserving saved layout', () => {
+  const route = {
+    p0: { x: 0, y: 0 },
+    c1: { x: 20, y: 40 },
+    c2: { x: 80, y: 40 },
+    p3: { x: 100, y: 0 },
+    label: { x: 60, y: -20, w: 80 },
+  };
+  const original = structuredClone(route),
+    displayed = labelOnCurve(route);
+  assert.deepEqual(displayed.label, { x: 50, y: 34, w: 80 });
+  assert.equal(labelOnCurve(route), displayed);
+  assert.deepEqual(route, original);
 });
