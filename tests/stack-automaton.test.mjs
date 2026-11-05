@@ -147,7 +147,11 @@ test('scientific aliases include the first original expression and inversion', (
   const text = toAcademic(m);
   assert.match(text, /^A1 = \{1\.\.9\} \/\/ \[1-9\]$/m);
   m.edges[0].invert = true;
-  assert.ok(toAcademic(m).includes('// not ([1-9])'));
+  assert.ok(toAcademic(m).includes('// [^1-9]'));
+  m.edges[0].label = '[^1-9]';
+  assert.match(toAcademic(m), /^A1 = \{1\.\.9\} \/\/ \[1-9\]$/m);
+  m.edges[0].label = 'a|b';
+  assert.ok(toAcademic(m).includes('// (?!(?:a|b)$)[\\s\\S]'));
 });
 
 test('scientific symbols show punctuation literally and quote whitespace', () => {

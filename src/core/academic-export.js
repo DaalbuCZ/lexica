@@ -37,6 +37,20 @@ function set(ranges) {
         '}'
     : '{}';
 }
+function sourceExpression({ label, invert }) {
+  if (invert) {
+    const characterClass = /^\[((?:\\[\s\S]|[^\]\\])*)\]$/u.exec(label);
+    if (characterClass) {
+      const body = characterClass[1];
+      const invertedBody = body.startsWith('^') ? body.slice(1).replace(/^\^/, '\\^') : '^' + body;
+      label = '[' + invertedBody + ']';
+    } else {
+      label = '(?!(?:' + label + ')$)[\\s\\S]';
+    }
+  }
+  return label.replace(/[\r\n]/g, (char) => (char === '\n' ? '\\n' : '\\r'));
+}
+
 export function toAcademic(machine) {
   validate(machine);
   if (!machine.start) throw Error('Choose a start state before exporting an automaton.');
@@ -62,12 +76,7 @@ export function toAcademic(machine) {
       const value = set(sets[i]);
       if (!aliases.has(value)) {
         aliases.set(value, `A${aliases.size + 1}`);
-        expressions.set(
-          value,
-          (edge.invert ? 'not (' + edge.label + ')' : edge.label).replace(/[\r\n]/g, (char) =>
-            char === '\n' ? '\\n' : '\\r',
-          ),
-        );
+        expressions.set(value, sourceExpression(edge));
       }
       input = aliases.get(value);
     }
@@ -81,9 +90,7 @@ export function toAcademic(machine) {
     extended ? 'M = (Q, Σ, Γ, R, s, S, F)' : 'M = (Q, Σ, R, s, F)',
     `Q = {${[...names.values()].join(', ')}}`,
     `Σ = ${set(alphabet)}`,
-    ...[...aliases].map(
-      ([value, name]) => `${name} = ${value} // ${expressions.get(value)}`,
-    ),
+    ...[...aliases].map(([value, name]) => `${name} = ${value} // ${expressions.get(value)}`),
     ...(extended ? [`Γ = {${stack.alphabet.join(', ')}}`, `S = ${stack.initial}`] : []),
     rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = {}',
     `s = ${names.get(machine.start)}`,
