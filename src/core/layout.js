@@ -1,3 +1,4 @@
+import { groupWidth, nodePort } from './labels.js';
 import { forceSimulation, forceManyBody, forceLink, forceX, forceY, forceCollide } from 'd3-force';
 import { springSettings } from './spring-settings.js';
 import { transitionLabel } from './labels.js';
@@ -794,6 +795,10 @@ export function applyBend(route, edge, start, end) {
     p.y += (edge.bend.y * 4) / 3;
   }
   const attach = (point, control, state) => {
+    if (state.group) {
+      Object.assign(point, nodePort(state, Math.atan2(control.y - state.y, control.x - state.x)));
+      return;
+    }
     const radius = Math.hypot(point.x - state.x, point.y - state.y),
       dx = control.x - state.x,
       dy = control.y - state.y,
@@ -835,7 +840,7 @@ function computeRoutes(machine, labels) {
     {
       x: s.x,
       y: s.y,
-      w: 90,
+      w: s.group ? groupWidth(s) + 18 : 90,
       h: 90,
     },
     ...(s.portal ? [statePortalBox(s)] : []),
@@ -1011,14 +1016,8 @@ function computeRoutes(machine, labels) {
         };
         const startAngle = Math.atan2(mid.y - a.y, mid.x - a.x),
           endAngle = Math.atan2(mid.y - b.y, mid.x - b.x);
-        const p0 = {
-            x: a.x + Math.cos(startAngle) * 37,
-            y: a.y + Math.sin(startAngle) * 37,
-          },
-          p3 = {
-            x: b.x + Math.cos(endAngle) * 37,
-            y: b.y + Math.sin(endAngle) * 37,
-          };
+        const p0 = nodePort(a, startAngle),
+          p3 = nodePort(b, endAngle);
         c = {
           p0,
           p3,
@@ -1067,8 +1066,8 @@ function computeRoutes(machine, labels) {
               (s) =>
                 s !== a &&
                 s !== b &&
-                s.x >= left - 65 &&
-                s.x <= right + 65 &&
+                s.x >= left - (s.group ? groupWidth(s) / 2 + 9 : 65) &&
+                s.x <= right + (s.group ? groupWidth(s) / 2 + 9 : 65) &&
                 s.y >= top - 65 &&
                 s.y <= bottom + 65,
             )
@@ -1085,7 +1084,13 @@ function computeRoutes(machine, labels) {
           : [];
       for (let t = 0.04; t < 0.98 && score < bestScore; t += 0.03) {
         const p = sample(c, t);
-        for (const s of nearby) if ((p.x - s.x) ** 2 + (p.y - s.y) ** 2 < 65 ** 2) score += 10000;
+        for (const s of nearby)
+          if (
+            s.group
+              ? Math.abs(p.x - s.x) < groupWidth(s) / 2 + 9 && Math.abs(p.y - s.y) < 45
+              : (p.x - s.x) ** 2 + (p.y - s.y) ** 2 < 65 ** 2
+          )
+            score += 10000;
       }
       const nearbyCaptions = captions.filter(
         (box) =>

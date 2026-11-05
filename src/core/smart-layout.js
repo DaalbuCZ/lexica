@@ -15,7 +15,7 @@ import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
-import { circularStartRing } from './radial-ring.js';
+import { circularStartRing, hasCircularStartRing } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
@@ -980,8 +980,11 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
     const certify = (id) => {
       const view = graphView(machine, id),
         baseline = drawingClearance(view.states, view.edges);
-      if (baseline.crossings || view.edges.some((e) => e.portal != null || e.bend)) return;
-      const original = view.states.map((s) => ({ ...s }));
+      if (view.edges.some((e) => e.portal != null || e.bend)) return;
+      // A compact seed may cross even when its circular arrangement routes.
+      const recoveredRing = !id && baseline.crossings ? circularStartRing(view) : view.states;
+      if (baseline.crossings && recoveredRing === view.states) return;
+      const original = recoveredRing.map((s) => ({ ...s }));
       let accepted;
       for (const scale of [1, 1.25, 1.6, 2, 3]) {
         const states = original.map((s) => ({ ...s, x: s.x * scale, y: s.y * scale }));
@@ -997,7 +1000,8 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
       let preserveStartRing = false;
       if (!id) {
         const ring = circularStartRing({ ...view, states: accepted });
-        preserveStartRing = ring !== accepted;
+        preserveStartRing =
+          ring !== accepted || hasCircularStartRing({ ...view, states: accepted });
         accepted = ring;
       }
       accepted = compactAesthetics(

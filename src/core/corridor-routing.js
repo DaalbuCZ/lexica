@@ -1,3 +1,4 @@
+import { groupWidth, nodePort, tokenCaption } from './labels.js';
 import { curveClearance } from './curve-clearance.js';
 import { SpatialIndex } from './spatial-index.js';
 import { mix, curvePoint, finishRoute, curveAvoidsBox, routeBounds } from './route-geometry.js';
@@ -22,10 +23,15 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
     bundles = new Map(),
     routes = previous ? [...previous] : [],
     index = new SpatialIndex(),
-    obstacles = new SpatialIndex();
+    obstacles = new SpatialIndex(),
+    captions = new SpatialIndex();
   const frozen = new Set();
-  for (const s of machine.states)
-    obstacles.set(s.id, { left: s.x - 46, right: s.x + 46, top: s.y - 46, bottom: s.y + 46 });
+  for (const s of machine.states) {
+    const half = s.group ? groupWidth(s) / 2 + 10 : 46;
+    obstacles.set(s.id, { left: s.x - half, right: s.x + half, top: s.y - 46, bottom: s.y + 46 });
+    const caption = tokenCaption(s);
+    if (caption) captions.set(s.id, caption);
+  }
   for (const [i, e] of machine.edges.entries()) {
     if (e.portal != null || e.bend || !nodes.has(e.from) || !nodes.has(e.to)) {
       if (!previous?.[i]) return null;
@@ -92,8 +98,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
         }
       }
     const s = nodes.get(id);
-    for (const p of ring)
-      ports.set(p.key, { x: s.x + 37 * Math.cos(p.angle), y: s.y + 37 * Math.sin(p.angle) });
+    for (const p of ring) ports.set(p.key, nodePort(s, p.angle));
   }
   let conflict;
   const valid = (r, e) => {
@@ -101,6 +106,12 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
       if (id === e.from || id === e.to) continue;
       if (!curveAvoidsBox(r, obstacles.items.get(id).box)) {
         conflict = { node: id };
+        return false;
+      }
+    }
+    for (const id of captions.query(routeBounds(r))) {
+      if (!curveAvoidsBox(r, captions.items.get(id).box)) {
+        conflict = { caption: id };
         return false;
       }
     }
@@ -145,7 +156,7 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           offset === 0 ? 0 : offset + Math.sign(offset) * extra,
         );
         // During drag, try wider detours before asking neighboring routes to move.
-        if (previous)
+        if (previous || captions.items.size)
           for (const width of [48, 96, 160, 240]) {
             shifts.push(offset + (Math.sign(offset) || 1) * width);
             if (!offset) shifts.push(-width);
@@ -184,6 +195,36 @@ function routeLanes(machine, labels, { previous, dirty, onFailure, laneScale }) 
           if (valid(r, e)) {
             chosen = r;
             break;
+          }
+        }
+        // An approach from below can cross the target's caption even with a
+        // wide mid-curve bend. Try entering or leaving at a side port.
+        if (!chosen) {
+          const aCaption = b.y > a.y ? tokenCaption(a) : null;
+          const bCaption = a.y > b.y ? tokenCaption(b) : null;
+          for (const side of [1, -1]) {
+            if (!aCaption && !bCaption) break;
+            const r = {
+              p0: ports.get(`${i}:a`),
+              p3: ports.get(`${i}:b`),
+              c1: mix(a, b, 1 / 3),
+              c2: mix(a, b, 2 / 3),
+            };
+            const state = aCaption ? a : b;
+            const caption = aCaption ?? bCaption;
+            const x = state.x + side * ((caption.right - caption.left) / 2 + 110);
+            r.c1.x = r.c2.x = x;
+            if (aCaption) {
+              r.p0 = nodePort(a, side > 0 ? 0 : Math.PI);
+              r.c1.y = a.y;
+            } else {
+              r.p3 = nodePort(b, side > 0 ? 0 : Math.PI);
+              r.c2.y = b.y;
+            }
+            if (valid(r, e)) {
+              chosen = r;
+              break;
+            }
           }
         }
       } else {

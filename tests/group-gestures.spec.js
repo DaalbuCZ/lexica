@@ -16,7 +16,7 @@ const machine = {
   groups: [{ id: 'g', name: 'Group', stateIds: ['a', 'b'], x: 80, y: 0 }],
   comments: [],
 };
-async function setup(page, presentation = 'overlay') {
+async function setup(page, presentation = 'overlay', m = machine) {
   await page.addInitScript(
     ({ m, presentation }) => {
       localStorage.setItem('lexica-machine', JSON.stringify(m));
@@ -26,7 +26,7 @@ async function setup(page, presentation = 'overlay') {
       );
       localStorage.setItem('lexica-tester-collapsed', 'true');
     },
-    { m: machine, presentation },
+    { m, presentation },
   );
   await page.goto('/');
 }
@@ -247,4 +247,19 @@ test('Ctrl-drag inserts inside the group and offers a searchable destination out
     .poll(async () => (await read()).edges.some((e) => e.from === 'a' && e.to === 'end'))
     .toBe(true);
   expect((await read()).states).toHaveLength(5);
+});
+
+test('a long group name paints at full size and the wider node can be opened', async ({ page }) => {
+  const m = structuredClone(machine);
+  m.groups[0].name = 'A much longer group name';
+  await setup(page, 'overlay', m);
+  await expect(page.locator('#app-loading')).toBeHidden();
+  const point = await page.locator('#canvas').evaluate((canvas) => {
+    const t = canvas.getContext('2d').getTransform();
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + t.e + 155 * t.a, y: r.top + t.f };
+  });
+  await page.mouse.dblclick(point.x, point.y);
+  await expect(page.locator('.group-overlay')).toBeVisible();
+  await expect(page.locator('#group-overlay-title')).toHaveValue(m.groups[0].name);
 });

@@ -561,6 +561,19 @@ test('almost horizontal transitions align exactly when feasible and retain clear
   assert.equal(alignHorizontal(blocked)[1].y, 12);
 });
 
+test('a corridor enters an accepting state from below without crossing its token caption', () => {
+  const machine = {
+    states: [
+      { id: 'source', x: 0, y: 250 },
+      { id: 'final', x: 0, y: 0, token: 'LONG_ACCEPTING_TOKEN_NAME' },
+    ],
+    edges: [{ from: 'source', to: 'final', label: 'a' }],
+  };
+  const routes = corridorRoutes(machine, ['a']);
+  assert.ok(routes);
+  assert.ok(curveAvoidsBox(routes[0], { left: -73, right: 73, top: 46, bottom: 60 }));
+});
+
 test('a feasible start ring remains circular through aesthetic cleanup', () => {
   const m = {
     start: 'root',

@@ -1,6 +1,6 @@
 import { graphBounds } from './canvas-graph.js';
 import { editorSettings, simpleTransitionLabel } from './editor-settings.js';
-import { stateLabel, transitionLabel } from './labels.js';
+import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { transitionError, isAccepting, statePortalBox } from './lexer.js';
 import { routeEdges } from './layout.js';
@@ -68,10 +68,14 @@ export function machineSvg(machine, { simplified = editorSettings.simplified } =
       edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box" x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}" x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
     }
     for (const s of visualMachine(machine).states) {
-      const label = stateLabel(s.name);
-      if (s.id === machine.start || s.startView !== undefined)
-        html += `<path class="edge" d="M ${s.x - 85} ${s.y} L ${s.x - 40} ${s.y}"/>`;
-      html += `<g class="node ${s.outside ? 'outside' : ''} ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})">${s.group ? '<rect x="-48" y="-36" width="96" height="72" rx="12"/>' : '<circle r="36"/>'}${
+      const label = s.group
+        ? { lines: [s.name], fontSize: 12, y: 4, lineHeight: 13.2 }
+        : stateLabel(s.name);
+      if (s.id === machine.start || s.startView !== undefined) {
+        const tipX = s.x - (s.group ? groupWidth(s) / 2 + 4 : 40);
+        html += `<path class="edge" d="M ${tipX - 45} ${s.y} L ${tipX} ${s.y}"/>`;
+      }
+      html += `<g class="node ${s.outside ? 'outside' : ''} ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})">${s.group ? `<rect x="${-groupWidth(s) / 2}" y="-36" width="${groupWidth(s)}" height="72" rx="12"/>` : '<circle r="36"/>'}${
         s.portal
           ? (() => {
               const box = statePortalBox(s),
@@ -90,7 +94,7 @@ export function machineSvg(machine, { simplified = editorSettings.simplified } =
               )}`;
             })()
           : ''
-      }${isAccepting(s) ? '<circle class="inner" r="31"/>' : ''}<text class="state-name" style="font-size:${label.fontSize}px">${label.lines.map((line, i) => `<tspan x="0" y="${label.y + i * label.lineHeight}" ${line.length > (label.lines.length > 1 ? 8 : 10) ? `textLength="${label.width}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(line)}</tspan>`).join('')}</text>${isAccepting(s) ? `<text class="token-label" y="57">${esc(s.token)}${s.skip ? ' · skip' : ''}</text>` : ''}</g>`;
+      }${isAccepting(s) ? '<circle class="inner" r="31"/>' : ''}<text class="state-name" style="font-size:${label.fontSize}px">${label.lines.map((line, i) => `<tspan x="0" y="${label.y + i * label.lineHeight}" ${!s.group && line.length > (label.lines.length > 1 ? 8 : 10) ? `textLength="${label.width}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(line)}</tspan>`).join('')}</text>${isAccepting(s) ? `<text class="token-label" y="57">${esc(s.token)}${s.skip ? ' · skip' : ''}</text>` : ''}</g>`;
     }
     if (commentSource && connectPoint) {
       const c = machine.comments?.find((c) => c.id === commentSource);

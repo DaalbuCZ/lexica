@@ -2,17 +2,33 @@ import { drawingClearance } from './planar-layout.js';
 import { corridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
 
+function startNeighbors(machine, root) {
+  return new Set(
+    machine.edges
+      .filter((edge) => edge.from === root.id && edge.to !== root.id && edge.portal == null)
+      .map((edge) => edge.to),
+  );
+}
+
+export function hasCircularStartRing(machine) {
+  const root = machine.states.find((state) => state.id === machine.start);
+  if (!root) return false;
+  const ids = startNeighbors(machine, root);
+  const radii = machine.states
+    .filter((state) => ids.has(state.id))
+    .map((state) => Math.hypot(state.x - root.x, state.y - root.y));
+  return (
+    radii.length >= 3 && Math.min(...radii) > 0 && Math.max(...radii) - Math.min(...radii) < 1e-5
+  );
+}
+
 // Rebalance the first ring without inheriting the unequal radii of local
 // branch compaction. Try both a polar warp and harmonic displacement; accept
 // only a complete non-crossing drawing, then pin this ring during cleanup.
 export function circularStartRing(machine) {
   const root = machine.states.find((s) => s.id === machine.start);
   if (!root) return machine.states;
-  const ids = new Set(
-    machine.edges
-      .filter((e) => e.from === root.id && e.to !== root.id && e.portal == null)
-      .map((e) => e.to),
-  );
+  const ids = startNeighbors(machine, root);
   const ring = machine.states
     .filter((s) => ids.has(s.id))
     .map((s) => ({
@@ -21,7 +37,7 @@ export function circularStartRing(machine) {
       radius: Math.hypot(s.x - root.x, s.y - root.y),
     }))
     .sort((a, b) => a.angle - b.angle || (a.s.id < b.s.id ? -1 : 1));
-  if (ring.length < 4) return machine.states;
+  if (ring.length < 3) return machine.states;
   const labels = machine.edges.map(simpleTransitionLabel),
     demand = Math.max(
       240,
@@ -194,7 +210,7 @@ export function circularStartRing(machine) {
       const area =
         (Math.max(...states.map((s) => s.x)) - Math.min(...states.map((s) => s.x))) *
         (Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y)));
-      if (mode !== 'branches' && area > initialArea * 1.1) continue;
+      if (mode !== 'branches' && area > initialArea * 1.6) continue;
       if (area < bestArea && corridorRoutes({ ...machine, states, comments: [] }, labels)) {
         best = states;
         bestArea = area;

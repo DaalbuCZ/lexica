@@ -4529,7 +4529,11 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
   assert.deepEqual(m, before);
   m.edges[0].label = 'a';
   m.edges[0].invert = true;
+  assert.match(toAcademic(m), /"b"…U\+007F/);
+  m.edges.push({ from: 'b', to: 'b', label: '\\u{1F600}' });
   assert.match(toAcademic(m), /"b"…U\+10FFFF/);
+  assert.match(toAcademic(m), /q1 U\+1F600 → q1/);
+  m.edges.pop();
   m.edges[0].label = '[a-c]';
   m.edges[0].invert = false;
   m.cells = [

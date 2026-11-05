@@ -1,4 +1,4 @@
-import { stateLabel, transitionLabel } from './labels.js';
+import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
 import { visualMachine } from './start-views.js';
@@ -21,9 +21,10 @@ export function graphBounds(machine, routes) {
   machine = visualMachine(machine);
   const boxes = machine.states.flatMap((s) => [
     {
-      x: s.x - 85,
+      x:
+        s.x - (s.group ? Math.max(85, groupWidth(s) / 2 + (s.id === machine.start ? 50 : 12)) : 85),
       y: s.y - 80,
-      width: 170,
+      width: s.group ? Math.max(170, groupWidth(s) + (s.id === machine.start ? 100 : 24)) : 170,
       height: 150,
     },
     ...(s.portal
@@ -324,16 +325,17 @@ export function createGraphCanvas(canvas, minimap) {
                     ? c.green
                     : c.edge;
       if (s.id === machine.start || s.startView !== undefined) {
+        const tipX = s.x - (s.group ? groupWidth(s) / 2 + 4 : 40);
         ctx.strokeStyle = bad ? c.error : color;
         ctx.lineWidth = 1.6;
         line(
           ctx,
           {
-            x: s.x - 85,
+            x: tipX - 45,
             y: s.y,
           },
           {
-            x: s.x - 40,
+            x: tipX,
             y: s.y,
           },
         );
@@ -341,11 +343,11 @@ export function createGraphCanvas(canvas, minimap) {
           ctx,
           {
             p3: {
-              x: s.x - 40,
+              x: tipX,
               y: s.y,
             },
             c2: {
-              x: s.x - 85,
+              x: tipX - 45,
               y: s.y,
             },
           },
@@ -354,7 +356,7 @@ export function createGraphCanvas(canvas, minimap) {
       }
       ctx.setLineDash(s.outside ? [6, 4] : []);
       ctx.beginPath();
-      if (s.group) ctx.roundRect(s.x - 44, s.y - 36, 88, 72, 13);
+      if (s.group) ctx.roundRect(s.x - groupWidth(s) / 2, s.y - 36, groupWidth(s), 72, 13);
       else ctx.arc(s.x, s.y, 36, 0, Math.PI * 2);
       ctx.fillStyle = bad
         ? c.node
@@ -375,7 +377,9 @@ export function createGraphCanvas(canvas, minimap) {
         ctx.lineWidth = 1.7;
         ctx.stroke();
       }
-      const label = stateLabel(s.name);
+      const label = s.group
+        ? { lines: [s.name], fontSize: 12, y: 4, lineHeight: 13.2 }
+        : stateLabel(s.name);
       ctx.font = `${label.fontSize}px "DM Sans",sans-serif`;
       ctx.fillStyle = bad
         ? c.error
@@ -388,7 +392,8 @@ export function createGraphCanvas(canvas, minimap) {
               : c.text;
       ctx.textAlign = 'center';
       for (let i = 0; i < label.lines.length; i++)
-        ctx.fillText(label.lines[i], s.x, s.y + label.y + i * label.lineHeight, label.width);
+        if (s.group) ctx.fillText(s.name, s.x, s.y + label.y);
+        else ctx.fillText(label.lines[i], s.x, s.y + label.y + i * label.lineHeight, label.width);
       if (!s.group && isAccepting(s)) {
         ctx.font = '9px "IBM Plex Mono",monospace';
         ctx.fillText(s.token + (s.skip ? ' · skip' : ''), s.x, s.y + 57);
@@ -656,9 +661,9 @@ export function createGraphCanvas(canvas, minimap) {
       if (
         s.group
           ? contains(p, {
-              x: s.x - 44,
+              x: s.x - groupWidth(s) / 2,
               y: s.y - 36,
-              width: 88,
+              width: groupWidth(s),
               height: 72,
             })
           : Math.hypot(p.x - s.x, p.y - s.y) <= 36

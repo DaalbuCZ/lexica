@@ -1,3 +1,4 @@
+import { groupWidth, tokenCaption } from './labels.js';
 import { curvePoint, curveAvoidsBox, routeBounds } from './route-geometry.js';
 import { SpatialIndex } from './spatial-index.js';
 import { commentLayout } from './comments.js';
@@ -20,16 +21,10 @@ export function reflowRouteLabels(machine, routes, dirty = new Set(routes.keys()
     captions = new SpatialIndex(),
     wires = new SpatialIndex();
   machine.states.forEach((s, i) => {
-    obstacles.set(i, { left: s.x - 47, right: s.x + 47, top: s.y - 47, bottom: s.y + 47 });
-    if (s.token && s.accepting !== false) {
-      const half = (s.token.length + (s.skip ? 7 : 0)) * 2.75 + 4;
-      obstacles.set('token:' + i, {
-        left: s.x - half,
-        right: s.x + half,
-        top: s.y + 46,
-        bottom: s.y + 60,
-      });
-    }
+    const half = s.group ? groupWidth(s) / 2 + 11 : 47;
+    obstacles.set(i, { left: s.x - half, right: s.x + half, top: s.y - 47, bottom: s.y + 47 });
+    const caption = tokenCaption(s);
+    if (caption) obstacles.set('token:' + i, caption);
   });
   (machine.comments ?? []).forEach((c, i) => {
     const { w, h } = commentLayout(c);

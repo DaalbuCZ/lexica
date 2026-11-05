@@ -2,16 +2,25 @@ import { destination, isAccepting, matcher, validate } from './lexer.js';
 import { memoryRuleLabel, stackCell } from './memory.js';
 
 // IFJ, Modely pro regulární jazyky, slide 7: M = (Q, Σ, R, s, F).
-// Enumerate the finite Unicode input domain, compressing consecutive symbols.
+// Cache compressed character ranges separately for each input domain.
 const characterSets = new Map();
-function rangesFor(edge) {
-  const key = JSON.stringify([edge.label, !!edge.invert]);
+function usesUnicode(label) {
+  if ([...label].some((char) => char.codePointAt(0) > 127)) return true;
+  for (const escape of label.matchAll(
+    /\\(?:u\{([0-9a-f]+)\}|u([0-9a-f]{4})|x([0-9a-f]{2})|([pP])\{|[\s\S])/giu,
+  )) {
+    if (escape[4] || parseInt(escape[1] ?? escape[2] ?? escape[3], 16) > 127) return true;
+  }
+  return false;
+}
+function rangesFor(edge, limit) {
+  const key = JSON.stringify([edge.label, !!edge.invert, limit]);
   if (characterSets.has(key)) return characterSets.get(key);
   const accepts = matcher(edge.label, edge.invert),
     ranges = [];
   let start = null;
-  for (let code = 0; code <= 0x110000; code++) {
-    const matches = code < 0x110000 && accepts(String.fromCodePoint(code));
+  for (let code = 0; code <= limit; code++) {
+    const matches = code < limit && accepts(String.fromCodePoint(code));
     if (matches && start === null) start = code;
     if (!matches && start !== null) {
       ranges.push([start, code - 1]);
@@ -50,7 +59,8 @@ export function toAcademic(machine) {
       : label;
   };
   const names = new Map(machine.states.map((state, i) => [state.id, `q${i}`]));
-  const sets = machine.edges.map(rangesFor);
+  const unicode = machine.edges.some((edge) => usesUnicode(edge.label));
+  const sets = machine.edges.map((edge) => rangesFor(edge, unicode ? 0x110000 : 128));
   const alphabet = [];
   for (const [a, b] of sets.flat().sort((a, b) => a[0] - b[0])) {
     const last = alphabet.at(-1);
@@ -109,6 +119,7 @@ export function toAcademic(machine) {
         `${names.get(state.id)} = ${JSON.stringify(state.name)} (id ${JSON.stringify(state.id)})`,
     ),
     '',
+    `Input domain: ${unicode ? 'Unicode' : 'ASCII'}.`,
     'Notation: U+XXXX denotes a Unicode character; … includes every code point between the endpoints.',
     'p A [guard] / actions → q abbreviates one rule for each character in A. Omitted guard = true; omitted actions = identity.',
     ...(extended
