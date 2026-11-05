@@ -89,10 +89,10 @@ test('debugger seeks and restores stack snapshots', () => {
 test('IFJ export uses stack rules and ASCII input with no epsilon transitions', () => {
   const m = stackMachine(),
     text = toAcademic(m);
-  assert.match(text, /M = \(Q, Sigma, Gamma, R, s, S, F\)/);
-  assert.match(text, /Gamma = \{S, OPEN\}/);
-  assert.match(text, /OPEN q0 "\)" -> eps q1/);
-  assert.match(text, /S q0 "\(" -> S OPEN q1/);
+  assert.match(text, /M = \(Q, Σ, Γ, R, s, S, F\)/);
+  assert.match(text, /Γ = \{S, OPEN\}/);
+  assert.match(text, /OPEN q0 "\)" → ε q1/);
+  assert.match(text, /S q0 "\(" → S OPEN q1/);
   assert.match(text, /ASCII/);
   m.edges[0].label = '';
   assert.throws(() => tokenize(m, '('), /empty/);
@@ -127,14 +127,25 @@ test('stack clipboard copies alternatives and rejects unknown enum values on val
   assert.throws(() => validate(m), /enum/);
 });
 
-test('scientific export contains ASCII only and omits internal IDs', () => {
+test('scientific export keeps ASCII character groups and omits internal IDs', () => {
   const m = stackMachine();
   m.states[0].name = 'Žluťoučký 😀';
   m.states[0].id = '550e8400-e29b-41d4-a716-446655440000';
   m.start = m.states[0].id;
   for (const edge of m.edges) edge.from = m.start;
   const text = toAcademic(m);
-  assert.ok([...text].every((char) => char.charCodeAt(0) < 128));
+  assert.match(text, /Σ/);
+  assert.match(text, /Γ/);
   assert.ok(!text.includes(m.start));
   assert.ok(!text.includes('U+'));
+});
+
+test('scientific aliases include original expressions and inversion', () => {
+  const m = stackMachine();
+  m.edges[0].label = '[1-9]';
+  m.edges[1].label = '[123456789]';
+  const text = toAcademic(m);
+  assert.ok(text.includes('A1 = {"1".."9"} // [1-9]; [123456789]'));
+  m.edges[0].invert = true;
+  assert.ok(toAcademic(m).includes('// not ([1-9])'));
 });

@@ -3980,10 +3980,10 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
   };
   const before = structuredClone(m);
   const text = toAcademic(m);
-  assert.match(text, /M = \(Q, Sigma, R, s, F\)/);
+  assert.match(text, /M = \(Q, Σ, R, s, F\)/);
   assert.match(text, /Q = \{q0, q1\}/);
-  assert.match(text, /Sigma = \{"a"\.\."c"\}/);
-  assert.match(text, /q0 A1 -> q1/);
+  assert.match(text, /Σ = \{"a"\.\."c"\}/);
+  assert.match(text, /q0 A1 → q1/);
   assert.match(text, /s = q0/);
   assert.match(text, /F = \{q1\}/);
   assert.deepEqual(m, before);

@@ -67,7 +67,7 @@ test('fresh defaults, canvas focus, centered dialogs and IFJ export', async ({
     if (name === 'Export') {
       await page.locator('#format').click();
       await page.getByRole('option', { name: 'Academic automaton / IFJ (.txt)' }).click();
-      await expect(page.locator('#export-preview')).toHaveValue(/M = \(Q, Sigma, R, s, F\)/);
+      await expect(page.locator('#export-preview')).toHaveValue(/M = \(Q, Σ, R, s, F\)/);
       const downloaded = page.waitForEvent('download');
       await page.locator('#download').click();
       expect((await downloaded).suggestedFilename()).toBe('lexer.txt');
