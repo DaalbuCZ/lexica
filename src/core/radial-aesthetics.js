@@ -431,3 +431,126 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
   stats.attempts = attempts;
   return states;
 }
+
+// Tighten long spokes after the radial cleanup. Move each connected branch
+// rigidly so the arrangement within it survives, including cycles and lanes.
+export function compactRadialSpokes(machine) {
+  const root = machine.states.find((state) => state.id === machine.start);
+  if (
+    !root ||
+    machine.states.length > 160 ||
+    machine.edges.length > 320 ||
+    machine.edges.some((edge) => edge.portal != null || edge.bend)
+  )
+    return machine.states;
+  const neighbors = new Map(machine.states.map((state) => [state.id, new Set()]));
+  for (const edge of machine.edges) {
+    neighbors.get(edge.from)?.add(edge.to);
+    neighbors.get(edge.to)?.add(edge.from);
+  }
+  const remaining = new Set(neighbors.keys());
+  remaining.delete(root.id);
+  const branches = [];
+  const labels = machine.edges.map(simpleTransitionLabel);
+  while (remaining.size) {
+    const members = [remaining.values().next().value];
+    remaining.delete(members[0]);
+    for (const id of members)
+      for (const next of neighbors.get(id)) if (remaining.delete(next)) members.push(next);
+    if (members.length < 4 || members.length > 24) continue;
+    const ids = new Set(members);
+    const spokes = machine.edges.flatMap((edge, i) => {
+      if (edge.from !== root.id || !ids.has(edge.to)) return [];
+      return [{ id: edge.to, minimum: Math.max(175, labels[i].length * 7 + 110) }];
+    });
+    if (spokes.length) branches.push({ ids, spokes });
+  }
+  if (!branches.length) return machine.states;
+  const radius = (state) => Math.hypot(state.x - root.x, state.y - root.y);
+  const baseline = drawingClearance(machine.states, machine.edges);
+  if (baseline.crossings) return machine.states;
+  let states = machine.states,
+    routeChecks = 0;
+  for (let sweep = 0; sweep < 2 && routeChecks < 6; sweep++) {
+    const previous = states;
+    const ranked = branches
+      .map((branch) => ({
+        ...branch,
+        reach: Math.max(...states.filter((state) => branch.ids.has(state.id)).map(radius)),
+      }))
+      .sort((a, b) => b.reach - a.reach);
+    for (const { ids, spokes, reach } of ranked.slice(0, 4)) {
+      if (routeChecks >= 6) break;
+      const members = states.filter((state) => ids.has(state.id));
+      const anchors = new Map(members.map((state) => [state.id, state]));
+      const centroid = spokes.reduce(
+        (point, spoke) => {
+          const state = anchors.get(spoke.id);
+          point.x += state.x - root.x;
+          point.y += state.y - root.y;
+          return point;
+        },
+        { x: 0, y: 0 },
+      );
+      const heading = Math.atan2(centroid.y, centroid.x);
+      const spare = Math.min(
+        ...spokes.map((spoke) => radius(anchors.get(spoke.id)) - spoke.minimum),
+      );
+      // Limit each move to a fraction of the spoke radius to retain the fan.
+      const step = Math.min(
+        spare,
+        0.35 * Math.min(...spokes.map((spoke) => radius(anchors.get(spoke.id)))),
+      );
+      if (step < 45) continue;
+      const pivot = {
+        x: root.x + centroid.x / spokes.length,
+        y: root.y + centroid.y / spokes.length,
+      };
+      search: for (const fraction of [1, 0.7, 0.4]) {
+        for (const swing of [0, -Math.PI / 9, Math.PI / 9]) {
+          const dx = -Math.cos(heading + swing) * step * fraction;
+          const dy = -Math.sin(heading + swing) * step * fraction;
+          for (const turn of [0, -Math.PI / 18, Math.PI / 18, -Math.PI / 9, Math.PI / 9]) {
+            const cos = Math.cos(turn),
+              sin = Math.sin(turn);
+            const moved = new Map(
+              members.map((state) => {
+                const x = state.x - pivot.x,
+                  y = state.y - pivot.y;
+                return [
+                  state.id,
+                  {
+                    ...state,
+                    x: pivot.x + x * cos - y * sin + dx,
+                    y: pivot.y + x * sin + y * cos + dy,
+                  },
+                ];
+              }),
+            );
+            if (
+              Math.max(...[...moved.values()].map(radius)) >= reach - 35 ||
+              spokes.some((spoke) => radius(moved.get(spoke.id)) < spoke.minimum)
+            )
+              continue;
+            const next = states.map((state) => moved.get(state.id) ?? state);
+            const clearance = drawingClearance(next, machine.edges);
+            if (
+              clearance.crossings ||
+              clearance.node < Math.min(175, baseline.node) - 1e-6 ||
+              clearance.wire < Math.min(70, baseline.wire) - 1e-6
+            )
+              continue;
+            routeChecks++;
+            if (placementCorridorRoutes({ ...machine, states: next, comments: [] }, labels)) {
+              states = next;
+              break search;
+            }
+            if (routeChecks >= 6) break search;
+          }
+        }
+      }
+    }
+    if (previous === states) break;
+  }
+  return states;
+}

@@ -21,7 +21,11 @@ import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
 import { validateRouteSeparation } from './layout-validation.js';
 import { polishSubgroup } from './subgroup-aesthetics.js';
-import { polishRadialBranches, pullOuterBranches } from './radial-aesthetics.js';
+import {
+  polishRadialBranches,
+  pullOuterBranches,
+  compactRadialSpokes,
+} from './radial-aesthetics.js';
 const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
 
 export function simpleBranch(machine) {
@@ -1005,8 +1009,10 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
           { ...view, states: accepted },
           { stats: (metrics.radialAesthetics = {}) },
         );
-      if (!id && !machine.groups?.length && options.smartGroups === false)
+      if (!id && !machine.groups?.length && options.smartGroups === false) {
         accepted = pullOuterBranches({ ...view, states: accepted });
+        accepted = compactRadialSpokes({ ...view, states: accepted });
+      }
       if (!id && machine.groups?.length) accepted = orientGroupsUp({ ...view, states: accepted });
       const positions = new Map(accepted.map((s) => [s.id, s]));
       for (const s of view.states) {

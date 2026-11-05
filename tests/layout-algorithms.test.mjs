@@ -25,7 +25,11 @@ import { interactiveRoutes } from '../src/core/interactive-routes.js';
 import { cycleAnalysis, insideCycle, cycleScore } from '../src/core/cycle-aesthetics.js';
 import { transitionBundles } from '../src/core/graph-bundles.js';
 import { polishSubgroup } from '../src/core/subgroup-aesthetics.js';
-import { polishRadialBranches, pullOuterBranches } from '../src/core/radial-aesthetics.js';
+import {
+  compactRadialSpokes,
+  polishRadialBranches,
+  pullOuterBranches,
+} from '../src/core/radial-aesthetics.js';
 import { simpleTransitionLabel } from '../src/core/editor-settings.js';
 
 test('radial assembly keeps a cyclic branch exit outside its cycles before late cleanup', () => {
@@ -1205,5 +1209,36 @@ test('radial pulling flips a blocked branch head inward while preserving pinned 
   const clearance = drawingClearance(result, edges);
   assert.equal(clearance.crossings, 0);
   assert.ok(clearance.node >= 175);
+  assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
+});
+
+test('radial spoke cleanup moves multiple attachments together and preserves branch geometry', () => {
+  const states = [
+    ['root', 0, 0],
+    ['a', 800, -100],
+    ['b', 800, 100],
+    ['c', 1000, -100],
+    ['d', 1000, 100],
+  ].map(([id, x, y]) => ({ id, x, y }));
+  const edges = [
+    ['root', 'a'],
+    ['root', 'b'],
+    ['a', 'c'],
+    ['b', 'd'],
+    ['c', 'd'],
+  ].map(([from, to]) => ({ from, to, label: 'x' }));
+  const machine = { start: 'root', states, edges };
+  const result = compactRadialSpokes(machine);
+  assert.deepEqual(result[0], states[0]);
+  for (let i = 1; i < states.length; i++) {
+    assert.ok(Math.hypot(result[i].x, result[i].y) < Math.hypot(states[i].x, states[i].y));
+    for (let j = i + 1; j < states.length; j++)
+      assert.ok(
+        Math.abs(
+          Math.hypot(result[i].x - result[j].x, result[i].y - result[j].y) -
+            Math.hypot(states[i].x - states[j].x, states[i].y - states[j].y),
+        ) < 1e-6,
+      );
+  }
   assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
 });
