@@ -2668,7 +2668,7 @@ test('simplified captions remove regex brackets without changing stored rules or
       label: '[0-9]',
       stackRules: [{ top: 'S', replace: ['S', 'OPEN'] }],
     }),
-    '0-9 · S → (push) OPEN',
+    '0-9 · S → push OPEN',
   );
 });
 test('pinch zoom preserves its world anchor while scaling and moving across letterboxed views', () => {

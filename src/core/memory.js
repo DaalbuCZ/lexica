@@ -31,16 +31,16 @@ export const stackRules = (m, e) =>
   e.stackRules?.length
     ? e.stackRules
     : stackDefinition(m).alphabet.map((top) => ({ top, replace: [top] }));
-export const memoryRuleLabel = (r) =>
-  `${r.top} → ${
-    !r.replace.length
-      ? '(pop)'
-      : r.replace.length === 1 && r.replace[0] === r.top
-        ? '(keep)'
-        : r.replace.length === 2 && r.replace[0] === r.top
-          ? '(push) ' + r.replace[1]
-          : r.replace.join(' ')
-  }`;
+function actionLabel(rule) {
+  const action = stackAction(rule);
+  if (action === 'keep') return '';
+  if (action === 'pop') return 'pop';
+  if (action.startsWith('push:')) return 'push ' + action.slice(5);
+  if (action.startsWith('replace:')) return 'replace ' + action.slice(8);
+  return 'replace ' + rule.replace.join(' ');
+}
+export const memoryRuleLabel = (rule) =>
+  rule.top + (actionLabel(rule) ? ' → ' + actionLabel(rule) : '');
 export function renameStackSymbol(machine, index, name) {
   const stack = (machine.stack ??= structuredClone(stackDefinition(machine)));
   name = name.trim();
@@ -85,8 +85,22 @@ export function setStackAction(rule, action) {
   else if (action.startsWith('replace:')) rule.replace = [action.slice(8)];
 }
 
-export const stackRuleSuffix = (e) =>
-  e.stackRules?.length ? ' · ' + e.stackRules.map(memoryRuleLabel).join(' OR ') : '';
+// Presentation only: group equivalent actions without changing rule order or execution.
+export function stackRuleSuffix(edge) {
+  const groups = new Map();
+  for (const rule of edge.stackRules ?? []) {
+    const action = actionLabel(rule);
+    if (!groups.has(action)) groups.set(action, []);
+    const tops = groups.get(action);
+    if (!tops.includes(rule.top)) tops.push(rule.top);
+  }
+  return groups.size
+    ? ' · ' +
+        [...groups]
+          .map(([action, tops]) => tops.join(', ') + (action ? ' → ' + action : ''))
+          .join(' OR ')
+    : '';
+}
 export const copyStackRules = (e) =>
   JSON.stringify({ kind: 'lexica-stack-rules', rules: e.stackRules ?? [] });
 export function pasteStackRules(e, text) {

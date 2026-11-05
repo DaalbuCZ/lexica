@@ -41,9 +41,9 @@ test('one enum stack replaces top atomically, OR alternatives work, empty stack 
   assert.equal(frames.filter((f) => f.result).at(-1).token, 'ERROR');
   assert.deepEqual(frames[0].memory.stack, ['S']);
   assert.deepEqual(m, before);
-  assert.match(toTikz(m), / OR /);
+  assert.match(toTikz(m), /S, OPEN/);
   assert.ok(toTikz(m).includes('\\ensuremath{\\rightarrow}'));
-  assert.ok(toTikz(m).includes('(pop)'));
+  assert.ok(toTikz(m).includes('pop'));
 });
 test('enum validates alphabet, initial symbol and every replacement', () => {
   for (const change of [
@@ -180,16 +180,43 @@ test('enum renaming updates initial symbol and every top and replacement atomica
 });
 test('stack action shorthand preserves keep, pop, replace, and push semantics', () => {
   const r = { top: 'S', replace: ['S'] };
-  assert.equal(memoryRuleLabel(r), 'S → (keep)');
+  assert.equal(memoryRuleLabel(r), 'S');
   for (const [action, replacement, label] of [
-    ['pop', [], 'S → (pop)'],
-    ['keep', ['S'], 'S → (keep)'],
-    ['push:S', ['S', 'S'], 'S → (push) S'],
-    ['replace:OPEN', ['OPEN'], 'S → OPEN'],
+    ['pop', [], 'S → pop'],
+    ['keep', ['S'], 'S'],
+    ['push:S', ['S', 'S'], 'S → push S'],
+    ['replace:OPEN', ['OPEN'], 'S → replace OPEN'],
   ]) {
     setStackAction(r, action);
     assert.deepEqual(r.replace, replacement);
     assert.equal(stackAction(r), action);
     assert.equal(memoryRuleLabel(r), label);
   }
+});
+
+import { stackRuleSuffix } from '../src/core/memory.js';
+test('graph labels group matching actions and omit keep without changing scientific rules', () => {
+  const rules = [
+    { top: 'BOTTOM', replace: ['BOTTOM'] },
+    { top: 'EXPR', replace: ['EXPR'] },
+    { top: 'STRING', replace: [] },
+    { top: 'MULTILINE', replace: [] },
+    { top: 'A', replace: ['A', 'TOKEN'] },
+    { top: 'B', replace: ['B', 'TOKEN'] },
+    { top: 'C', replace: ['TOKEN'] },
+    { top: 'D', replace: ['TOKEN'] },
+  ];
+  const before = structuredClone(rules);
+  assert.equal(
+    stackRuleSuffix({ stackRules: rules }),
+    ' · BOTTOM, EXPR OR STRING, MULTILINE → pop OR A, B → push TOKEN OR C, D → replace TOKEN',
+  );
+  assert.deepEqual(rules, before);
+  const m = stackMachine(),
+    scientific = toAcademic(m);
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · S, OPEN → push OPEN');
+  assert.equal(toAcademic(m), scientific);
+  assert.ok(scientific.includes('S q0 ( → S OPEN q1'));
+  assert.ok(scientific.includes('OPEN q0 ( → OPEN OPEN q1'));
+  assert.ok(!scientific.includes('push OPEN'));
 });
