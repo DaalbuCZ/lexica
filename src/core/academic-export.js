@@ -1,19 +1,10 @@
 import { destination, isAccepting, matcher, validate } from './lexer.js';
-import { memoryRuleLabel, stackCell } from './memory.js';
+import { isStackMachine, stackDefinition, stackRules } from './memory.js';
 
 // IFJ, Modely pro regulární jazyky, slide 7: M = (Q, Σ, R, s, F).
-// Cache compressed character ranges separately for each input domain.
+// All input sets are restricted to ASCII.
 const characterSets = new Map();
-function usesUnicode(label) {
-  if ([...label].some((char) => char.codePointAt(0) > 127)) return true;
-  for (const escape of label.matchAll(
-    /\\(?:u\{([0-9a-f]+)\}|u([0-9a-f]{4})|x([0-9a-f]{2})|([pP])\{|[\s\S])/giu,
-  )) {
-    if (escape[4] || parseInt(escape[1] ?? escape[2] ?? escape[3], 16) > 127) return true;
-  }
-  return false;
-}
-function rangesFor(edge, limit) {
+function rangesFor(edge, limit = 128) {
   const key = JSON.stringify([edge.label, !!edge.invert, limit]);
   if (characterSets.has(key)) return characterSets.get(key);
   const accepts = matcher(edge.label, edge.invert),
@@ -45,22 +36,11 @@ function set(ranges) {
 }
 export function toAcademic(machine) {
   validate(machine);
-  if (!machine.start) throw Error('Choose a start state before exporting a finite automaton.');
-  const extended =
-    machine.machineType !== 'fsm' &&
-    (machine.machineType === 'extended' ||
-      machine.cells?.length ||
-      machine.edges.some((e) => e.guard || e.guards?.length || e.effect || e.effects?.length));
-  const cells = new Map((machine.cells ?? []).map((cell) => [cell.name, cell]));
-  const guardText = (guard) => {
-    const label = memoryRuleLabel(guard);
-    return stackCell(cells.get(guard.cell)) && !['empty', 'notEmpty'].includes(guard.op)
-      ? label.replace(guard.cell, `top(${guard.cell})`)
-      : label;
-  };
+  if (!machine.start) throw Error('Choose a start state before exporting an automaton.');
+  const extended = isStackMachine(machine),
+    stack = stackDefinition(machine);
   const names = new Map(machine.states.map((state, i) => [state.id, `q${i}`]));
-  const unicode = machine.edges.some((edge) => usesUnicode(edge.label));
-  const sets = machine.edges.map((edge) => rangesFor(edge, unicode ? 0x110000 : 128));
+  const sets = machine.edges.map((edge) => rangesFor(edge));
   const alphabet = [];
   for (const [a, b] of sets.flat().sort((a, b) => a[0] - b[0])) {
     const last = alphabet.at(-1);
@@ -79,33 +59,18 @@ export function toAcademic(machine) {
       if (!aliases.has(value)) aliases.set(value, `A${aliases.size + 1}`);
       input = aliases.get(value);
     }
-    const guards =
-      !extended || edge.guardDisabled
-        ? []
-        : [...(edge.guard ? [edge.guard] : []), ...(edge.guards ?? [])];
-    const actions =
-      !extended || edge.effectDisabled
-        ? []
-        : [...(edge.effect ? [edge.effect] : []), ...(edge.effects ?? [])];
-    const condition = guards.length
-      ? ` [${guards.map(guardText).join(edge.guardMode === 'any' ? ' ∨ ' : ' ∧ ')}]`
-      : '';
-    const effect = actions.length ? ` / ${actions.map(memoryRuleLabel).join('; ')}` : '';
-    return [`  ${from} ${input}${condition}${effect} → ${to}`];
+    return extended
+      ? stackRules(machine, edge).map(
+          (rule) => `  ${rule.top} ${from} ${input} → ${rule.replace.join(' ') || 'ε'} ${to}`,
+        )
+      : [`  ${from} ${input} → ${to}`];
   });
   return [
-    extended
-      ? 'M = (Q, Σ, R, s, F, C, μ₀) — IFJ notation extended with memory'
-      : 'M = (Q, Σ, R, s, F)',
+    extended ? 'M = (Q, Σ, Γ, R, s, S, F)' : 'M = (Q, Σ, R, s, F)',
     `Q = {${[...names.values()].join(', ')}}`,
     `Σ = ${set(alphabet)}`,
     ...[...aliases].map(([value, name]) => `${name} = ${value}`),
-    ...(extended
-      ? [
-          `C = {${[...cells.values()].map((cell) => `${cell.name}: ${stackCell(cell) ? 'stack' : 'counter'}`).join(', ')}}`,
-          `μ₀ = {${[...cells.values()].map((cell) => `${cell.name} = ${JSON.stringify(cell.initial ?? (stackCell(cell) ? [] : 0))}`).join(', ')}}`,
-        ]
-      : []),
+    ...(extended ? [`Γ = {${stack.alphabet.join(', ')}}`, `S = ${stack.initial}`] : []),
     rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = ∅',
     `s = ${names.get(machine.start)}`,
     `F = {${machine.states
@@ -119,16 +84,18 @@ export function toAcademic(machine) {
         `${names.get(state.id)} = ${JSON.stringify(state.name)} (id ${JSON.stringify(state.id)})`,
     ),
     '',
-    `Input domain: ${unicode ? 'Unicode' : 'ASCII'}.`,
-    'Notation: U+XXXX denotes a Unicode character; … includes every code point between the endpoints.',
-    'p A [guard] / actions → q abbreviates one rule for each character in A. Omitted guard = true; omitted actions = identity.',
+    'Input domain: ASCII (0–127).',
+    'U+XXXX denotes an ASCII code; … includes every code between the endpoints.',
     ...(extended
       ? [
-          'Guards read memory before the transition. Actions run left to right, atomically. A failed pop disables the transition.',
-          'Stacks are listed bottom to top; comparisons use top(stack) and fail on an empty stack. Counters are safe integers.',
-          'μ₀ initializes memory for the input. Successful tokens carry memory forward. Disabled memory rules are omitted.',
+          'IFJ stack rules: A p a → w q, where A ∈ Γ, a ∈ Σ, and w ∈ Γ*.',
+          'A rule replaces the top A with w. Stack sequences are bottom to top (rightmost on top).',
+          'Every transition consumes one ASCII character; epsilon input transitions are not supported.',
+          'An input alias abbreviates one rule per character; rules are alternatives (OR).',
+          'Initial configuration: S s x. Acceptance: S s x ⇒* w f, f ∈ F (all input consumed).',
+          'No rule applies to an empty stack. Omitted stack rules expand to A → A for every A ∈ Γ.',
         ]
-      : []),
+      : ['p A → q abbreviates one rule for each character in A.']),
     'Groups and portals are flattened.',
     'This describes the automaton graph; token names, skip flags and longest-match tokenization are not part of M.',
     '',

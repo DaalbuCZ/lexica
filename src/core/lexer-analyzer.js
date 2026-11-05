@@ -101,7 +101,7 @@ export function createLexerAnalyzer(tokenizer, { workerFactory = null, threshold
       data.machine = {
         start: machine.start,
         machineType: machine.machineType,
-        cells: machine.cells,
+        stack: machine.stack,
         states: machine.states,
         edges: machine.edges,
       };

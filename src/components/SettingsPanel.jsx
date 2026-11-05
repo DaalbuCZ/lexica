@@ -25,6 +25,7 @@ export function SettingsPanel({ dialog, onClose }) {
             onValueChange={(type) =>
               controller.update((next) => {
                 next.machineType = type;
+                if (type === 'extended') next.stack ??= { alphabet: ['S'], initial: 'S' };
               })
             }
           >
@@ -36,8 +37,8 @@ export function SettingsPanel({ dialog, onClose }) {
             </RadioCards.Item>
             <RadioCards.Item value="extended">
               <span>
-                <strong>Extended FSM</strong>
-                <small>Stacks and memory rules</small>
+                <strong>Stack automaton</strong>
+                <small>One enum stack (IFJ)</small>
               </span>
             </RadioCards.Item>
           </RadioCards.Root>

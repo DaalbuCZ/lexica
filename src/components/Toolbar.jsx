@@ -167,7 +167,7 @@ export function Toolbar() {
       <IconButton
         id="memory-cells"
         icon={Layers}
-        label="Manage memory cells"
+        label="Manage stack alphabet"
         hidden={machineType(scene.machine) !== 'extended'}
         onClick={() => dialog('memory')}
       />

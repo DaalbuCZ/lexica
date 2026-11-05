@@ -2544,37 +2544,7 @@
     color: var(--step-color);
     font-weight: 600;
   }
-  [data-theme='dark'] .memory-rule input,
-  [data-theme='dark'] .memory-rule select {
-    background: #171c21;
-    color: #eff4f8;
-    border-color: #596975;
-  }
-  .memory-cell {
-    border-top: 1px solid var(--line);
-    padding-top: 5px;
-    margin-top: 10px;
-  }
-  .memory-rule {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(55px, 0.7fr);
-    gap: 5px;
-    margin: 5px 0 12px;
-  }
-  .memory-rule input,
-  .memory-rule select {
-    min-width: 0;
-    width: 100%;
-    padding: 6px 5px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: white;
-    color: #405638;
-    font-size: 10px;
-  }
-  .memory-rule input[type='number'] {
-    font-family: 'IBM Plex Mono', monospace;
-  }
+
   /* Editor modes and simplified controls */
   #settings-dialog {
     width: 460px;
@@ -2846,20 +2816,7 @@
   .simple-rule-fields .simple-field select {
     font-size: 11px;
   }
-  .simple-memory-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
-    align-items: end;
-    gap: 10px;
-    border-top: 1px solid var(--line);
-    padding-top: 12px;
-  }
-  .simple-memory-row .danger {
-    grid-column: 1/-1;
-    justify-self: start;
-    margin: 0;
-    padding: 5px 0;
-  }
+
   .simple-editor [data-add-stack] {
     align-self: flex-start;
   }
@@ -2900,8 +2857,7 @@
     align-items: center;
     gap: 4px;
   }
-  .inspector-actions .icon-button,
-  .simple-memory-row .icon-button {
+  .inspector-actions .icon-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2912,8 +2868,7 @@
     background: transparent;
     color: inherit;
   }
-  .inspector-actions .icon-button:hover,
-  .simple-memory-row .icon-button:hover {
+  .inspector-actions .icon-button:hover {
     background: #0001;
   }
   .inspector-actions #delete-selection {
@@ -2925,36 +2880,7 @@
   .simple-editor {
     gap: 8px;
   }
-  .simple-memory-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr) 30px;
-    align-items: center;
-    gap: 7px;
-    border: 0;
-    padding: 0;
-    margin: 0;
-  }
-  .simple-memory-row > input {
-    min-width: 0;
-    width: 100%;
-    height: 38px;
-    padding: 8px 9px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--panel);
-    color: inherit;
-    font-size: 12px;
-  }
-  .simple-memory-row .icon-button {
-    grid-column: auto;
-    margin: 0;
-  }
-  .simple-memory-row + .simple-memory-row {
-    border-top: 1px solid var(--line);
-    padding-top: 9px;
-  }
-  .simple-memory-row .danger {
-    display: none;
-  }
+
   .simple-toggle {
     padding: 7px 0;
   }
@@ -3074,8 +3000,7 @@
   [data-theme='dark'] .setting-section h3 {
     color: #b5c0c8;
   }
-  [data-theme='dark'] .inspector-actions .icon-button:hover,
-  [data-theme='dark'] .simple-memory-row .icon-button:hover {
+  [data-theme='dark'] .inspector-actions .icon-button:hover {
     background: #fff1;
   }
   @media (max-width: 650px) {
@@ -3084,9 +3009,6 @@
     }
     .setting-section {
       padding: 11px 0;
-    }
-    .simple-memory-row {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr) 30px;
     }
   }
   .input-token-hover {
@@ -3136,10 +3058,7 @@
     border-top: 0;
     padding-top: 4px;
   }
-  .simple-memory-row + .simple-memory-row {
-    border: 0;
-    padding-top: 3px;
-  }
+
   .compact-field {
     position: relative;
     gap: 0;
@@ -3292,8 +3211,7 @@
   .simple-editor .simple-toggle,
   .simple-editor .simple-section,
   .simple-editor .simple-memory,
-  .simple-editor .memory-rule-section + .memory-rule-section,
-  .simple-editor .simple-memory-row + .simple-memory-row {
+  .simple-editor .memory-rule-section + .memory-rule-section {
     border: 0 !important;
     box-shadow: none !important;
   }
@@ -3982,8 +3900,7 @@
     border: 0;
   }
 
-  .memory-rule-section .simple-rule-fields,
-  .memory-rule-section .memory-rule {
+  .memory-rule-section .simple-rule-fields {
     grid-template-columns: minmax(0, 1fr);
   }
   .memory-rule-section .simple-field {
@@ -4016,31 +3933,6 @@
   .condition-toggle-row > label {
     flex: 1;
     min-width: 0;
-  }
-  .condition-clipboard {
-    display: flex;
-    gap: 2px;
-  }
-  .condition-clipboard button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 4px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-  }
-  .condition-clipboard button:hover {
-    background: #0001;
-  }
-  .condition-clipboard .tool-icon {
-    width: 16px;
-    height: 16px;
-  }
-  [data-theme='dark'] .condition-clipboard button:hover {
-    background: #fff1;
   }
 
   .portal-preview {

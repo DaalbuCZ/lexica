@@ -13,7 +13,7 @@ import { simpleTransitionLabel } from '../core/editor-settings.js';
 import { tokenColorClass } from '../core/token-colors.js';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { Check, Select, Modal } from './ui.jsx';
-import { MemoryCells } from './MemoryEditor.jsx';
+import { StackAlphabet } from './MemoryEditor.jsx';
 import { destinationName } from './Inspector.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 export function Dialogs() {
@@ -43,8 +43,8 @@ export function Dialogs() {
       return <LayoutDialog {...props} />;
     case 'memory':
       return (
-        <Modal title="Memory cells" onClose={close} anchorId={dialog.anchorId}>
-          <MemoryCells heading={false} />
+        <Modal title="Stack alphabet" onClose={close} anchorId={dialog.anchorId}>
+          <StackAlphabet heading={false} />
         </Modal>
       );
     case 'shortcuts':
@@ -195,7 +195,7 @@ function ExportDialog({ onClose, dialog }) {
           <option value="json">Editable machine (.json)</option>
           <option value="tex">LaTeX / TikZ (.tex)</option>
           <option value="svg">Vector diagram (.svg)</option>
-          <option value="txt">Academic FSM / IFJ (.txt)</option>
+          <option value="txt">Academic automaton / IFJ (.txt)</option>
         </Select>
         {format === 'tex' && (
           <Check

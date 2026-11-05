@@ -70,7 +70,7 @@ Radix Themes supplies the shared controls; the pre-React palette is mapped onto 
 - Enable “Recalculate paths while dragging” under Settings → Editor for continuous obstacle routing. Routing runs in a worker; endpoints track the pointer between completed calculations.
 - SVG export includes a visual preview and separate diagrams for the main graph and every group. Download a diagram individually or all SVG files together in a ZIP archive.
 - Settings also controls standard/extended FSM mode, simplified properties, label backgrounds, skipped tokens, zoom sensitivity, and theme.
-- Extended FSMs support numeric stacks, legacy counters, conditions, and ordered side effects.
+- Stack automatons use one stack with an enum alphabet defined in Memory. Choose its initial symbol, then define alternative top-symbol replacement rules on transitions. Rules are always OR; replacements are bottom to top, with the rightmost symbol on top. An empty replacement pops the top. Omitted rules preserve any top symbol; an empty stack blocks all transitions.
 - Use the debugger or Alt+S, Alt+Left/Right, and Alt+Shift+Left/Right to inspect execution. Debug controls, status, and memory values appear together in a separate window above the graph.
 - Drag the toolbar/tester grips to dock them, or focus a grip and use arrow keys. The tester separator supports dragging and arrow keys.
 - The top toolbar sits beside the logo; the bottom toolbar sits beside the fixed-size minimap. Tester docks reserve space for both.
@@ -79,7 +79,7 @@ Radix Themes supplies the shared controls; the pre-React palette is mapped onto 
 
 ## Data compatibility
 
-Existing JSON machines, portals, groups, comments, memory rules, start views, tester input, and skipped-token preferences remain supported. The app continues using the `lexica-*` local-storage keys; there is no destructive storage migration.
+Standard FSMs, portals, groups, comments, start views, tester input, and skipped-token preferences remain supported. Migration of the previous numeric memory/save format is deferred. The app continues using the `lexica-*` local-storage keys; there is no destructive storage migration.
 
 JSON exports include tester input and its skipped-token preference. TikZ exports can include a complete compilable document. SVG exports remain vector diagrams. Import validates before replacing the current machine and is undoable.
 
@@ -88,3 +88,7 @@ Open the React app at the same origin to recover saved browser data automaticall
 ## Building and serving
 
 `pnpm build` creates static files in `build/`. Serve those files with a static web server. The Dockerfile builds the React app and serves it with nginx. Deployment is managed by the user; development and verification do not publish the app.
+
+Stack notation follows the FIT definition `M = (Q, Σ, Γ, R, s, S, F)`, with rules `A p a → w q`. Lexica deliberately supports only consuming transitions (`a ∈ Σ`), with no epsilon input transitions. Input matching is restricted to ASCII (0–127), including inverted sets; non-ASCII input produces ERROR tokens. Enum names are ASCII identifiers. Academic export includes Γ, S and expanded replacement rules; SVG/TikZ labels show the same alternatives. The lexer retains deterministic ambiguity reporting, longest-match tokenization and stack carry-over between tokens; these lexer conventions are separate from the exported automaton's final-state acceptance definition.
+
+Definition reference: [FIT VUT, Lorenc thesis, definitions 2.11–2.14](https://www.fit.vut.cz/person/meduna/public/work/lib/exe/fetch.php?media=lectures%3Aphd%3Athesis%3Alorenc_phd_thesis.pdf).

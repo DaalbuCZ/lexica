@@ -91,7 +91,7 @@ export function DebuggerWindow({ open, frame, canPrevious, canNext, onMove, onSt
               ))}
             </div>
           ) : (
-            <p className="debugger-empty">No memory cells</p>
+            <p className="debugger-empty">No stack in standard FSM mode</p>
           )}
         </div>
       </section>

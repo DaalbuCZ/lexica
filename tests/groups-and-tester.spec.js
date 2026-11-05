@@ -9,7 +9,7 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
 }, testInfo) => {
   const machine = example();
   machine.machineType = 'extended';
-  machine.cells = [{ name: 'stack', type: 'stack', initial: [] }];
+  machine.stack = { alphabet: ['S', 'OPEN'], initial: 'S' };
   const group = createGroup(machine, new Set(['s1', 's2']), 'Tokens');
   await page.addInitScript((machine) => {
     localStorage.setItem('lexica-machine', JSON.stringify(machine));
@@ -22,12 +22,12 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await expect(page.locator('#tokens .token')).toHaveCount(3);
-  const diagram = graphView(machine),
-    routes = routeEdges(diagram, (edge) =>
-      edge.originalIndices?.length > 1
-        ? `${edge.originalIndices.length} transitions`
-        : simpleTransitionLabel(edge),
-    );
+  const diagram = graphView(machine);
+  let routes = routeEdges(diagram, (edge) =>
+    edge.originalIndices?.length > 1
+      ? `${edge.originalIndices.length} transitions`
+      : simpleTransitionLabel(edge),
+  );
   const camera = () =>
     page.locator('#canvas').evaluate((canvas) => {
       const t = canvas.getContext('2d').getTransform();
@@ -49,19 +49,27 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.screenshot({ path: testInfo.outputPath('group-overlay.png') });
   await page.getByRole('button', { name: 'Close group', exact: true }).click();
   await expect(page.locator('.canvas-surface #canvas')).toHaveCount(1);
+  const current = await page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')));
+  routes = routeEdges(graphView(current), (edge) =>
+    edge.originalIndices?.length > 1
+      ? `${edge.originalIndices.length} transitions`
+      : simpleTransitionLabel(edge),
+  );
   transform = await camera();
-  await page.locator('#canvas').click({ position: point(routes[0].label) });
+  await page.locator('#canvas').dblclick({ position: point(routes[0].label) });
   await page
     .getByRole('dialog', { name: 'Choose a transition to edit', exact: true })
     .getByRole('button', { name: /start → identifier/ })
     .click();
   await page.locator('#memory-rules summary').click();
-  await page.getByLabel('Use a condition', { exact: true }).check();
-  await page.getByRole('button', { name: 'Add condition', exact: false }).click();
-  await expect(page.getByLabel('Combine conditions', { exact: true })).toBeVisible();
-  await page.getByLabel('Combine conditions', { exact: true }).click();
-  await page.getByRole('option', { name: 'Any condition (OR)', exact: true }).click();
-  await page.getByLabel('Use a condition', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Add stack rule', exact: true }).click();
+  await page.getByRole('button', { name: 'Add stack rule', exact: true }).click();
+  await expect(page.locator('.stack-rule-or')).toHaveText('OR');
+  await expect(page.getByLabel('Combine conditions', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Epsilon input (ε)')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('stack-rules.png') });
+  await page.getByRole('button', { name: 'Remove rule 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove rule 1', exact: true }).click();
   await page.getByRole('button', { name: 'Close properties', exact: true }).click();
   await page.locator('#toolbar-grip').focus();
   await page.keyboard.press('ArrowRight');

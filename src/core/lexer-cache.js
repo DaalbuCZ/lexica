@@ -4,7 +4,7 @@ export function lexerConfigurationKey(machine) {
   return JSON.stringify([
     machine.machineType ?? null,
     machine.start,
-    machine.cells ?? [],
+    machine.stack ?? null,
     machine.states.map((state) => [
       state.id,
       state.name,
@@ -19,13 +19,7 @@ export function lexerConfigurationKey(machine) {
       edge.portal ?? null,
       edge.label,
       !!edge.invert,
-      edge.guard ?? null,
-      edge.guards ?? null,
-      edge.guardMode ?? null,
-      !!edge.guardDisabled,
-      edge.effect ?? null,
-      edge.effects ?? null,
-      !!edge.effectDisabled,
+      edge.stackRules ?? null,
     ]),
   ]);
 }

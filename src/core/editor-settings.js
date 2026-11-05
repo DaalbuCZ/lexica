@@ -1,4 +1,4 @@
-import { memoryRuleLabel } from './memory.js';
+import { stackRuleSuffix } from './memory.js';
 const STORAGE_KEY = 'lexica-editor-settings';
 export function readEditorSettings(storage) {
   try {
@@ -63,18 +63,5 @@ export function characterClassExpression(characters) {
 export function simpleTransitionLabel(edge) {
   const set = simpleCharacterClass(edge.label, edge.invert),
     match = set ? `${set.inverted ? 'not ' : ''}${set.characters || '…'}` : edge.label || '…';
-  const guards = edge.guardDisabled
-    ? []
-    : [...(edge.guard ? [edge.guard] : []), ...(edge.guards ?? [])];
-  return (
-    match +
-    (guards.length
-      ? ' · ' + guards.map(memoryRuleLabel).join(edge.guardMode === 'any' ? ' OR ' : ' AND ')
-      : '') +
-    (edge.effectDisabled
-      ? ''
-      : [...(edge.effect ? [edge.effect] : []), ...(edge.effects ?? [])]
-          .map((a) => ' · ' + memoryRuleLabel(a))
-          .join(''))
-  );
+  return match + stackRuleSuffix(edge);
 }

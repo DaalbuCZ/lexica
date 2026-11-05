@@ -14,7 +14,7 @@ import {
 import { simpleCharacterClass, characterClassExpression } from '../core/editor-settings.js';
 import { singleCharacterError } from '../core/regex-analysis.js';
 import { transitionLabel } from '../core/labels.js';
-import { MemoryCells, MemoryRules } from './MemoryEditor.jsx';
+import { StackAlphabet, MemoryRules } from './MemoryEditor.jsx';
 import { Button, Check, Field, IconButton, Select } from './ui.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 
@@ -117,7 +117,7 @@ export function Inspector() {
         ) : selection.type === 'comment-link' ? (
           <p className="prop-note">Comment connection. Use the trash button to remove this link.</p>
         ) : machineType(machine) === 'extended' ? (
-          <MemoryCells heading={false} />
+          <StackAlphabet heading={false} />
         ) : (
           <p className="prop-note">
             Select a state or connection to edit it. Double-click empty canvas to add a state.
@@ -458,7 +458,7 @@ function EdgeProperties({ edge, index, machine, controller, simple }) {
         <MemoryRules edge={edge} index={index} edit={edit} machine={machine} />
       )}
       <p className="prop-note">
-        One character per transition. Examples: [a-z], [0-9], \s, \+
+        One ASCII character per transition. Examples: [a-z], [0-9], \s, \+
         <br />
         Overlapping transitions are reported when testing.
       </p>

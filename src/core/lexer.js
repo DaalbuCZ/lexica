@@ -1,13 +1,4 @@
-import {
-  validCell,
-  guardOps,
-  effectOps,
-  needsValue,
-  guardAllows,
-  memoryEffect,
-  stackCell,
-  memoryRuleLabel,
-} from './memory.js';
+import { isStackMachine, stackDefinition, validateStack, stackRules } from './memory.js';
 import { stateLabel, transitionLabel } from './labels.js';
 import { commentLayout, commentNodeIds, commentLinks } from './comments.js';
 import { visualMachine } from './start-views.js';
@@ -20,20 +11,7 @@ export function validate(m) {
     throw Error('A machine needs states and transitions.');
   if (m.machineType !== undefined && !['fsm', 'extended'].includes(m.machineType))
     throw Error('Invalid machine type.');
-  if (m.cells !== undefined && !Array.isArray(m.cells))
-    throw Error('Memory cells must be an array.');
-  const cells = new Map();
-  for (const cell of m.cells ?? []) {
-    if (
-      !cell ||
-      typeof cell.name !== 'string' ||
-      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(cell.name) ||
-      cells.has(cell.name) ||
-      !validCell(cell)
-    )
-      throw Error('Invalid or duplicate memory cell.');
-    cells.set(cell.name, cell);
-  }
+  validateStack(m);
   if (
     m.tester !== undefined &&
     (!m.tester ||
@@ -116,32 +94,6 @@ export function validate(m) {
     )
       throw Error('Invalid transition bend.');
     if (e.label) matcher(e.label, e.invert);
-    if (e.guardDisabled !== undefined && typeof e.guardDisabled !== 'boolean')
-      throw Error('Invalid condition enabled setting.');
-    if (e.guardMode !== undefined && !['all', 'any'].includes(e.guardMode))
-      throw Error('Invalid condition matching mode.');
-    if (e.guards !== undefined && !Array.isArray(e.guards))
-      throw Error('Invalid transition guards.');
-    for (const g of [...(e.guard !== undefined ? [e.guard] : []), ...(e.guards ?? [])])
-      if (
-        !g ||
-        !cells.has(g.cell) ||
-        !guardOps(cells.get(g.cell)).includes(g.op) ||
-        (needsValue(g.op) && !Number.isSafeInteger(g.value))
-      )
-        throw Error('Invalid transition guard.');
-    if (e.effectDisabled !== undefined && typeof e.effectDisabled !== 'boolean')
-      throw Error('Invalid action enabled setting.');
-    if (e.effects !== undefined && !Array.isArray(e.effects))
-      throw Error('Invalid transition side effects.');
-    for (const a of [...(e.effect !== undefined ? [e.effect] : []), ...(e.effects ?? [])])
-      if (
-        !a ||
-        !cells.has(a.cell) ||
-        !effectOps(cells.get(a.cell)).includes(a.op) ||
-        (needsValue(a.op) && !Number.isSafeInteger(a.value))
-      )
-        throw Error('Invalid transition side effect.');
   }
   validateGroups(m);
   return m;
@@ -167,7 +119,14 @@ export function matcher(label, invert = false) {
     throw Error('Invalid character expression: ' + label);
   }
   if (r.test('')) throw Error('Transitions must consume one character.');
-  return (c) => (invert ? !r.test(c) : r.test(c));
+  if (
+    [...label].some((char) => char.codePointAt(0) > 127) ||
+    [...label.matchAll(/\\(?:u\{([0-9a-f]+)\}|u([0-9a-f]{4})|x([0-9a-f]{2})|[\s\S])/gi)].some(
+      (m) => parseInt(m[1] ?? m[2] ?? m[3], 16) > 127,
+    )
+  )
+    throw Error('Automata support ASCII characters only (0–127).');
+  return (c) => c.length === 1 && c.charCodeAt(0) < 128 && (invert ? !r.test(c) : r.test(c));
 }
 export function transitionError(m, e) {
   try {
@@ -200,56 +159,16 @@ export function* lexerSteps(m, input, stepping = true, startOffset = 0, startMem
     if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
     outgoing.get(edge.from).push(edge);
   }
-  const extended =
-    m.machineType === 'extended' ||
-    (m.machineType === undefined &&
-      ((m.cells ?? []).length ||
-        m.edges.some(
-          (edge) => edge.guard || edge.guards?.length || edge.effect || edge.effects?.length,
-        )));
-  const initialMemory = Object.fromEntries(
-    (extended ? (m.cells ?? []) : []).map((c) => [
-      c.name,
-      stackCell(c) ? [...(c.initial ?? [])] : (c.initial ?? 0),
-    ]),
+  const extended = isStackMachine(m);
+  let memory = structuredClone(
+    startMemory ?? (extended ? { stack: [stackDefinition(m).initial] } : {}),
   );
-  let memory = {
-    ...(startMemory ?? initialMemory),
-  };
-  const apply = (edge, mem) => {
-    if (!extended || edge.effectDisabled) return mem;
-    let result = mem;
-    for (const effect of [...(edge.effect ? [edge.effect] : []), ...(edge.effects ?? [])]) {
-      const value = result[effect.cell];
-      if (effect.op === 'pop' && !value.length) return null;
-      const next = memoryEffect(effect, value);
-      if (!Array.isArray(next) && !Number.isSafeInteger(next))
-        throw Object.assign(
-          Error('Memory cell ' + effect.cell + ' exceeded the safe integer range.'),
-          {
-            stateId: edge.from,
-            edgeIndices: [edge.index],
-          },
-        );
-      result = {
-        ...result,
-        [effect.cell]: next,
-      };
-    }
-    return result;
-  };
-  const enabled = (edge, mem) => {
-    if (!extended) return true;
-    const guards = edge.guardDisabled
-        ? []
-        : [...(edge.guard ? [edge.guard] : []), ...(edge.guards ?? [])],
-      matches = (g) => guardAllows(g, mem[g.cell]);
-    return (
-      (!guards.length ||
-        (edge.guardMode === 'any' ? guards.some(matches) : guards.every(matches))) &&
-      apply(edge, mem) !== null
-    );
-  };
+  const choices = (edge, mem) =>
+    !extended
+      ? [{ edge, memory: mem }]
+      : stackRules(m, edge)
+          .filter((r) => mem.stack.length && r.top === mem.stack.at(-1))
+          .map((r) => ({ edge, memory: { stack: [...mem.stack.slice(0, -1), ...r.replace] } }));
   let pos = Number.isInteger(startOffset) ? Math.max(0, Math.min(input.length, startOffset)) : 0;
   if (
     pos > 0 &&
@@ -295,7 +214,9 @@ export function* lexerSteps(m, input, stepping = true, startOffset = 0, startMem
     if (stepping) yield frame('start', pos, 'Start token at ' + pos);
     while (end < input.length) {
       const c = String.fromCodePoint(input.codePointAt(end)),
-        next = (outgoing.get(state) ?? []).filter((e) => e.test(c) && enabled(e, memory));
+        next = (outgoing.get(state) ?? [])
+          .filter((e) => e.test(c))
+          .flatMap((e) => choices(e, memory));
       if (next.length > 1)
         throw Object.assign(
           Error(
@@ -303,10 +224,11 @@ export function* lexerSteps(m, input, stepping = true, startOffset = 0, startMem
           ),
           {
             stateId: state,
-            edgeIndices: next.map((e) => e.index),
+            edgeIndices: [...new Set(next.map(({ edge }) => edge.index))],
           },
         );
-      const edge = next[0];
+      const choice = next[0],
+        edge = choice?.edge;
       if (!edge) {
         if (stepping)
           yield frame('blocked', end, 'No transition for ' + JSON.stringify(c), {
@@ -315,7 +237,7 @@ export function* lexerSteps(m, input, stepping = true, startOffset = 0, startMem
           });
         break;
       }
-      memory = apply(edge, memory);
+      memory = choice.memory;
       state = edge.to;
       pathStates.push(state);
       pathEdges.push(edge.index);
@@ -413,7 +335,7 @@ export function tokenize(m, input) {
 }
 const tex = (s) =>
   s.replace(
-    /[\\{}$&#%_^~]/g,
+    /[\\{}$&#%_^~→ε·]/g,
     (c) =>
       ({
         '\\': '\\textbackslash{}',
@@ -426,6 +348,9 @@ const tex = (s) =>
         _: '\\_',
         '^': '\\textasciicircum{}',
         '~': '\\textasciitilde{}',
+        '→': '\\ensuremath{\\rightarrow}',
+        ε: '\\ensuremath{\\varepsilon}',
+        '·': '\\ensuremath{\\cdot}',
       })[c],
   );
 export function toTikz(m, standalone = true) {
@@ -530,20 +455,7 @@ export function toTikz(m, standalone = true) {
           ';',
       );
     }
-  const exportLabel = (e) => {
-    const guards = e.guardDisabled ? [] : [...(e.guard ? [e.guard] : []), ...(e.guards ?? [])];
-    return (
-      transitionLabel(e) +
-      (guards.length
-        ? ' · ' + guards.map(memoryRuleLabel).join(e.guardMode === 'any' ? ' OR ' : ' AND ')
-        : '') +
-      (e.effectDisabled
-        ? ''
-        : [...(e.effect ? [e.effect] : []), ...(e.effects ?? [])]
-            .map((a) => ' · ' + memoryRuleLabel(a))
-            .join(''))
-    );
-  };
+  const exportLabel = transitionLabel;
   const routes = routeEdges(m, exportLabel),
     edgeLabels = [];
   m.edges.forEach((e, i) => {

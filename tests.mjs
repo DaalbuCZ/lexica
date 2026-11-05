@@ -1309,8 +1309,8 @@ test('transition diagnostics identify unfinished rules and failed tokens retain 
 });
 test('inverted transitions complement one-character matches and survive saves, copies, and TeX', async () => {
   const { matcher } = await import('./src/core/lexer.js');
-  const exceptEol = matcher('[\\r\\n\\u2028\\u2029]', true);
-  for (const ch of ['a', '😀', ' ']) assert.equal(exceptEol(ch), true);
+  const exceptEol = matcher('[\\r\\n]', true);
+  for (const ch of ['a', ' ']) assert.equal(exceptEol(ch), true);
   for (const ch of ['\r', '\n', '\u2028', '\u2029']) assert.equal(exceptEol(ch), false);
   assert.throws(() => matcher('', true), /empty/);
   assert.throws(() => matcher('[', true), /Invalid/);
@@ -1605,7 +1605,7 @@ test('automatic portals preserve small branches despite remaining crossings', ()
   assert.doesNotThrow(() => toTikz(m));
   for (const e of m.edges) assert.equal(destination(m, e).id, e.to);
 });
-test('character steps use Unicode code points, portal targets, inversion and the same emitted tokens', () => {
+test('character steps reject non-ASCII input and preserve portal and inversion behavior', () => {
   const m = example();
   enablePortal(m, m.edges[0]);
   m.edges[0].label = '[\\r\\n0-9 ]';
@@ -1613,9 +1613,9 @@ test('character steps use Unicode code points, portal targets, inversion and the
   const input = '😀 42\n',
     steps = [...lexerSteps(m, input)],
     reads = steps.filter((s) => s.kind === 'character');
-  assert.equal(reads[0].character, '😀');
-  assert.equal(reads[0].end, 2);
-  assert.equal(reads[0].state, 's1');
+  assert.equal(steps.find((s) => s.result).token, 'ERROR');
+  assert.equal(reads[0].character, ' ');
+  assert.equal(reads[0].end, 3);
   assert.equal(steps.at(-1).kind, 'done');
   assert.deepEqual(
     steps.filter((s) => s.result).map((s) => s.result),
@@ -2052,69 +2052,6 @@ test('debugger seeks the token under the cursor and jumps by token or character'
   assert.equal(session.canNext(), false);
   assert.equal(session.previousToken().tokenStart, 9);
 });
-test('debugger token seeking replays committed memory effects and includes skipped tokens', () => {
-  const m = {
-    start: 'a',
-    machineType: 'extended',
-    cells: [
-      {
-        name: 'n',
-        initial: 0,
-      },
-    ],
-    states: [
-      {
-        id: 'a',
-        name: 'start',
-        token: '',
-        x: 0,
-        y: 0,
-      },
-      {
-        id: 'b',
-        name: 'letter',
-        token: 'LETTER',
-        x: 100,
-        y: 0,
-      },
-      {
-        id: 'w',
-        name: 'space',
-        token: 'WS',
-        skip: true,
-        x: 200,
-        y: 0,
-      },
-    ],
-    edges: [
-      {
-        from: 'a',
-        to: 'b',
-        label: '[a-z]',
-        effect: {
-          cell: 'n',
-          op: 'add',
-          value: 1,
-        },
-      },
-      {
-        from: 'a',
-        to: 'w',
-        label: ' ',
-      },
-    ],
-  };
-  const session = createDebugSession(m, 'a b');
-  assert.equal(session.seek(2).memory.n, 1);
-  assert.equal(session.current().tokenStart, 2);
-  assert.equal(session.next().memory.n, 2);
-  assert.equal(session.previousToken().tokenStart, 1);
-  assert.equal(session.current().memory.n, 1);
-  assert.equal(session.seek(0).memory.n, 0);
-  session.nextToken();
-  session.nextToken();
-  assert.equal(session.nextToken().memory.n, 2);
-});
 test('simplified editing preserves regex meaning and refuses concatenations', () => {
   assert.equal(simpleCharacterClass('abc'), null);
   assert.equal(simpleCharacterClass('a|bc'), null);
@@ -2221,88 +2158,6 @@ test('adjacent error characters form continuous underlines without joining skipp
       phase: -5,
     },
   ]);
-});
-test('guarded memory transitions validate, report ambiguity, and roll back speculative effects', () => {
-  const m = {
-    machineType: 'extended',
-    cells: [
-      {
-        name: 'n',
-        initial: 0,
-      },
-    ],
-    start: 'a',
-    states: [
-      {
-        id: 'a',
-        name: 'a',
-        token: '',
-        x: 0,
-        y: 0,
-      },
-      {
-        id: 'b',
-        name: 'b',
-        token: 'B',
-        x: 100,
-        y: 0,
-      },
-      {
-        id: 'c',
-        name: 'c',
-        token: '',
-        x: 200,
-        y: 0,
-      },
-    ],
-    edges: [
-      {
-        from: 'a',
-        to: 'b',
-        label: 'a',
-        effect: {
-          cell: 'n',
-          op: 'add',
-          value: 1,
-        },
-      },
-      {
-        from: 'b',
-        to: 'c',
-        label: 'b',
-        effect: {
-          cell: 'n',
-          op: 'add',
-          value: 10,
-        },
-      },
-      {
-        from: 'a',
-        to: 'b',
-        label: 'a',
-        guard: {
-          cell: 'n',
-          op: '>',
-          value: 10,
-        },
-      },
-    ],
-  };
-  const frames = [...lexerSteps(m, 'aba')],
-    emits = frames.filter((f) => f.kind === 'emit');
-  assert.deepEqual(
-    emits.map((f) => f.memory.n),
-    [1, 1, 2],
-  );
-  assert.equal(frames[0].memory.n, 0);
-  assert.deepEqual(
-    tokenize(validate(JSON.parse(JSON.stringify(m))), 'aba').map((t) => t.token),
-    ['B', 'ERROR', 'B'],
-  );
-  m.edges[2].guard.value = -1;
-  assert.throws(() => tokenize(m, 'a'), /Ambiguous/);
-  m.edges[2].guard.cell = 'missing';
-  assert.throws(() => validate(m), /guard/);
 });
 test('debugger surfaces invalid configurations instead of throwing before the session starts', () => {
   const m = example();
@@ -2506,10 +2361,7 @@ test('portal routing keeps the transition label separate from its destination ta
         to: 'b',
         portal: 'DESTINATION',
         label: '[a-z]',
-        guard: {
-          cell: 'some_stack',
-          op: 'notEmpty',
-        },
+        stackRules: [{ top: 'S', replace: ['S'] }],
       },
     ],
   };
@@ -2808,18 +2660,9 @@ test('simplified captions remove regex brackets without changing stored rules or
   assert.equal(
     simpleTransitionLabel({
       label: '[0-9]',
-      guard: {
-        cell: 'n',
-        op: 'odd',
-        value: 0,
-      },
-      effect: {
-        cell: 'n',
-        op: 'add',
-        value: 1,
-      },
+      stackRules: [{ top: 'S', replace: ['S', 'OPEN'] }],
     }),
-    '0-9 · n odd · n += 1',
+    '0-9 · S → S OPEN',
   );
 });
 test('pinch zoom preserves its world anchor while scaling and moving across letterboxed views', () => {
@@ -3068,7 +2911,7 @@ test('background lexer analysis cancels obsolete input and rejects late worker m
   assert.deepEqual(await latest, tokenize(m, '42'));
   assert.deepEqual(analyzer.get(m, '42'), tokenize(m, '42'));
 });
-test('worker analysis preserves errors, memory guards and full trace order', () => {
+test('worker analysis preserves errors and full trace order', () => {
   const handle = createWorkerHandler(),
     m = example(),
     input = 'hello 😀 42';
@@ -3138,23 +2981,14 @@ test('input debounce runs only the latest work and flushes before debugger start
   work.flush();
   assert.equal(runs, 1);
 });
-test('simplified label boxes include memory guards and effects in routing and hit bounds', () => {
+test('simplified label boxes include stack rules in routing and hit bounds', () => {
   const m = example(),
     edge = m.edges[0];
-  edge.guard = {
-    cell: 'long_counter_name',
-    op: '>=',
-    value: 123,
-  };
-  edge.effect = {
-    cell: 'long_counter_name',
-    op: 'add',
-    value: 1,
-  };
+  edge.stackRules = [{ top: 'LONG_ENUM_NAME', replace: ['LONG_ENUM_NAME', 'SYMBOL'] }];
   const classic = routeEdges(m),
     simplified = routeEdges(m, simpleTransitionLabel);
   assert.equal(simplified[0].label.w, simpleTransitionLabel(edge).length * 7 + 14);
-  assert.ok(simplified[0].label.w > classic[0].label.w);
+  assert.ok(simplified[0].label.w > 100);
   assert.equal(routeEdges(m), classic);
   assert.equal(routeEdges(m, simpleTransitionLabel), simplified);
 });
@@ -3228,16 +3062,11 @@ test('incremental lexer matches full analysis across edits and memory changes', 
     old = next;
   }
 });
-test('incremental cache invalidates speculative lookahead and restores counter checkpoints', () => {
+test('incremental cache invalidates speculative lookahead and restores stack checkpoints', () => {
   const m = {
       start: 'a',
       machineType: 'extended',
-      cells: [
-        {
-          name: 'n',
-          initial: 0,
-        },
-      ],
+      stack: { alphabet: ['S'], initial: 'S' },
       states: [
         {
           id: 'a',
@@ -3266,11 +3095,7 @@ test('incremental cache invalidates speculative lookahead and restores counter c
           from: 'a',
           to: 'b',
           label: 'a',
-          effect: {
-            cell: 'n',
-            op: 'add',
-            value: 1,
-          },
+          stackRules: [{ top: 'S', replace: ['S', 'S'] }],
         },
         {
           from: 'b',
@@ -3287,190 +3112,6 @@ test('incremental cache invalidates speculative lookahead and restores counter c
     cache = createTokenizationCache(tokenize);
   for (const input of ['aaaaabbbbb', 'aaaaabbbbc', 'aaaaaa', 'aabaa', '😀aaaa'])
     assert.deepEqual(cache.get(m, input), tokenize(m, input));
-});
-function stackMachine() {
-  return {
-    machineType: 'extended',
-    start: 'a',
-    cells: [
-      {
-        name: 's',
-        type: 'stack',
-        initial: [7],
-      },
-      {
-        name: 'n',
-        initial: 0,
-      },
-    ],
-    states: [
-      {
-        id: 'a',
-        name: 'start',
-        token: '',
-        x: 0,
-        y: 0,
-      },
-      {
-        id: 'b',
-        name: 'accepted',
-        token: 'TOKEN',
-        x: 100,
-        y: 0,
-      },
-    ],
-    edges: [
-      {
-        from: 'a',
-        to: 'b',
-        label: '\\(',
-        effect: {
-          cell: 's',
-          op: 'push',
-          value: 11,
-        },
-      },
-      {
-        from: 'a',
-        to: 'b',
-        label: '\\)',
-        guard: {
-          cell: 's',
-          op: '==',
-          value: 11,
-        },
-        effect: {
-          cell: 's',
-          op: 'pop',
-        },
-      },
-      {
-        from: 'a',
-        to: 'b',
-        label: 'x',
-        guard: {
-          cell: 's',
-          op: '==',
-          value: 7,
-        },
-        effect: {
-          cell: 's',
-          op: 'clear',
-        },
-      },
-      {
-        from: 'a',
-        to: 'b',
-        label: 'n',
-        guard: {
-          cell: 's',
-          op: 'empty',
-        },
-        effect: {
-          cell: 'n',
-          op: 'add',
-          value: 1,
-        },
-      },
-    ],
-  };
-}
-test('numeric stacks push, inspect top, pop and clear alongside counters with immutable snapshots', () => {
-  const m = stackMachine(),
-    frames = [...lexerSteps(m, '()xn)')],
-    emits = frames.filter((f) => f.result);
-  assert.deepEqual(
-    emits.map((f) => f.memory.s),
-    [[7, 11], [7], [], [], []],
-  );
-  assert.equal(emits[3].memory.n, 1);
-  assert.equal(emits[4].token, 'ERROR');
-  assert.deepEqual(frames[0].memory.s, [7]);
-  assert.deepEqual(m.cells[0].initial, [7]);
-  assert.deepEqual(parseMachine(JSON.stringify(m)), m);
-  m.edges[1].guard = {
-    cell: 's',
-    op: 'notEmpty',
-  };
-  m.cells[0].initial = [];
-  assert.equal(tokenize(m, ')')[0].token, 'ERROR');
-  m.edges[1].guard = {
-    cell: 's',
-    op: '!=',
-    value: 1,
-  };
-  assert.equal(tokenize(m, ')')[0].token, 'ERROR');
-});
-test('stack validation rejects mixed types and invalid values', () => {
-  for (const mutate of [
-    (m) => (m.cells[0].initial = [1.5]),
-    (m) => (m.cells[0].initial = 0),
-    (m) => (m.edges[0].effect.value = '1'),
-    (m) => (m.edges[0].effect.op = 'add'),
-    (m) => (m.edges[3].effect.op = 'push'),
-    (m) =>
-      (m.edges[0].guard = {
-        cell: 's',
-        op: 'odd',
-        value: 0,
-      }),
-  ]) {
-    const m = stackMachine();
-    mutate(m);
-    assert.throws(() => validate(m));
-  }
-});
-test('stack changes roll back on failed lookahead and survive incremental edits and worker caching', () => {
-  const m = stackMachine();
-  m.states.push({
-    id: 'c',
-    name: 'speculative',
-    token: '',
-    x: 200,
-    y: 0,
-  });
-  m.edges.push({
-    from: 'b',
-    to: 'c',
-    label: 'z',
-    effect: {
-      cell: 's',
-      op: 'push',
-      value: 99,
-    },
-  });
-  const emits = [...lexerSteps(m, '(z)')].filter((f) => f.result);
-  assert.deepEqual(
-    emits.map((f) => f.memory.s),
-    [[7, 11], [7, 11], [7]],
-  );
-  const cache = createTokenizationCache(tokenize),
-    worker = createWorkerHandler();
-  for (const input of ['()xn', '()xnn', '()x', '(()', '()']) {
-    assert.deepEqual(cache.get(m, input), tokenize(m, input));
-    assert.deepEqual(
-      worker({
-        id: 1,
-        machine: m,
-        input,
-      }).tokens,
-      tokenize(m, input),
-    );
-  }
-  assert.equal(
-    simpleTransitionLabel({
-      label: 'a',
-      guard: {
-        cell: 's',
-        op: 'empty',
-      },
-      effect: {
-        cell: 's',
-        op: 'pop',
-      },
-    }),
-    'a · s is empty · s pop',
-  );
 });
 test('incremental analysis reuses converged suffixes and matches full lexing through random edits', () => {
   const m = example(),
@@ -3593,191 +3234,7 @@ test('double right-click resets only the same nearby connection within the time 
   click(event(a, 950, 21));
   assert.equal(resets, 1);
 });
-test('all transition conditions must match and survive JSON, cache changes and TikZ export', () => {
-  const m = stackMachine(),
-    edge = m.edges[1];
-  m.cells.push({
-    name: 'other',
-    type: 'stack',
-    initial: [3],
-  });
-  edge.guards = [
-    {
-      cell: 'other',
-      op: '==',
-      value: 3,
-    },
-    {
-      cell: 's',
-      op: '==',
-      value: 7,
-    },
-  ];
-  edge.guard = {
-    cell: 's',
-    op: '==',
-    value: 7,
-  };
-  assert.equal(tokenize(m, ')')[0].token, 'TOKEN');
-  const cache = createTokenizationCache(tokenize);
-  assert.equal(cache.get(m, ')')[0].token, 'TOKEN');
-  edge.guards[0].value = 4;
-  assert.equal(cache.get(m, ')')[0].token, 'ERROR');
-  assert.deepEqual(parseMachine(JSON.stringify(m)).edges[1].guards, edge.guards);
-  assert.ok(toTikz(m).includes('other == 4'));
-  edge.guards = [
-    {
-      cell: 'missing',
-      op: 'empty',
-    },
-  ];
-  assert.throws(() => validate(m), /guard/);
-});
-test('condition matching mode supports AND and OR and invalidates cached tokenization', () => {
-  const m = stackMachine(),
-    e = m.edges[1];
-  e.guard = {
-    cell: 's',
-    op: '==',
-    value: 7,
-  };
-  e.guards = [
-    {
-      cell: 's',
-      op: '==',
-      value: 9,
-    },
-  ];
-  const cache = createTokenizationCache(tokenize);
-  assert.equal(cache.get(m, ')')[0].token, 'ERROR');
-  e.guardMode = 'any';
-  assert.equal(cache.get(m, ')')[0].token, 'TOKEN');
-  assert.match(toTikz(m), / OR /);
-  e.guardMode = 'all';
-  assert.equal(cache.get(m, ')')[0].token, 'ERROR');
-  delete e.guard;
-  delete e.guards;
-  e.guardMode = 'any';
-  assert.equal(tokenize(m, ')')[0].token, 'TOKEN');
-  e.guardMode = 'bad';
-  assert.throws(() => validate(m), /matching mode/);
-});
-test('disabled conditions retain their rules without affecting matching or exports', () => {
-  const m = stackMachine(),
-    e = m.edges[1];
-  e.guard = {
-    cell: 's',
-    op: '==',
-    value: 99,
-  };
-  e.guards = [
-    {
-      cell: 's',
-      op: 'empty',
-    },
-  ];
-  const cache = createTokenizationCache(tokenize);
-  assert.equal(cache.get(m, ')')[0].token, 'ERROR');
-  e.guardDisabled = true;
-  assert.equal(cache.get(m, ')')[0].token, 'TOKEN');
-  assert.equal(parseMachine(JSON.stringify(m)).edges[1].guards.length, 1);
-  assert.ok(!toTikz(m).includes('s == 99'));
-  e.guardDisabled = false;
-  assert.equal(cache.get(m, ')')[0].token, 'ERROR');
-});
-test('multiple stack actions run in order, block invalid pops atomically, and survive JSON and cache', () => {
-  const m = stackMachine(),
-    e = m.edges[0];
-  m.cells.push({
-    name: 'other',
-    type: 'stack',
-    initial: [],
-  });
-  e.effect = {
-    cell: 'other',
-    op: 'push',
-    value: 4,
-  };
-  e.effects = [
-    {
-      cell: 'other',
-      op: 'pop',
-    },
-    {
-      cell: 's',
-      op: 'push',
-      value: 8,
-    },
-  ];
-  const cache = createTokenizationCache(tokenize),
-    result = cache.get(m, '(')[0];
-  assert.equal(result.token, 'TOKEN');
-  assert.deepEqual(result.memoryAfter.s, [7, 8]);
-  assert.deepEqual(result.memoryAfter.other, []);
-  assert.equal(parseMachine(JSON.stringify(m)).edges[0].effects.length, 2);
-  assert.ok(toTikz(m).includes('other push 4'));
-  e.effects = [
-    {
-      cell: 'other',
-      op: 'pop',
-    },
-    {
-      cell: 'other',
-      op: 'pop',
-    },
-  ];
-  const blocked = cache.get(m, '(')[0];
-  assert.equal(blocked.token, 'ERROR');
-  assert.deepEqual(blocked.memoryAfter.other, []);
-  e.effectDisabled = true;
-  assert.equal(cache.get(m, '(')[0].token, 'TOKEN');
-  e.effectDisabled = false;
-  e.effects = [
-    {
-      cell: 'other',
-      op: 'add',
-      value: 1,
-    },
-  ];
-  assert.throws(() => validate(m), /side effect/);
-});
-import { copyConditions, pasteConditions } from './src/core/memory.js';
-test('condition clipboard replaces rules and preserves mode and disabled state', () => {
-  const m = stackMachine(),
-    source = {
-      guard: {
-        cell: 's',
-        op: 'empty',
-      },
-      guards: [
-        {
-          cell: 's',
-          op: '==',
-          value: 7,
-        },
-      ],
-      guardMode: 'any',
-      guardDisabled: true,
-    },
-    target = m.edges[1];
-  pasteConditions(target, copyConditions(source));
-  assert.deepEqual(JSON.parse(copyConditions(target)), JSON.parse(copyConditions(source)));
-  validate(m);
-  assert.throws(() => pasteConditions(target, 'invalid'), /Copy conditions/);
-  const before = JSON.stringify(m);
-  const next = structuredClone(m);
-  pasteConditions(
-    next.edges[1],
-    copyConditions({
-      guard: {
-        cell: 'missing',
-        op: 'empty',
-      },
-    }),
-  );
-  assert.throws(() => validate(next), /guard/);
-  assert.equal(JSON.stringify(m), before);
-});
+
 test('ordinary transition tips reach the state boundary', () => {
   const m = example();
   for (const bend of [
@@ -4530,32 +3987,11 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
   m.edges[0].label = 'a';
   m.edges[0].invert = true;
   assert.match(toAcademic(m), /"b"…U\+007F/);
-  m.edges.push({ from: 'b', to: 'b', label: '\\u{1F600}' });
-  assert.match(toAcademic(m), /"b"…U\+10FFFF/);
-  assert.match(toAcademic(m), /q1 U\+1F600 → q1/);
-  m.edges.pop();
-  m.edges[0].label = '[a-c]';
-  m.edges[0].invert = false;
-  m.cells = [
-    { name: 'n', initial: 2 },
-    { name: 'items', type: 'stack', initial: [4] },
-  ];
-  m.edges[0].guards = [
-    { cell: 'n', op: 'odd' },
-    { cell: 'items', op: '==', value: 4 },
-  ];
-  m.edges[0].guardMode = 'any';
-  m.edges[0].effects = [
-    { cell: 'items', op: 'pop' },
-    { cell: 'n', op: 'add', value: 1 },
-  ];
-  m.edges.push({ from: 'b', to: 'b', label: '[a-c]' });
-  const extended = toAcademic(m);
-  assert.match(extended, /μ₀ = \{n = 2, items = \[4\]\}/);
-  assert.match(extended, /q0 A1 \[n odd ∨ top\(items\) == 4\] \/ items pop; n \+= 1 → q1/);
-  assert.match(extended, /q1 A1 → q1/);
-  m.edges[0].effectDisabled = true;
-  assert.doesNotMatch(toAcademic(m), /items pop/);
+  assert.throws(() => {
+    m.edges[0].label = '\\u{1F600}';
+    toAcademic(m);
+  }, /ASCII/);
+  m.edges[0].label = 'a';
   m.start = null;
   assert.throws(() => toAcademic(m), /start state/);
 });
@@ -4608,3 +4044,5 @@ test('Auto layout chooses tree below ten nodes and radial at ten, always compact
     globalThis.Worker = previous;
   }
 });
+
+import './tests/stack-automaton.test.mjs';

@@ -44,7 +44,7 @@ test('fresh defaults, canvas focus, centered dialogs and IFJ export', async ({
   for (const name of ['Settings', 'Import', 'Export']) {
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.getByRole('menuitem', { name, exact: true }).click();
-    const dialog = page.locator('.react-dialog');
+    const dialog = page.locator('.react-dialog[role=dialog]');
     await expect(dialog).toBeVisible();
     // Inspect intermediate frames: scale must preserve the viewport center.
     const centers = await dialog.evaluate(async (el) => {
@@ -66,7 +66,7 @@ test('fresh defaults, canvas focus, centered dialogs and IFJ export', async ({
     }
     if (name === 'Export') {
       await page.locator('#format').click();
-      await page.getByRole('option', { name: 'Academic FSM / IFJ (.txt)' }).click();
+      await page.getByRole('option', { name: 'Academic automaton / IFJ (.txt)' }).click();
       await expect(page.locator('#export-preview')).toHaveValue(/M = \(Q, Σ, R, s, F\)/);
       const downloaded = page.waitForEvent('download');
       await page.locator('#download').click();

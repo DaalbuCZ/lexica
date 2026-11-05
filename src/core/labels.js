@@ -1,3 +1,4 @@
+import { stackRuleSuffix } from './memory.js';
 export function stateLabel(name) {
   const words = name.trim().split(/\s+/),
     lines = [];
@@ -20,7 +21,7 @@ export function stateLabel(name) {
   };
 }
 export function transitionLabel(edge) {
-  return edge.invert ? 'not (' + edge.label + ')' : edge.label;
+  return (edge.invert ? 'not (' + edge.label + ')' : edge.label) + stackRuleSuffix(edge);
 }
 
 // A conservative width estimate shared by canvas, SVG, and routing workers.

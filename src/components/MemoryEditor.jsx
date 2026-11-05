@@ -1,397 +1,173 @@
-import { Button, IconButton } from './ui.jsx';
+import { Button, IconButton, Field, Select } from './ui.jsx';
 import { Copy, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 import { useStudio } from '../state/studio.js';
-import {
-  stackCell,
-  guardOps,
-  effectOps,
-  needsValue,
-  copyConditions,
-  pasteConditions,
-} from '../core/memory.js';
-import { Check, Field, Select } from './ui.jsx';
-const labels = {
-  '==': 'equals',
-  '!=': 'not equal',
-  '>': 'greater than',
-  '>=': 'at least',
-  '<': 'less than',
-  '<=': 'at most',
-  odd: 'is odd',
-  even: 'is even',
-  empty: 'Stack is empty',
-  notEmpty: 'Stack is not empty',
-  add: '+= add',
-  set: ':= set',
-  push: 'Push value',
-  pop: 'Pop top',
-  clear: 'Clear stack',
-};
-let conditionClipboard = '';
-export function MemoryCells({ heading = true }) {
+import { stackDefinition, copyStackRules, pasteStackRules } from '../core/memory.js';
+let ruleClipboard = '';
+export function StackAlphabet({ heading = true }) {
   const machine = useStudio((s) => s.scene.machine),
     controller = useStudio((s) => s.controller);
-  const cells = machine.cells ?? [];
-  const edit = (change) => controller.update(change);
-  const rename = (index, name) =>
-    edit((next) => {
-      name = name.trim();
-      if (
-        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
-        cells.some((c, i) => i !== index && c.name === name)
-      )
-        throw Error('Use a unique cell name starting with a letter or underscore.');
-      const old = next.cells[index].name;
-      next.cells[index].name = name;
-      for (const edge of next.edges)
-        for (const rule of [
-          edge.guard,
-          edge.effect,
-          ...(edge.guards ?? []),
-          ...(edge.effects ?? []),
-        ])
-          if (rule?.cell === old) rule.cell = name;
-    });
-  const remove = (index) =>
-    edit((next) => {
-      const name = next.cells[index].name;
-      for (const edge of next.edges)
-        for (const kind of ['guard', 'effect']) {
-          const list = kind === 'guard' ? 'guards' : 'effects',
-            disabled = kind + 'Disabled';
-          const uses = edge[kind]?.cell === name || edge[list]?.some((rule) => rule.cell === name);
-          if (uses && !edge[disabled])
-            throw Error('Remove this cell from transition guards and side effects first.');
-          if (edge[disabled]) {
-            if (edge[kind]?.cell === name) delete edge[kind];
-            if (edge[list]) {
-              edge[list] = edge[list].filter((rule) => rule.cell !== name);
-              if (!edge[list].length) delete edge[list];
-            }
-            if (!edge[kind] && !edge[list]?.length) {
-              delete edge[disabled];
-              if (kind === 'guard') delete edge.guardMode;
-            }
-          }
-        }
-      next.cells.splice(index, 1);
-    });
+  const stack = stackDefinition(machine);
   return (
     <>
-      {heading && <h2 className="property-name">Memory cells</h2>}
+      {heading && <h2 className="property-name">Stack alphabet</h2>}
       <p className="prop-note">
-        Stack values are ordered bottom to top. Existing counters are retained for compatibility.
+        One stack, with values from this enum (Γ). Names use ASCII letters, digits and underscores.
       </p>
-      {cells.map((cell, index) => (
-        <div key={index} className="memory-cell">
-          <Field
-            label="Name"
-            value={cell.name}
-            spellCheck={false}
-            onCommit={(name) => rename(index, name)}
-          />
-          <Field
-            label={stackCell(cell) ? 'Initial stack' : 'Initial value'}
-            value={stackCell(cell) ? JSON.stringify(cell.initial ?? []) : (cell.initial ?? 0)}
-            onCommit={(text) =>
-              edit((next) => {
-                const value = stackCell(cell) ? JSON.parse(text) : Number(text);
-                if (
-                  stackCell(cell)
-                    ? !Array.isArray(value) || !value.every(Number.isSafeInteger)
-                    : !Number.isSafeInteger(value)
-                )
-                  throw Error(
-                    'Use safe integers; a stack starts with a numeric array, such as [1, 2].',
-                  );
-                next.cells[index].initial = value;
-              })
-            }
-          />
-          <Button className="danger" onClick={() => remove(index)}>
-            Delete cell
-          </Button>
-        </div>
-      ))}
-      <Button
-        data-add-stack
-        onClick={() =>
-          edit((next) => {
-            let name = 'stack',
-              n = 2;
-            while (cells.some((c) => c.name === name)) name = 'stack' + n++;
-            (next.cells ??= []).push({
-              name,
-              type: 'stack',
-              initial: [],
-            });
+      <Field
+        label="Enum values"
+        value={stack.alphabet.join(', ')}
+        spellCheck={false}
+        onCommit={(text) =>
+          controller.update((next) => {
+            const alphabet = text.split(',').map((s) => s.trim());
+            next.stack = {
+              alphabet,
+              initial: alphabet.includes(stack.initial) ? stack.initial : alphabet[0],
+            };
+          })
+        }
+      />
+      <Select
+        label="Initial stack symbol (S)"
+        value={stack.initial}
+        onChange={(initial) =>
+          controller.update((next) => {
+            next.stack = { ...stack, initial };
           })
         }
       >
-        ＋ Add stack
-      </Button>
+        {stack.alphabet.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </Select>
+      <p className="prop-note">
+        The stack starts with the selected symbol. Sequences are written bottom to top; the
+        rightmost symbol is on top. Remove a symbol from transition rules before removing it here.
+      </p>
     </>
   );
 }
 export function MemoryRules({ edge, index, edit, machine, simple = false }) {
-  const [open, setOpen] = useState(
-    !!(edge.guard || edge.guards?.length || edge.effect || edge.effects?.length),
-  );
-  const cells = machine.cells ?? [];
+  const { alphabet, initial } = stackDefinition(machine);
+  const rules = edge.stackRules ?? [];
   const notify = useStudio((s) => s.notify);
   const copy = async () => {
-    conditionClipboard = copyConditions(edge);
+    ruleClipboard = copyStackRules(edge);
     try {
-      await navigator.clipboard.writeText(conditionClipboard);
-      notify('Conditions copied.');
-    } catch {
-      notify('Conditions copied inside this editor.');
-    }
+      await navigator.clipboard.writeText(ruleClipboard);
+    } catch {}
+    notify('Stack rules copied.');
   };
   const paste = async () => {
-    let text = conditionClipboard;
+    let text = ruleClipboard;
     try {
       text = await navigator.clipboard.readText();
     } catch {}
     const state = useStudio.getState();
-    if (state.scene.selection.type !== 'edge' || state.scene.selection.index !== index) {
-      notify('Select the transition again and paste.');
-      return;
-    }
-    state.controller.update((next) => pasteConditions(next.edges[index], text));
+    if (state.scene.selection.type !== 'edge' || state.scene.selection.index !== index) return;
+    state.controller.update((next) => pasteStackRules(next.edges[index], text));
   };
   const Container = simple ? 'details' : 'section';
   return (
-    <Container
-      id="memory-rules"
-      className={`simple-memory ${simple ? 'compact-memory' : ''}`}
-      {...(simple ? { open, onToggle: (event) => setOpen(event.currentTarget.open) } : {})}
-    >
-      {simple ? <summary>Memory rules</summary> : <h3>Memory rules</h3>}
+    <Container id="memory-rules" className={`simple-memory ${simple ? 'compact-memory' : ''}`}>
+      {simple ? <summary>Stack rules</summary> : <h3>Stack rules</h3>}
       <div className="simple-memory-content">
-        {['guard', 'effect'].map((kind) => {
-          const list = kind === 'guard' ? 'guards' : 'effects',
-            disabled = kind + 'Disabled';
-          const exists = !!(edge[kind] || edge[list]?.length),
-            enabled = exists && !edge[disabled];
-          const firstStack = cells.find(stackCell);
-          const add = () =>
-            edit((e) => {
-              (e[list] ??= []).push({
-                cell: firstStack.name,
-                op: kind === 'guard' ? 'empty' : 'push',
-                ...(kind === 'effect'
-                  ? {
-                      value: 1,
+        <p className="prop-note">
+          Match the top symbol and replace it atomically. An empty replacement (ε) pops it. The last
+          replacement symbol becomes the top.
+        </p>
+        {!rules.length && (
+          <p className="prop-note">
+            No explicit rules: preserve any top symbol. An empty stack blocks the transition.
+          </p>
+        )}
+        {rules.map((rule, i) => (
+          <section className="memory-rule-section" key={i}>
+            {i > 0 && <p className="stack-rule-or">OR</p>}
+            <Select
+              label={`Top symbol ${i + 1}`}
+              value={rule.top}
+              onChange={(top) =>
+                edit((e) => {
+                  e.stackRules[i].top = top;
+                })
+              }
+            >
+              {alphabet.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+            <div className="stack-replacement">
+              <span>Replace with {rule.replace.length ? '(bottom → top)' : 'ε (pop)'}</span>
+              {rule.replace.map((symbol, j) => (
+                <div className="stack-symbol-row" key={j}>
+                  <Select
+                    label={`Replacement ${i + 1}, symbol ${j + 1}`}
+                    value={symbol}
+                    onChange={(value) =>
+                      edit((e) => {
+                        e.stackRules[i].replace[j] = value;
+                      })
                     }
-                  : {}),
-              });
-            });
-          return (
-            <section className="memory-rule-section" key={kind}>
-              <h3>{kind === 'guard' ? 'Stack condition' : 'Stack action'}</h3>
-              <div className="memory-rule-heading">
-                <Check
-                  id={kind + '-enabled'}
-                  label={
-                    simple
-                      ? kind === 'guard'
-                        ? 'Condition'
-                        : 'Action'
-                      : kind === 'guard'
-                        ? 'Use a condition'
-                        : 'Update stack'
-                  }
-                  checked={enabled}
-                  disabled={!firstStack && !exists}
-                  onChange={(value) =>
-                    edit((e) => {
-                      if (value) {
-                        delete e[disabled];
-                        if (!exists)
-                          e[kind] = {
-                            cell: firstStack.name,
-                            op: kind === 'guard' ? 'empty' : 'push',
-                            value: kind === 'guard' ? 0 : 1,
-                          };
-                      } else e[disabled] = true;
-                    })
-                  }
-                />
-                {simple && (
-                  <div className="memory-rule-tools">
-                    {kind === 'guard' && (
-                      <>
-                        <IconButton
-                          icon={Copy}
-                          label="Copy conditions"
-                          disabled={!exists}
-                          onClick={copy}
-                        />
-                        <IconButton
-                          icon={ClipboardPaste}
-                          label="Paste conditions"
-                          onClick={paste}
-                        />
-                      </>
-                    )}
-                    <IconButton
-                      icon={Plus}
-                      label={kind === 'guard' ? 'Add condition' : 'Add action'}
-                      disabled={!enabled || !firstStack}
-                      onClick={add}
-                    />
-                  </div>
-                )}
-              </div>
-              {!simple && kind === 'guard' && (
-                <div className="condition-clipboard">
-                  <Button type="button" disabled={!exists} onClick={copy}>
-                    Copy conditions
-                  </Button>
-                  <Button type="button" onClick={paste}>
-                    Paste conditions
-                  </Button>
-                </div>
-              )}
-              {enabled && (
-                <>
-                  <Rule
-                    kind={kind}
-                    rule={edge[kind]}
-                    cells={cells}
-                    onChange={(change) => edit((e) => change(e[kind]))}
+                  >
+                    {alphabet.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </Select>
+                  <IconButton
+                    icon={Trash2}
+                    label={`Remove replacement ${i + 1}, symbol ${j + 1}`}
+                    onClick={() =>
+                      edit((e) => {
+                        e.stackRules[i].replace.splice(j, 1);
+                      })
+                    }
                   />
-                  {kind === 'guard' &&
-                    (!simple || (edge.guard ? 1 : 0) + (edge.guards?.length ?? 0) > 1) && (
-                      <Select
-                        label="Combine conditions"
-                        value={edge.guardMode ?? 'all'}
-                        onChange={(mode) =>
-                          edit((e) => {
-                            if (mode === 'any') e.guardMode = 'any';
-                            else delete e.guardMode;
-                          })
-                        }
-                      >
-                        <option value="all">All conditions (AND)</option>
-                        <option value="any">Any condition (OR)</option>
-                      </Select>
-                    )}
-                  {(edge[list] ?? []).map((rule, i) => (
-                    <div className="extra-memory-rule" key={i}>
-                      <Rule
-                        kind={kind}
-                        rule={rule}
-                        cells={cells}
-                        onChange={(change) => edit((e) => change(e[list][i]))}
-                      />
-                      {simple ? (
-                        <IconButton
-                          icon={Trash2}
-                          label={kind === 'guard' ? 'Remove condition' : 'Remove action'}
-                          className="danger"
-                          onClick={() =>
-                            edit((e) => {
-                              e[list].splice(i, 1);
-                              if (!e[list].length) delete e[list];
-                            })
-                          }
-                        />
-                      ) : (
-                        <Button
-                          type="button"
-                          onClick={() =>
-                            edit((e) => {
-                              e[list].splice(i, 1);
-                              if (!e[list].length) delete e[list];
-                            })
-                          }
-                        >
-                          Remove {kind === 'guard' ? 'condition' : 'action'}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {!simple && (
-                    <Button type="button" disabled={!firstStack} onClick={add}>
-                      ＋ Add {kind === 'guard' ? 'condition' : 'action'}
-                    </Button>
-                  )}
-                </>
-              )}
-            </section>
-          );
-        })}
+                </div>
+              ))}
+              <Button
+                onClick={() =>
+                  edit((e) => {
+                    e.stackRules[i].replace.push(initial);
+                  })
+                }
+              >
+                Add replacement symbol
+              </Button>
+            </div>
+            <Button
+              className="danger"
+              onClick={() =>
+                edit((e) => {
+                  e.stackRules.splice(i, 1);
+                })
+              }
+            >
+              Remove rule {i + 1}
+            </Button>
+          </section>
+        ))}
+        <div className="memory-rule-tools">
+          <IconButton icon={Copy} label="Copy stack rules" onClick={copy} />
+          <IconButton icon={ClipboardPaste} label="Paste stack rules" onClick={paste} />
+          <IconButton
+            icon={Plus}
+            label="Add stack rule"
+            onClick={() =>
+              edit((e) => {
+                const top = alphabet.find((s) => !rules.some((r) => r.top === s)) ?? initial;
+                (e.stackRules ??= []).push({ top, replace: [top] });
+              })
+            }
+          />
+        </div>
       </div>
     </Container>
-  );
-}
-function Rule({ kind, rule, cells, onChange }) {
-  if (!rule) return null;
-  const cell = cells.find((c) => c.name === rule.cell),
-    ops = kind === 'guard' ? guardOps : effectOps;
-  return (
-    <div className="memory-rule-fields">
-      <Select
-        label="Memory"
-        value={rule.cell}
-        onChange={(name) =>
-          onChange((next) => {
-            next.cell = name;
-            const choices = ops(cells.find((c) => c.name === name));
-            if (!choices.includes(next.op)) next.op = choices[0];
-            if (needsValue(next.op) && !Number.isSafeInteger(next.value)) next.value = 0;
-          })
-        }
-      >
-        {cells
-          .filter((c) => stackCell(c) || c.name === rule.cell)
-          .map((c) => (
-            <option value={c.name} key={c.name}>
-              {c.name}
-            </option>
-          ))}
-      </Select>
-      <Select
-        label="Operation"
-        value={rule.op}
-        onChange={(op) =>
-          onChange((next) => {
-            next.op = op;
-            if (needsValue(op) && !Number.isSafeInteger(next.value)) next.value = 0;
-          })
-        }
-      >
-        {ops(cell).map((op) => (
-          <option key={op} value={op}>
-            {kind === 'guard' && stackCell(cell) && ['==', '!=', '>', '>=', '<', '<='].includes(op)
-              ? 'Top ' + labels[op]
-              : (labels[op] ?? op)}
-          </option>
-        ))}
-      </Select>
-      {needsValue(rule.op) && (
-        <Field
-          label="Value"
-          type="number"
-          step="1"
-          value={rule.value ?? 0}
-          onCommit={(text) =>
-            onChange((next) => {
-              const value = Number(text);
-              if (!Number.isSafeInteger(value)) throw Error('Use a safe integer.');
-              next.value = value;
-            })
-          }
-        />
-      )}
-      {kind === 'guard' && stackCell(cell) && needsValue(rule.op) && (
-        <p className="prop-note">
-          Compares the top value. An empty stack does not satisfy this condition.
-        </p>
-      )}
-    </div>
   );
 }

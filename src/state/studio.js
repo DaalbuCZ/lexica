@@ -65,11 +65,5 @@ export function persistedMachine() {
   };
 }
 export function machineType(machine) {
-  return (
-    machine.machineType ??
-    (machine.cells?.length ||
-    machine.edges.some((e) => e.guard || e.guards?.length || e.effect || e.effects?.length)
-      ? 'extended'
-      : 'fsm')
-  );
+  return machine.machineType ?? (machine.stack ? 'extended' : 'fsm');
 }

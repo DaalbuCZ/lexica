@@ -1,97 +1,50 @@
-export const stackCell = (cell) => cell?.type === 'stack';
-export const guardOps = (cell) =>
-  stackCell(cell)
-    ? ['empty', 'notEmpty', '==', '!=', '>', '>=', '<', '<=']
-    : ['==', '!=', '>', '>=', '<', '<=', 'odd', 'even'];
-export const effectOps = (cell) => (stackCell(cell) ? ['push', 'pop', 'clear'] : ['add', 'set']);
-export const needsValue = (op) =>
-  !['empty', 'notEmpty', 'odd', 'even', 'pop', 'clear'].includes(op);
-export function validCell(cell) {
-  return (
-    (cell.type === undefined || ['counter', 'stack'].includes(cell.type)) &&
-    (stackCell(cell)
-      ? Array.isArray(cell.initial ?? []) && (cell.initial ?? []).every(Number.isSafeInteger)
-      : Number.isSafeInteger(cell.initial ?? 0))
-  );
+export const isStackMachine = (m) =>
+  m.machineType === 'extended' || (m.machineType === undefined && !!m.stack);
+export const stackDefinition = (m) => m.stack ?? { alphabet: ['S'], initial: 'S' };
+export function validateStack(m) {
+  const stack = stackDefinition(m);
+  if (
+    !stack ||
+    !Array.isArray(stack.alphabet) ||
+    !stack.alphabet.length ||
+    stack.alphabet.some((s) => typeof s !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) ||
+    new Set(stack.alphabet).size !== stack.alphabet.length ||
+    !stack.alphabet.includes(stack.initial)
+  )
+    throw Error('Define unique ASCII enum names and choose an initial stack symbol.');
+  for (const e of m.edges)
+    if (
+      e.stackRules !== undefined &&
+      (!Array.isArray(e.stackRules) ||
+        e.stackRules.some(
+          (r) =>
+            !r ||
+            !stack.alphabet.includes(r.top) ||
+            !Array.isArray(r.replace) ||
+            r.replace.some((s) => !stack.alphabet.includes(s)),
+        ))
+    )
+      throw Error('Stack rules must use symbols from the memory enum.');
 }
-export function guardAllows(guard, value) {
-  if (!guard) return true;
-  if (Array.isArray(value)) {
-    if (guard.op === 'empty') return value.length === 0;
-    if (guard.op === 'notEmpty') return value.length > 0;
-    if (!value.length) return false;
-    value = value.at(-1);
-  }
-  switch (guard.op) {
-    case '==':
-      return value === guard.value;
-    case '!=':
-      return value !== guard.value;
-    case '>':
-      return value > guard.value;
-    case '>=':
-      return value >= guard.value;
-    case '<':
-      return value < guard.value;
-    case '<=':
-      return value <= guard.value;
-    case 'odd':
-      return Math.abs(value % 2) === 1;
-    case 'even':
-      return value % 2 === 0;
-    default:
-      return false;
-  }
-}
-export function memoryEffect(effect, value) {
-  switch (effect.op) {
-    case 'push':
-      return [...value, effect.value];
-    case 'pop':
-      return value.slice(0, -1);
-    case 'clear':
-      return [];
-    case 'set':
-      return effect.value;
-    case 'add':
-      return value + effect.value;
-  }
-}
-export function memoryRuleLabel(rule) {
-  return (
-    rule.cell +
-    ' ' +
-    ({
-      add: '+=',
-      set: ':=',
-      empty: 'is empty',
-      notEmpty: 'is not empty',
-    }[rule.op] ?? rule.op) +
-    (needsValue(rule.op) ? ' ' + rule.value : '')
-  );
-}
-export function copyConditions(edge) {
-  return JSON.stringify({
-    kind: 'lexica-conditions',
-    ...Object.fromEntries(
-      ['guard', 'guards', 'guardMode', 'guardDisabled']
-        .filter((key) => edge[key] !== undefined)
-        .map((key) => [key, edge[key]]),
-    ),
-  });
-}
-export function pasteConditions(edge, text) {
+// Omitted rules mean A -> A for every symbol, never for an empty stack.
+export const stackRules = (m, e) =>
+  e.stackRules?.length
+    ? e.stackRules
+    : stackDefinition(m).alphabet.map((top) => ({ top, replace: [top] }));
+export const memoryRuleLabel = (r) => `${r.top} → ${r.replace.join(' ') || 'ε'}`;
+export const stackRuleSuffix = (e) =>
+  e.stackRules?.length ? ' · ' + e.stackRules.map(memoryRuleLabel).join(' OR ') : '';
+export const copyStackRules = (e) =>
+  JSON.stringify({ kind: 'lexica-stack-rules', rules: e.stackRules ?? [] });
+export function pasteStackRules(e, text) {
   if (text.length > 1000000) throw Error('Clipboard is too large.');
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    throw Error('Copy conditions from a transition first.');
+    throw Error('Copy stack rules from a transition first.');
   }
-  if (!data || data.kind !== 'lexica-conditions' || (!data.guard && !data.guards?.length))
-    throw Error('Copy conditions from a transition first.');
-  for (const key of ['guard', 'guards', 'guardMode', 'guardDisabled']) {
-    delete edge[key];
-    if (data[key] !== undefined) edge[key] = data[key];
-  }
+  if (data?.kind !== 'lexica-stack-rules' || !Array.isArray(data.rules))
+    throw Error('Copy stack rules from a transition first.');
+  e.stackRules = data.rules;
 }
