@@ -1,6 +1,9 @@
 export const isStackMachine = (m) =>
   m.machineType === 'extended' || (m.machineType === undefined && !!m.stack);
 export const stackDefinition = (m) => m.stack ?? { alphabet: ['S'], initial: 'S' };
+export const stackTopLabel = (top) =>
+  top === '*' ? '(any)' : top.startsWith('!') ? 'not ' + top.slice(1) : top;
+const matchedTop = (rule) => (rule.top === '*' || rule.top.startsWith('!') ? '*' : rule.top);
 export function validateStack(m) {
   const stack = stackDefinition(m);
   if (
@@ -19,9 +22,14 @@ export function validateStack(m) {
         e.stackRules.some(
           (r) =>
             !r ||
-            (r.top !== '*' && !stack.alphabet.includes(r.top)) ||
+            typeof r.top !== 'string' ||
+            (r.top !== '*' &&
+              !stack.alphabet.includes(r.top) &&
+              !(r.top.startsWith('!') && stack.alphabet.includes(r.top.slice(1)))) ||
             !Array.isArray(r.replace) ||
-            r.replace.some((s) => !stack.alphabet.includes(s) && !(r.top === '*' && s === '*')),
+            r.replace.some(
+              (s) => !stack.alphabet.includes(s) && !(matchedTop(r) === '*' && s === '*'),
+            ),
         ))
     )
       throw Error('Stack rules must use symbols from the memory enum.');
@@ -32,11 +40,13 @@ export function stackRules(machine, edge) {
   const alphabet = stackDefinition(machine).alphabet;
   if (!edge.stackRules?.length) return alphabet.map((top) => ({ top, replace: [top] }));
   return edge.stackRules.flatMap((rule) =>
-    rule.top === '*'
-      ? alphabet.map((top) => ({
-          top,
-          replace: rule.replace.map((symbol) => (symbol === '*' ? top : symbol)),
-        }))
+    matchedTop(rule) === '*'
+      ? alphabet
+          .filter((top) => !rule.top.startsWith('!') || top !== rule.top.slice(1))
+          .map((top) => ({
+            top,
+            replace: rule.replace.map((symbol) => (symbol === '*' ? top : symbol)),
+          }))
       : [rule],
   );
 }
@@ -49,7 +59,7 @@ function actionLabel(rule) {
   return 'replace ' + rule.replace.join(' ');
 }
 export const memoryRuleLabel = (rule) =>
-  (rule.top === '*' ? '(any)' : rule.top) + (actionLabel(rule) ? ' → ' + actionLabel(rule) : '');
+  stackTopLabel(rule.top) + (actionLabel(rule) ? ' → ' + actionLabel(rule) : '');
 export function renameStackSymbol(machine, index, name) {
   const stack = (machine.stack ??= structuredClone(stackDefinition(machine)));
   name = name.trim();
@@ -64,6 +74,7 @@ export function renameStackSymbol(machine, index, name) {
   for (const edge of machine.edges)
     for (const rule of edge.stackRules ?? []) {
       if (rule.top === old) rule.top = name;
+      else if (rule.top === '!' + old) rule.top = '!' + name;
       rule.replace = rule.replace.map((value) => (value === old ? name : value));
     }
 }
@@ -73,7 +84,9 @@ export function removeStackSymbol(machine, index) {
   if (stack.alphabet.length === 1) throw Error('Keep at least one enum value.');
   if (
     machine.edges.some((edge) =>
-      edge.stackRules?.some((rule) => rule.top === value || rule.replace.includes(value)),
+      edge.stackRules?.some(
+        (rule) => rule.top === value || rule.top === '!' + value || rule.replace.includes(value),
+      ),
     )
   )
     throw Error('Remove this value from transition rules before deleting it.');
@@ -83,14 +96,15 @@ export function removeStackSymbol(machine, index) {
 export function stackAction(rule) {
   if (!rule.replace.length) return 'pop';
   if (rule.replace.length === 1)
-    return rule.replace[0] === rule.top ? 'keep' : 'replace:' + rule.replace[0];
-  if (rule.replace.length === 2 && rule.replace[0] === rule.top) return 'push:' + rule.replace[1];
+    return rule.replace[0] === matchedTop(rule) ? 'keep' : 'replace:' + rule.replace[0];
+  if (rule.replace.length === 2 && rule.replace[0] === matchedTop(rule))
+    return 'push:' + rule.replace[1];
   return 'sequence';
 }
 export function setStackAction(rule, action) {
   if (action === 'pop') rule.replace = [];
-  else if (action === 'keep') rule.replace = [rule.top];
-  else if (action.startsWith('push:')) rule.replace = [rule.top, action.slice(5)];
+  else if (action === 'keep') rule.replace = [matchedTop(rule)];
+  else if (action.startsWith('push:')) rule.replace = [matchedTop(rule), action.slice(5)];
   else if (action.startsWith('replace:')) rule.replace = [action.slice(8)];
 }
 
@@ -101,7 +115,7 @@ export function stackRuleSuffix(edge) {
     const action = actionLabel(rule);
     if (!groups.has(action)) groups.set(action, []);
     const tops = groups.get(action);
-    const top = rule.top === '*' ? '(any)' : rule.top;
+    const top = stackTopLabel(rule.top);
     if (!tops.includes(top)) tops.push(top);
   }
   return groups.size

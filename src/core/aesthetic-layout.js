@@ -51,7 +51,14 @@ export function compactAesthetics(
     return states;
   const distance = (e) =>
     Math.hypot(nodes.get(e.a).x - nodes.get(e.b).x, nodes.get(e.a).y - nodes.get(e.b).y);
-  for (const e of edges) e.minimum = Math.min(distance(e), e.demand);
+  for (const e of edges) {
+    e.minimum = Math.min(distance(e), e.demand);
+    const a = nodes.get(e.a),
+      b = nodes.get(e.b),
+      dx = Math.abs(a.x - b.x),
+      dy = Math.abs(a.y - b.y);
+    e.preferHorizontal = !radial && dx > 120 && dy <= Math.min(180, dx * 0.4);
+  }
   const baseline = drawingClearance(states, machine.edges),
     minimumNode = Math.min(175, baseline.node),
     minimumWire = Math.min(70, baseline.wire);
@@ -61,7 +68,14 @@ export function compactAesthetics(
     leftGap = Math.min(140, ...outer.map((s) => initialLeft - s.x));
   const score = () => {
     let cost = 0;
-    for (const e of edges) cost += Math.max(0, distance(e) - e.demand) ** 2 / e.demand;
+    for (const e of edges) {
+      cost += Math.max(0, distance(e) - e.demand) ** 2 / e.demand;
+      if (e.preferHorizontal) {
+        const a = nodes.get(e.a),
+          b = nodes.get(e.b);
+        cost += (2 * (a.y - b.y) ** 2) / Math.max(160, Math.abs(a.x - b.x));
+      }
+    }
     if (radial && root) {
       const ring = [...neighbors.get(root.id)],
         mean = ring.reduce((sum, id) => sum + radius(id), 0) / Math.max(1, ring.length);
@@ -106,7 +120,7 @@ export function compactAesthetics(
         for (const next of neighbors.get(ids[i])) if (remaining.delete(next)) ids.push(next);
       components.push(ids);
     }
-    if (components.length > 1) components.forEach(offer);
+    if (components.length > 1 || cut.id === machine.start) components.forEach(offer);
   }
   states.forEach((s) => offer([s.id]));
   let best = score(),
@@ -125,6 +139,22 @@ export function compactAesthetics(
         const a = nodes.get(ids.has(e.a) ? e.a : e.b),
           b = nodes.get(ids.has(e.a) ? e.b : e.a),
           d = Math.hypot(a.x - b.x, a.y - b.y);
+        // Move an attached branch as a unit, retaining the link's required length.
+        // Full routing below still vetoes crossings, close nodes and distorted motifs.
+        if (
+          !radial &&
+          Math.abs(b.x - a.x) > 120 &&
+          Math.abs(b.y - a.y) > 1 &&
+          Math.abs(b.y - a.y) <= Math.min(180, Math.abs(b.x - a.x) * 0.4)
+        ) {
+          const horizontal = Math.max(Math.abs(b.x - a.x), e.minimum);
+          proposals.push({
+            ids,
+            dx: b.x - Math.sign(b.x - a.x) * horizontal - a.x,
+            dy: b.y - a.y,
+            gain: (2 * (b.y - a.y) ** 2) / Math.max(160, horizontal),
+          });
+        }
         if (d <= e.demand + 2) continue;
         proposals.push({
           ids,

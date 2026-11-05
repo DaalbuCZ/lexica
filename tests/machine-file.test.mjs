@@ -11,7 +11,7 @@ test('versioned machine files retain complete graph, layout, tester and dormant 
     const m = example();
     m.machineType = machineType;
     m.stack = { alphabet: ['BOTTOM', 'STRING'], initial: 'BOTTOM' };
-    m.edges[0].stackRules = [{ top: '*', replace: ['*', 'STRING'] }];
+    m.edges[0].stackRules = [{ top: '!STRING', replace: ['*', 'STRING'] }];
     m.edges[0].bend = { x: 12, y: -34 };
     m.edges[0].groupBend = { x: 10, y: 20 };
     enablePortal(m, m.edges[0]);

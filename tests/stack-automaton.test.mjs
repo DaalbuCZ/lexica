@@ -245,3 +245,30 @@ test('Any expands to concrete stack symbols for execution and scientific export'
   m.edges[0].stackRules = [{ top: 'S', replace: ['*'] }];
   assert.throws(() => validate(m), /enum/);
 });
+
+test('not-symbol rules preserve relative actions, exclusions, renames and scientific expansion', () => {
+  const m = stackMachine();
+  m.edges[0].stackRules = [{ top: '!OPEN', replace: ['*', 'OPEN'] }];
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · not OPEN → push OPEN');
+  assert.deepEqual(
+    tokenize(m, '((').map((t) => t.token),
+    ['TOKEN', 'ERROR'],
+  );
+  const scientific = toAcademic(m);
+  assert.ok(scientific.includes('S q0 ( → S OPEN q1'));
+  assert.ok(!scientific.includes('OPEN q0 ( → OPEN OPEN q1'));
+  renameStackSymbol(m, 1, 'STRING');
+  assert.equal(m.edges[0].stackRules[0].top, '!STRING');
+  assert.deepEqual(m.edges[0].stackRules[0].replace, ['*', 'STRING']);
+  assert.throws(() => removeStackSymbol(m, 1), /transition rules/);
+  setStackAction(m.edges[0].stackRules[0], 'keep');
+  assert.equal(stackRuleSuffix(m.edges[0]), ' · not STRING');
+  assert.equal(stackAction(m.edges[0].stackRules[0]), 'keep');
+  setStackAction(m.edges[0].stackRules[0], 'pop');
+  assert.deepEqual(
+    tokenize(m, '((').map((t) => t.token),
+    ['TOKEN', 'ERROR'],
+  );
+  m.edges[0].stackRules[0].top = '!MISSING';
+  assert.throws(() => validate(m), /enum/);
+});

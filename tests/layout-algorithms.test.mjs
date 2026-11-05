@@ -1134,3 +1134,40 @@ test('live routing rejects stale geometry and sends patches after its baseline',
     globalThis.Worker = originalWorker;
   }
 });
+
+test('horizontal cleanup straightens feasible moderate slopes with long transition labels', () => {
+  const m = {
+    start: 'a',
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 600, y: 150 },
+    ],
+    edges: [{ from: 'a', to: 'b', label: 'LONG_TRANSITION_NAME'.repeat(3) }],
+  };
+  const states = alignHorizontal(m);
+  assert.equal(states[1].y, 0);
+  assert.equal(validateRouteSeparation(routeEdges({ ...m, states })).status, 'clear');
+  assert.equal(m.states[1].y, 150);
+});
+
+test('a long-caption branch straightens as a unit without tilting its horizontal links', () => {
+  const m = {
+    start: 'a',
+    states: [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 600, y: 150 },
+      { id: 'c', x: 780, y: 150 },
+    ],
+    edges: [
+      { from: 'a', to: 'b', label: 'long'.repeat(30) },
+      { from: 'b', to: 'c', label: 'x' },
+    ],
+  };
+  const states = compactAesthetics(m);
+  assert.deepEqual(
+    states.map((s) => s.y),
+    [0, 0, 0],
+  );
+  assert.ok(states[1].x >= Math.hypot(600, 150) - 0.01);
+  assert.equal(validateRouteSeparation(routeEdges({ ...m, states })).status, 'clear');
+});

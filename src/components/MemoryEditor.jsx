@@ -3,6 +3,7 @@ import { Copy, ClipboardPaste, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useStudio } from '../state/studio.js';
 import {
   stackDefinition,
+  stackTopLabel,
   copyStackRules,
   pasteStackRules,
   renameStackSymbol,
@@ -114,7 +115,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
             <div className="stack-rule-row">
               <Select
                 label={`Top symbol ${i + 1}`}
-                title={rule.top === '*' ? 'Any' : rule.top}
+                title={stackTopLabel(rule.top)}
                 value={rule.top}
                 onChange={(top) =>
                   edit((e) => {
@@ -130,6 +131,11 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
                 {alphabet.map((s) => (
                   <option key={s} value={s}>
                     {s}
+                  </option>
+                ))}
+                {alphabet.map((symbol) => (
+                  <option key={'!' + symbol} value={'!' + symbol}>
+                    not {symbol}
                   </option>
                 ))}
               </Select>

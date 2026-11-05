@@ -18,7 +18,7 @@ export function alignHorizontal(machine) {
     if (!a || !b || a === b || e.portal != null) continue;
     const dx = Math.abs(a.x - b.x),
       dy = Math.abs(a.y - b.y);
-    if (dx < 80 || dy < 1e-6 || dy > Math.min(48, dx * 0.15)) continue;
+    if (dx < 80 || dy < 1e-6 || dy > Math.min(180, dx * 0.4)) continue;
     for (const [move, target] of [
       [b, a],
       [a, b],
