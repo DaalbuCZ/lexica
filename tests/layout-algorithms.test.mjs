@@ -1171,3 +1171,39 @@ test('a long-caption branch straightens as a unit without tilting its horizontal
   assert.ok(states[1].x >= Math.hypot(600, 150) - 0.01);
   assert.equal(validateRouteSeparation(routeEdges({ ...m, states })).status, 'clear');
 });
+
+test('radial pulling flips a blocked branch head inward while preserving pinned upstream nodes', () => {
+  const states = [
+    ['root', 0, 0],
+    ['ring', 175, 0],
+    ['tail', 1100, 0],
+    ['tip', 1100, 250],
+    ['block', 650, 400],
+  ].map(([id, x, y]) => ({ id, name: id, x, y }));
+  const edges = [
+    ['root', 'ring'],
+    ['ring', 'tail'],
+    ['tail', 'tip'],
+    ['root', 'block'],
+  ].map(([from, to]) => ({ from, to, label: 'x' }));
+  const machine = { start: 'root', states, edges },
+    original = structuredClone(machine),
+    stats = {};
+  const result = pullOuterBranches(machine, { stats }),
+    nodes = new Map(result.map((s) => [s.id, s]));
+  assert.ok(stats.reoriented > 0);
+  assert.ok(nodes.get('tip').y < 0);
+  assert.ok(
+    Math.max(...['tail', 'tip'].map((id) => Math.hypot(nodes.get(id).x, nodes.get(id).y))) < 450,
+  );
+  for (const id of ['root', 'ring', 'block'])
+    assert.deepEqual(
+      nodes.get(id),
+      states.find((s) => s.id === id),
+    );
+  assert.deepEqual(machine, original);
+  const clearance = drawingClearance(result, edges);
+  assert.equal(clearance.crossings, 0);
+  assert.ok(clearance.node >= 175);
+  assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
+});

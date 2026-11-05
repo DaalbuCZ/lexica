@@ -141,8 +141,10 @@ export function polishRadialBranches(machine, { maxRoutes = 32, stats = {} } = {
 }
 
 // Pull small downstream regions toward their attachments without changing
-// any of their internal geometry. The first ring and all earlier layers stay pinned.
-export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
+// internal distances. Rigid head rotations/reflections may unlock a shorter stem.
+// The first ring and all earlier layers stay pinned.
+export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) {
+  stats.reoriented = 0;
   const root = machine.states.find((state) => state.id === machine.start);
   if (
     !root ||
@@ -240,14 +242,54 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
       }
       const boundaryLength = boundary.reduce((sum, edge) => sum + edge.length, 0);
       const moves = [];
-      if (pulls && Math.hypot(dx, dy) >= 24 * pulls) {
+      if (pulls) {
         dx /= pulls;
         dy /= pulls;
+      }
+      if (pulls && Math.hypot(dx, dy) >= 24) {
         for (const fraction of [0.85, 0.6, 0.35, 0.18])
           for (const angle of [0, Math.PI / 12, -Math.PI / 12]) {
             const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * fraction;
             const y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * fraction;
             moves.push(new Map([...region].map((id) => [id, { x, y }])));
+          }
+      }
+
+      // Reorient a downstream head as a rigid body before pulling it inward.
+      // Keep the attachment as pivot; additional attachment edges are checked below.
+      if (region.size > 1) {
+        const pivot = nodes.get(id),
+          axis = Math.atan2(pivot.y - root.y, pivot.x - root.x);
+        const translations = pulls ? [0.85, 0.6, 0.35, 0.18, 0] : [0];
+        for (const mirror of [false, true])
+          for (const angle of [
+            0,
+            Math.PI / 6,
+            -Math.PI / 6,
+            Math.PI / 3,
+            -Math.PI / 3,
+            Math.PI / 2,
+            -Math.PI / 2,
+            Math.PI,
+          ]) {
+            if (!mirror && !angle) continue;
+            for (const fraction of translations) {
+              const move = new Map();
+              for (const member of region) {
+                const state = nodes.get(member),
+                  x = state.x - pivot.x,
+                  y = state.y - pivot.y;
+                const localX = x * Math.cos(axis) + y * Math.sin(axis);
+                const localY = (-x * Math.sin(axis) + y * Math.cos(axis)) * (mirror ? -1 : 1);
+                const heading = axis + angle;
+                move.set(member, {
+                  x: localX * Math.cos(heading) - localY * Math.sin(heading) - x + dx * fraction,
+                  y: localX * Math.sin(heading) + localY * Math.cos(heading) - y + dy * fraction,
+                });
+              }
+              move.reoriented = true;
+              moves.push(move);
+            }
           }
       }
 
@@ -297,11 +339,18 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
 
       // Try the move that brings the tip in farthest first. Tightening a gap
       // may leave boundary length unchanged, but may not stretch it overall.
-      const tipRadius = (move) => {
-        const shift = move.get(tip.id);
-        return shift ? Math.hypot(tip.x + shift.x - root.x, tip.y + shift.y - root.y) : radius(tip);
-      };
-      moves.sort((a, b) => tipRadius(a) - tipRadius(b));
+      const regionRadius = (move) =>
+        Math.max(
+          ...[...region].map((id) => {
+            const state = nodes.get(id),
+              shift = move.get(id) ?? { x: 0, y: 0 };
+            return Math.hypot(state.x + shift.x - root.x, state.y + shift.y - root.y);
+          }),
+        );
+      moves.sort(
+        (a, b) =>
+          Number(!!a.reoriented) - Number(!!b.reoriented) || regionRadius(a) - regionRadius(b),
+      );
       for (const move of moves) {
         if (checked >= maxRoutes || attempts >= 160) break;
         let total = 0,
@@ -323,7 +372,16 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
           const shift = move.get(state.id);
           return shift ? { ...state, x: state.x + shift.x, y: state.y + shift.y } : state;
         });
-        if (
+        if (move.reoriented) {
+          const previous = [...region].map((id) => nodes.get(id)),
+            moved = next.filter((state) => region.has(state.id));
+          if (
+            Math.max(...moved.map(radius)) >= Math.max(...previous.map(radius)) - 1 ||
+            moved.reduce((sum, state) => sum + radius(state), 0) >=
+              previous.reduce((sum, state) => sum + radius(state), 0) - 1
+          )
+            continue;
+        } else if (
           next.some(
             (state) => move.has(state.id) && radius(state) >= radius(nodes.get(state.id)) - 1e-6,
           )
@@ -340,10 +398,13 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
         checked++;
         if (!placementCorridorRoutes({ ...machine, states: next, comments: [] }, labels)) continue;
         states = next;
+        if (move.reoriented) stats.reoriented++;
         break;
       }
     }
     if (states === before) break;
   }
+  stats.routeChecks = checked;
+  stats.attempts = attempts;
   return states;
 }
