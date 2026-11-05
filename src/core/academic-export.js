@@ -60,16 +60,16 @@ export function toAcademic(machine) {
     if (sets[i].length === 1 && sets[i][0][0] === sets[i][0][1]) input = symbol(sets[i][0][0]);
     else {
       const value = set(sets[i]);
-      if (!aliases.has(value)) aliases.set(value, `A${aliases.size + 1}`);
-      input = aliases.get(value);
-      if (!expressions.has(value)) expressions.set(value, new Set());
-      expressions
-        .get(value)
-        .add(
+      if (!aliases.has(value)) {
+        aliases.set(value, `A${aliases.size + 1}`);
+        expressions.set(
+          value,
           (edge.invert ? 'not (' + edge.label + ')' : edge.label).replace(/[\r\n]/g, (char) =>
             char === '\n' ? '\\n' : '\\r',
           ),
         );
+      }
+      input = aliases.get(value);
     }
     return extended
       ? stackRules(machine, edge).map(
@@ -82,7 +82,7 @@ export function toAcademic(machine) {
     `Q = {${[...names.values()].join(', ')}}`,
     `Σ = ${set(alphabet)}`,
     ...[...aliases].map(
-      ([value, name]) => `${name} = ${value} // ${[...expressions.get(value)].join('; ')}`,
+      ([value, name]) => `${name} = ${value} // ${expressions.get(value)}`,
     ),
     ...(extended ? [`Γ = {${stack.alphabet.join(', ')}}`, `S = ${stack.initial}`] : []),
     rules.length ? `R = {\n${rules.join(',\n')}\n}` : 'R = {}',

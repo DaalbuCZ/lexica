@@ -140,12 +140,12 @@ test('scientific export keeps ASCII character groups and omits internal IDs', ()
   assert.ok(!text.includes('U+'));
 });
 
-test('scientific aliases include original expressions and inversion', () => {
+test('scientific aliases include the first original expression and inversion', () => {
   const m = stackMachine();
   m.edges[0].label = '[1-9]';
   m.edges[1].label = '[123456789]';
   const text = toAcademic(m);
-  assert.ok(text.includes('A1 = {1..9} // [1-9]; [123456789]'));
+  assert.match(text, /^A1 = \{1\.\.9\} \/\/ \[1-9\]$/m);
   m.edges[0].invert = true;
   assert.ok(toAcademic(m).includes('// not ([1-9])'));
 });
