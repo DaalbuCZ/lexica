@@ -79,7 +79,7 @@ Radix Themes supplies the shared controls; the pre-React palette is mapped onto 
 
 ## Data compatibility
 
-Standard FSMs, portals, groups, comments, start views, tester input, and skipped-token preferences remain supported. Migration of the previous numeric memory/save format is deferred. The app continues using the `lexica-*` local-storage keys; there is no destructive storage migration.
+Standard FSMs, portals, groups, comments, start views, tester input, and skipped-token preferences remain supported. Older unversioned graphs remain importable. Files using one initially empty numeric stack with comparisons and push/pop actions are converted to enum stack rules; unsupported counters, clear operations and multiple stacks report an error instead of dropping behavior. The app continues using the `lexica-*` local-storage keys; there is no destructive storage migration.
 
 JSON exports include tester input and its skipped-token preference. TikZ exports can include a complete compilable document. SVG exports remain vector diagrams. Import validates before replacing the current machine and is undoable.
 
@@ -92,3 +92,5 @@ Open the React app at the same origin to recover saved browser data automaticall
 Stack notation follows the FIT definition `M = (Q, Σ, Γ, R, s, S, F)`, with rules `A p a → w q`. Lexica deliberately supports only consuming transitions (`a ∈ Σ`), with no epsilon input transitions. Input matching is restricted to ASCII (0–127), including inverted sets; non-ASCII input produces ERROR tokens. Enum names are ASCII identifiers. Academic export includes Γ, S and expanded replacement rules; SVG/TikZ labels show the same alternatives. The lexer retains deterministic ambiguity reporting, longest-match tokenization and stack carry-over between tokens; these lexer conventions are separate from the exported automaton's final-state acceptance definition.
 
 Definition reference: [FIT VUT, Lorenc thesis, definitions 2.11–2.14](https://www.fit.vut.cz/person/meduna/public/work/lib/exe/fetch.php?media=lectures%3Aphd%3Athesis%3Alorenc_phd_thesis.pdf).
+
+Editable files use `{ "format": "lexica", "version": 2, "type": "standard" | "stack", ... }`. The version is independent of the app version. `start`, `states`, `edges`, `groups`, `comments`, `startViews`, `labelBoxes`, `routingPolicy`, and `drawingRoutes` retain the complete graph and layout. State and edge records preserve token names, acceptance, skip flags, portals, stack rules, offsets and manual curves. `stack` stores the enum alphabet and initial symbol; it is also retained in standard mode. `tester` stores input and `showSkipped`. Auto-save and editable export use the same document format, with validation and explicit rejection of unknown versions. Import accepts JSON content from `.json` and `.txt` files. Theme, dock positions, panel dimensions and editor preferences remain local user settings; selection, active debugging and undo history are transient.

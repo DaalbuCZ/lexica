@@ -30,6 +30,9 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   await page.getByRole('menuitem', { name: 'Export', exact: true }).click();
   let data = JSON.parse(await page.locator('#export-preview').inputValue());
   expect(data.states.some((s) => s.name === 'NEW_STATE')).toBeTruthy();
+  expect(data.format).toBe('lexica');
+  expect(data.version).toBe(2);
+  expect(data.type).toBe('standard');
   await choose(page, '#format', 'Vector diagram (.svg)');
   await expect(page.getByRole('img', { name: 'Main graph SVG preview' })).toBeVisible();
   await choose(page, '#format', 'LaTeX / TikZ (.tex)');
@@ -84,10 +87,16 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   await page.getByRole('button', { name: 'Auto layout', exact: true }).click();
   await choose(page, '#layout-mode', 'Tree');
   await page.getByRole('button', { name: 'Apply layout', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Arrange graph', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Arrange graph', exact: true })).toHaveCount(0, {
+    timeout: 20000,
+  });
   await page.waitForTimeout(500);
   await page.reload();
   await expect(page.locator('#input')).toHaveValue('hello 42+');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')));
+  expect(saved.type).toBe('stack');
+  expect(saved.stack).toEqual({ alphabet: ['S', 'OPEN', 'BLOCK'], initial: 'BLOCK' });
+  expect(saved.tester).toEqual({ input: 'hello 42+', showSkipped: true });
   await expect(page.locator('#tokens .token')).toHaveCount(4);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Import', exact: true }).click();

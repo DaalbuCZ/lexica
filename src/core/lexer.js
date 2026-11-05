@@ -1,3 +1,4 @@
+import { decodeMachineDocument } from './machine-file.js';
 import { isStackMachine, stackDefinition, validateStack, stackRules } from './memory.js';
 import { stateLabel, transitionLabel } from './labels.js';
 import { commentLayout, commentNodeIds, commentLinks } from './comments.js';
@@ -108,7 +109,7 @@ export function parseMachine(text) {
   } catch {
     throw Error('Invalid JSON. Paste an exported machine JSON document.');
   }
-  return validate(machine);
+  return validate(decodeMachineDocument(machine));
 }
 export function matcher(label, invert = false) {
   if (!label) throw Error('Transition cannot be empty.');

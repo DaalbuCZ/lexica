@@ -4049,3 +4049,5 @@ test('Auto layout chooses tree below ten nodes and radial at ten, always compact
 });
 
 import './tests/stack-automaton.test.mjs';
+
+import './tests/machine-file.test.mjs';

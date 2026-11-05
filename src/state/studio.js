@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import { example, validate } from '../core/lexer.js';
+import { example, parseMachine } from '../core/lexer.js';
 import { readEditorSettings } from '../core/editor-settings.js';
 export function readStorage(key, fallback, json = true) {
   try {
@@ -22,7 +22,7 @@ let initialMachine;
 let restoreError = false;
 try {
   const saved = localStorage.getItem('lexica-machine');
-  initialMachine = saved ? validate(JSON.parse(saved)) : example();
+  initialMachine = saved ? parseMachine(saved) : example();
 } catch {
   initialMachine = example();
   restoreError = true;

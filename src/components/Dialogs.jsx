@@ -1,3 +1,4 @@
+import { serializeMachine } from '../core/machine-file.js';
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TextField, TextArea } from '@radix-ui/themes';
@@ -103,7 +104,7 @@ function ImportDialog({ onClose, dialog }) {
       <input
         ref={file}
         type="file"
-        accept=".json,application/json"
+        accept=".json,.txt,application/json,text/plain"
         hidden
         onChange={async (e) => {
           const selected = e.target.files[0];
@@ -119,7 +120,7 @@ function ImportDialog({ onClose, dialog }) {
       />
       <div className="dialog-actions">
         <Button id="import-file" onClick={() => file.current.click()}>
-          Choose .json file
+          Choose machine file
         </Button>
         <Button id="import-paste" className="primary" onClick={() => importText(text)}>
           Import JSON
@@ -151,7 +152,7 @@ function ExportDialog({ onClose, dialog }) {
   try {
     text =
       format === 'json'
-        ? JSON.stringify(machine, null, 2)
+        ? serializeMachine(machine)
         : format === 'tex'
           ? toTikz(machine, standalone)
           : format === 'txt'

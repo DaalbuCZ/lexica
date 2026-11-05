@@ -1,3 +1,4 @@
+import { machineDocument } from '../core/machine-file.js';
 import { useEffect } from 'react';
 import { useStudio, persistedMachine, writeStorage } from '../state/studio.js';
 export function usePersistence() {
@@ -7,7 +8,7 @@ export function usePersistence() {
     const save = () => {
       clearTimeout(timer);
       if (!dirty) return;
-      if (!writeStorage('lexica-machine', persistedMachine()))
+      if (!writeStorage('lexica-machine', machineDocument(persistedMachine())))
         useStudio.getState().notify('Storage unavailable — export to save.');
       else dirty = false;
     };
