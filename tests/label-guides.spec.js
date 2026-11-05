@@ -1,3 +1,4 @@
+import { example } from '../src/core/lexer.js';
 import { test, expect } from '@playwright/test';
 test('solid guides and labels highlight with the selected transition', async ({
   page,
@@ -42,6 +43,14 @@ test('solid guides and labels highlight with the selected transition', async ({
       return fillText.call(this, text, x, y, ...rest);
     };
   });
+  const machine = example();
+  // Explicit manual bends retain their offset label, exercising a visible guide.
+  machine.states[1].y = machine.states[0].y;
+  machine.edges[0].bend = { x: 0, y: 0 };
+  await page.addInitScript(
+    (machine) => localStorage.setItem('lexica-machine', JSON.stringify(machine)),
+    machine,
+  );
   await page.goto('/');
   await expect(page.locator('#tokens .token')).toHaveCount(3);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -63,6 +72,7 @@ test('solid guides and labels highlight with the selected transition', async ({
     )
     .toBe(true);
   await page.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
   const point = await page.evaluate(() => {
     window.canvasStrokes = [];
     return window.drawnLabels['a-zA-Z_'];

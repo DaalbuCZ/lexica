@@ -2306,7 +2306,7 @@ test('routing is deterministic as states move', () => {
     assert.deepEqual(routeEdges(m), routeEdges(structuredClone(m)));
   }
 });
-test('routing moves a transition label along its curve to avoid a state', () => {
+test('routing keeps a transition label clear of a state', () => {
   const m = {
     states: [
       {
@@ -2333,12 +2333,7 @@ test('routing moves a transition label along its curve to avoid a state', () => 
       },
     ],
   };
-  const r = routeEdges(m)[0],
-    mid = {
-      x: (r.p0.x + 3 * r.c1.x + 3 * r.c2.x + r.p3.x) / 8,
-      y: (r.p0.y + 3 * r.c1.y + 3 * r.c2.y + r.p3.y) / 8 - 13,
-    };
-  assert.ok(Math.abs(r.label.x - mid.x) > 20);
+  const r = routeEdges(m)[0];
   assert.ok(
     Math.abs(r.label.x - 500) > (r.label.w + 90) / 2 + 8 ||
       Math.abs(r.label.y) > (r.label.h + 90) / 2 + 8,
@@ -3165,8 +3160,8 @@ test('dragging a self-loop toward its state shrinks it while keeping its endpoin
     state = m.states.find((s) => s.id === edge.from),
     before = routeEdges(m)[1],
     apex = {
-      x: before.label.x - state.x,
-      y: before.label.y + 13 - state.y,
+      x: routedCurvePoint(before, 0.5).x - state.x,
+      y: routedCurvePoint(before, 0.5).y - state.y,
     };
   edge.bend = {
     x: -apex.x * 0.45,
@@ -3189,8 +3184,8 @@ test('dragging a loop around its state rotates it and keeps its size', () => {
       y: state.y,
     },
     apex = {
-      x: before.label.x,
-      y: before.label.y + 13,
+      x: routedCurvePoint(before, 0.5).x,
+      y: routedCurvePoint(before, 0.5).y,
     },
     initial = {
       x: center.x + 100,
@@ -3209,8 +3204,8 @@ test('dragging a loop around its state rotates it and keeps its size', () => {
       x: apex.x - center.x,
       y: apex.y - center.y,
     };
-  assert.ok(Math.abs(after.label.x - center.x + v.y) < 0.001);
-  assert.ok(Math.abs(after.label.y + 13 - center.y - v.x) < 0.001);
+  assert.ok(Math.abs(routedCurvePoint(after, 0.5).x - center.x + v.y) < 0.001);
+  assert.ok(Math.abs(routedCurvePoint(after, 0.5).y - center.y - v.x) < 0.001);
 });
 import { createBendReset } from './src/core/reset-bend.js';
 test('double right-click resets only the same nearby connection within the time limit', () => {
@@ -4056,6 +4051,7 @@ import './tests/stack-automaton.test.mjs';
 import './tests/machine-file.test.mjs';
 
 import { labelGuide } from './src/core/label-guides.js';
+import { curvePoint as routedCurvePoint } from './src/core/route-geometry.js';
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {
     p0: { x: 0, y: 0 },
@@ -4094,3 +4090,5 @@ test('label guides use the nearest left or right edge instead of a diagonal from
     );
   }
 });
+
+import './tests/label-routing.test.mjs';

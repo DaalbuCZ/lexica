@@ -71,9 +71,9 @@ export function reflowRouteLabels(
         best = label;
       }
     };
-    if (machine.edges[i]?.from === machine.edges[i]?.to) offer(route.label, 0, 8);
+    if (machine.edges[i]?.from === machine.edges[i]?.to) offer(route.label, 30, 8);
     for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88]) {
-      if (bestCost === 10) break;
+      if (bestCost === 0) break;
       const p = curvePoint(route, t),
         a = curvePoint(route, t - 0.01),
         b = curvePoint(route, t + 0.01);
@@ -83,13 +83,16 @@ export function reflowRouteLabels(
       const nx = -dy / length,
         ny = dx / length,
         half = (Math.abs(nx) * route.label.w) / 2 + Math.abs(ny) * 12;
+      // Prefer a clear position on the owning curve; obstacle/caption/wire penalties still dominate.
+      offer({ ...route.label, x: p.x, y: p.y + 4 }, Math.abs(t - 0.5) * 20, 8);
       for (const gap of [5, 14, 30, 55]) {
         if (bestCost < gap * 2) break;
         for (const side of [-1, 1]) {
           const offset = (half + gap) * side;
           offer(
             { ...route.label, x: p.x + nx * offset, y: p.y + ny * offset + 4 },
-            gap * 2 +
+            30 +
+              gap * 2 +
               Math.abs(t - 0.5) * 20 +
               Math.hypot(p.x + nx * offset - route.label.x, p.y + ny * offset + 4 - route.label.y) *
                 0.035,
@@ -97,8 +100,6 @@ export function reflowRouteLabels(
           );
         }
       }
-      // A label may sit on its own wire when the free space beside it is tight.
-      offer({ ...route.label, x: p.x, y: p.y + 4 }, 18 + Math.abs(t - 0.5) * 36, 8);
     }
     routes[i] = { ...route, label: best };
     captions.set(i, renderedLabelBox(best));

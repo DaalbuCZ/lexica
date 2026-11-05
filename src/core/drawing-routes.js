@@ -1,6 +1,7 @@
 import { finishRoute } from './route-geometry.js';
 export function drawingRouteKey(machine, labels) {
   return JSON.stringify([
+    'curve-labels-v2',
     machine.states,
     machine.edges,
     machine.comments,

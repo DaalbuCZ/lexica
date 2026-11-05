@@ -481,13 +481,15 @@ test('dragging reattaches automatic curves and reflows labels despite an unrelat
   const preview = interactiveRoutes(m, (e) => e.label, base)[0];
   assert.ok(Math.abs(preview.p0.x) < 1e-6);
   assert.ok(Math.abs(preview.p0.y - 37) < 1e-6);
-  assert.ok(Math.abs(preview.label.x) > 10);
+  assert.ok(Math.abs(preview.label.x) < 1e-6);
+  assert.ok(preview.label.y > 37 && preview.label.y < 203);
   const result = repairDraggedRoutes(m, (e) => e.label, base),
     r = result.routes[0];
   assert.equal(result.status, 'repaired');
   assert.ok(Math.abs(r.p0.x) < 1e-6);
   assert.ok(Math.abs(r.p0.y - 37) < 1e-6);
-  assert.ok(Math.abs(r.label.x) > 10);
+  assert.ok(Math.abs(r.label.x) < 1e-6);
+  assert.ok(r.label.y > 37 && r.label.y < 203);
   assert.equal(result.routes[1], routes[1]);
   assert.notDeepEqual(r.label, routes[0].label);
 });

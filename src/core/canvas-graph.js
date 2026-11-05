@@ -1,4 +1,4 @@
-import { labelGuide } from './label-guides.js';
+import { labelGuidesFor } from './label-guides.js';
 import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
@@ -258,6 +258,7 @@ export function createGraphCanvas(canvas, minimap) {
       current = trace?.kind ? (trace.state ?? trace.traceStates?.at(-1)) : null,
       currentEdge = trace?.kind === 'character' ? trace.traceEdges?.at(-1) : null;
     const edgeColors = scene.edgeColor ? machine.edges.map(scene.edgeColor) : [];
+    const guides = scene.labelGuides ? labelGuidesFor(machine, routes) : [];
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = c.noteLine;
     ctx.setLineDash([6 / transform().scale, 5 / transform().scale]);
@@ -294,12 +295,15 @@ export function createGraphCanvas(canvas, minimap) {
                 : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
       if (scene.labelGuides) {
-        const guide = labelGuide(r);
+        const guide = guides[i];
         if (guide) {
           ctx.save();
           ctx.lineWidth = (edgeSelected(e, i) ? 2.5 : 1) / transform().scale;
           ctx.setLineDash([]);
-          line(ctx, guide.from, guide.to);
+          ctx.beginPath();
+          ctx.moveTo(guide.from.x, guide.from.y);
+          for (const point of guide.points.slice(1)) ctx.lineTo(point.x, point.y);
+          ctx.stroke();
           ctx.restore();
         }
       }
