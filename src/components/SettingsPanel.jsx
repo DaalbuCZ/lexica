@@ -59,15 +59,9 @@ export function SettingsPanel({ dialog, onClose }) {
           />
           <Check
             id="label-guides"
-            label="Dashed guides from labels to transitions"
+            label="Guides from labels to transitions"
             checked={settings.labelGuides}
             onChange={(labelGuides) => change({ labelGuides })}
-          />
-          <Check
-            id="labels-on-curve"
-            label="Labels on curves (experimental)"
-            checked={settings.labelsOnCurve}
-            onChange={(labelsOnCurve) => change({ labelsOnCurve })}
           />
           <Check
             id="label-boxes"

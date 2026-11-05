@@ -1,6 +1,5 @@
 import { curvePoint } from './route-geometry.js';
-const guides = new WeakMap(),
-  onCurve = new WeakMap();
+const guides = new WeakMap();
 // Attach only at a side midpoint, choosing the shortest connection to this curve.
 export function labelGuide(route) {
   if (guides.has(route)) return guides.get(route);
@@ -46,12 +45,4 @@ export function labelGuide(route) {
   }
   guides.set(route, guide);
   return guide;
-}
-// A display-only copy keeps routing, saved layout and the experimental toggle independent.
-export function labelOnCurve(route) {
-  if (!onCurve.has(route)) {
-    const center = curvePoint(route, 0.5);
-    onCurve.set(route, { ...route, label: { ...route.label, x: center.x, y: center.y + 4 } });
-  }
-  return onCurve.get(route);
 }

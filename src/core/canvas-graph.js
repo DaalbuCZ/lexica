@@ -1,4 +1,4 @@
-import { labelGuide, labelOnCurve } from './label-guides.js';
+import { labelGuide } from './label-guides.js';
 import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
@@ -230,7 +230,7 @@ export function createGraphCanvas(canvas, minimap) {
     return palette;
   }
   function draw(next) {
-    scene = next.labelsOnCurve ? { ...next, routes: next.routes.map(labelOnCurve) } : next;
+    scene = next;
     const {
         routes,
         selectedStates,
@@ -283,22 +283,22 @@ export function createGraphCanvas(canvas, minimap) {
         active = currentEdge === index;
       ctx.strokeStyle = bad
         ? c.error
-        : edgeColors[i]
-          ? edgeColors[i]
-          : active
-            ? c.step
-            : traceEdges.has(index)
-              ? c.trace
-              : edgeSelected(e, i)
-                ? c.green
+        : edgeSelected(e, i)
+          ? c.green
+          : edgeColors[i]
+            ? edgeColors[i]
+            : active
+              ? c.step
+              : traceEdges.has(index)
+                ? c.trace
                 : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
-      if (scene.labelGuides && !scene.labelsOnCurve) {
+      if (scene.labelGuides) {
         const guide = labelGuide(r);
         if (guide) {
           ctx.save();
-          ctx.lineWidth = 1 / transform().scale;
-          ctx.setLineDash([4 / transform().scale, 4 / transform().scale]);
+          ctx.lineWidth = (edgeSelected(e, i) ? 2.5 : 1) / transform().scale;
+          ctx.setLineDash([]);
           line(ctx, guide.from, guide.to);
           ctx.restore();
         }
@@ -438,26 +438,29 @@ export function createGraphCanvas(canvas, minimap) {
           (scene.invalidEdges ? scene.invalidEdges.has(index) : !!transitionError(machine, e)) ||
           failureEdges.has(index) ||
           (trace?.token === 'ERROR' && traceEdges.has(index)),
+        selected = edgeSelected(e, i),
         color = bad
           ? c.error
-          : edgeColors[i]
-            ? edgeColors[i]
-            : currentEdge === index
-              ? c.step
-              : traceEdges.has(index)
-                ? c.traceText
-                : c.text;
+          : selected
+            ? c.green
+            : edgeColors[i]
+              ? edgeColors[i]
+              : currentEdge === index
+                ? c.step
+                : traceEdges.has(index)
+                  ? c.traceText
+                  : c.text;
       ctx.font = '11px "IBM Plex Mono",monospace';
       ctx.textAlign = 'center';
       const text = labelFor(e) || '⚠ empty';
-      if (scene.labelsOnCurve || e.groupEdge || (machine.labelBoxes && e.label)) {
-        ctx.fillStyle = c.panel;
-        ctx.strokeStyle = bad ? c.error : (edgeColors[i] ?? c.edge);
-        ctx.lineWidth = 1;
+      if (selected || e.groupEdge || (machine.labelBoxes && e.label)) {
+        ctx.fillStyle = selected ? c.selectedFill : c.panel;
+        ctx.strokeStyle = bad ? c.error : selected ? c.green : (edgeColors[i] ?? c.edge);
+        ctx.lineWidth = selected ? 2.5 : 1;
         ctx.beginPath();
         ctx.roundRect(r.label.x - r.label.w / 2, r.label.y - 15, r.label.w, 22, 3);
         ctx.fill();
-        if (machine.labelBoxes) ctx.stroke();
+        if (selected || machine.labelBoxes) ctx.stroke();
       } else {
         ctx.strokeStyle = c.background;
         ctx.lineWidth = 6;

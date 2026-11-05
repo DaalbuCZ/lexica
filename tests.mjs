@@ -2181,7 +2181,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
-      labelsOnCurve: false,
       pinchSensitivity: 2,
     },
   );
@@ -2197,7 +2196,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
-      labelsOnCurve: false,
       pinchSensitivity: 1,
     },
   );
@@ -2215,7 +2213,6 @@ test('simplified settings restore safely without changing graph preferences', ()
       rerouteWhileDragging: true,
       colorEdges: true,
       labelGuides: false,
-      labelsOnCurve: false,
       pinchSensitivity: 1,
     },
   );
@@ -4058,7 +4055,7 @@ import './tests/stack-automaton.test.mjs';
 
 import './tests/machine-file.test.mjs';
 
-import { labelGuide, labelOnCurve } from './src/core/label-guides.js';
+import { labelGuide } from './src/core/label-guides.js';
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {
     p0: { x: 0, y: 0 },
@@ -4096,19 +4093,4 @@ test('label guides use the nearest left or right edge instead of a diagonal from
       Math.abs(Math.hypot(guide.to.x - guide.from.x, guide.to.y - guide.from.y) - 50) < 0.01,
     );
   }
-});
-
-test('on-curve labels are display copies centered on the curve, preserving saved layout', () => {
-  const route = {
-    p0: { x: 0, y: 0 },
-    c1: { x: 20, y: 40 },
-    c2: { x: 80, y: 40 },
-    p3: { x: 100, y: 0 },
-    label: { x: 60, y: -20, w: 80 },
-  };
-  const original = structuredClone(route),
-    displayed = labelOnCurve(route);
-  assert.deepEqual(displayed.label, { x: 50, y: 34, w: 80 });
-  assert.equal(labelOnCurve(route), displayed);
-  assert.deepEqual(route, original);
 });
