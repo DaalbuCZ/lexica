@@ -13,6 +13,7 @@ import { Inspector } from './components/Inspector.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { Tester } from './components/Tester.jsx';
 import { IconButton } from './components/ui.jsx';
+import { StatePaletteHost } from './components/StatePalette.jsx';
 import { ContextMenu } from './components/ContextMenu.jsx';
 import { Toaster, toast } from 'sonner';
 const Dialogs = lazy(() =>
@@ -101,6 +102,7 @@ export default function App() {
         <span id="modehint" hidden />
         <Tester debuggerRef={debuggerRef} />
       </main>
+      <StatePaletteHost />
       <Suspense fallback={null}>
         <Dialogs />
       </Suspense>

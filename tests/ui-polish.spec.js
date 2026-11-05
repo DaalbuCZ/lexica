@@ -193,3 +193,32 @@ test('combined group transitions drag, persist, undo and open only on double cli
   await expect(page.locator('#app-loading')).toBeHidden();
   expect(await bend()).toEqual(saved);
 });
+
+test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) => {
+  let release;
+  let intercepted = false;
+  const ready = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    /(?:\/src\/components\/Dialogs\.jsx|\/assets\/Dialogs-[^/]+\.js)(?:\?.*)?$/,
+    async (route) => {
+      intercepted = true;
+      await ready;
+      await route.continue();
+    },
+  );
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#app-loading')).toBeHidden();
+    await expect.poll(() => intercepted).toBe(true);
+    await page.keyboard.press('Control+p');
+    await expect(page.getByRole('combobox', { name: 'Find a state' })).toBeFocused();
+    const animation = await page
+      .locator('.state-palette')
+      .evaluate((el) => getComputedStyle(el).animationName);
+    expect(animation).toBe('none');
+  } finally {
+    release();
+  }
+});

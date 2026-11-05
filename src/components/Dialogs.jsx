@@ -1,4 +1,3 @@
-import { StatePalette } from './StatePalette.jsx';
 import { Button } from './ui.jsx';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TextField, TextArea } from '@radix-ui/themes';
@@ -18,7 +17,8 @@ import { MemoryCells } from './MemoryEditor.jsx';
 import { destinationName } from './Inspector.jsx';
 import { usePresence } from '../hooks/usePresence.js';
 export function Dialogs() {
-  const current = useStudio((s) => s.dialog),
+  const dialogState = useStudio((s) => s.dialog),
+    current = dialogState?.type === 'state-search' ? null : dialogState,
     retained = useRef(null),
     present = usePresence(!!current);
   if (current) retained.current = current;
@@ -27,14 +27,12 @@ export function Dialogs() {
     useStudio.setState({
       dialog: null,
     });
-  if (!present || !dialog) return null;
+  if (dialogState?.type === 'state-search' || !present || !dialog) return null;
   const props = {
     dialog,
     onClose: close,
   };
   switch (dialog.type) {
-    case 'state-search':
-      return <StatePalette onClose={close} />;
     case 'settings':
       return <SettingsPanel {...props} />;
     case 'import':

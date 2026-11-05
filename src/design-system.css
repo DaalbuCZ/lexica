@@ -1101,6 +1101,9 @@ body.connecting-outside-group .group-overlay {
   padding: 0;
   overflow: hidden;
 }
+.react-dialog.state-palette[data-state='open'] {
+  animation: none;
+}
 .state-palette .dialog-heading {
   position: absolute;
   width: 1px;

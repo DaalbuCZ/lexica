@@ -20,7 +20,12 @@ function matchScore(text, query) {
 
 // Interior.dev Command Palette adapted to Lexica's modal and token palette.
 // https://www.interior.dev/docs/command-palette
-export function StatePalette({ onClose }) {
+export function StatePaletteHost() {
+  const open = useStudio((state) => state.dialog?.type === 'state-search');
+  return open ? <StatePalette onClose={() => useStudio.setState({ dialog: null })} /> : null;
+}
+
+function StatePalette({ onClose }) {
   const machine = useStudio((state) => state.scene.machine);
   const controller = useStudio((state) => state.controller);
   const [query, setQuery] = useState('');
