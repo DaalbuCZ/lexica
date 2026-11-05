@@ -370,12 +370,15 @@ export function pullOuterBranches(machine, { maxRoutes = 24, stats = {} } = {}) 
             return Math.hypot(state.x + shift.x - root.x, state.y + shift.y - root.y);
           }),
         );
-      moves.sort(
+      const rankedMoves = moves.map((move) => ({ move, radius: regionRadius(move) }));
+      rankedMoves.sort(
         (a, b) =>
-          Number(!!a.reoriented) - Number(!!b.reoriented) || regionRadius(a) - regionRadius(b),
+          Number(!!a.move.reoriented) - Number(!!b.move.reoriented) || a.radius - b.radius,
       );
-      for (const move of moves) {
-        if (checked >= maxRoutes || attempts >= 160) break;
+      // Leave room to check other heads when this region is boxed in.
+      const regionBudget = Math.min(attempts + 32, 160);
+      for (const { move } of rankedMoves) {
+        if (checked >= maxRoutes || attempts >= regionBudget) break;
         let total = 0,
           fits = true;
         for (const edge of boundary) {

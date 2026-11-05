@@ -1011,7 +1011,11 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
         );
       if (!id && !machine.groups?.length && options.smartGroups === false) {
         accepted = pullOuterBranches({ ...view, states: accepted });
-        accepted = compactRadialSpokes({ ...view, states: accepted });
+        const compacted = compactRadialSpokes({ ...view, states: accepted });
+        // Moving a spoke can open a pocket for a head that was blocked earlier.
+        if (compacted !== accepted) {
+          accepted = pullOuterBranches({ ...view, states: compacted }, { maxRoutes: 6 });
+        }
       }
       if (!id && machine.groups?.length) accepted = orientGroupsUp({ ...view, states: accepted });
       const positions = new Map(accepted.map((s) => [s.id, s]));
