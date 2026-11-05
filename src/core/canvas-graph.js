@@ -1,3 +1,4 @@
+import { labelGuide } from './label-guides.js';
 import { stateLabel, transitionLabel, groupWidth } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
@@ -292,6 +293,16 @@ export function createGraphCanvas(canvas, minimap) {
                 ? c.green
                 : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
+      if (scene.labelGuides) {
+        const guide = labelGuide(r);
+        if (guide) {
+          ctx.save();
+          ctx.lineWidth = 1 / transform().scale;
+          ctx.setLineDash([4 / transform().scale, 4 / transform().scale]);
+          line(ctx, guide.from, guide.to);
+          ctx.restore();
+        }
+      }
       ctx.stroke(paths[i]);
       arrow(ctx, r, ctx.strokeStyle);
     }

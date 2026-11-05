@@ -2180,6 +2180,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      labelGuides: false,
       pinchSensitivity: 2,
     },
   );
@@ -2194,6 +2195,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      labelGuides: false,
       pinchSensitivity: 1,
     },
   );
@@ -2210,6 +2212,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      labelGuides: false,
       pinchSensitivity: 1,
     },
   );
@@ -4051,3 +4054,21 @@ test('Auto layout chooses tree below ten nodes and radial at ten, always compact
 import './tests/stack-automaton.test.mjs';
 
 import './tests/machine-file.test.mjs';
+
+import { labelGuide } from './src/core/label-guides.js';
+test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
+  const route = {
+    p0: { x: 0, y: 0 },
+    c1: { x: 30, y: 0 },
+    c2: { x: 70, y: 0 },
+    p3: { x: 100, y: 0 },
+    label: { x: 50, y: 54, w: 40 },
+  };
+  const guide = labelGuide(route);
+  assert.ok(Math.abs(guide.to.x - 50) < 0.1);
+  assert.equal(guide.to.y, 0);
+  assert.equal(guide.from.y, 37);
+  assert.equal(labelGuide(route), guide);
+  assert.equal(labelGuide({ ...route, label: { x: 50, y: 4, w: 40 } }), null);
+  assert.equal(readEditorSettings({ getItem: () => '{"labelGuides":true}' }).labelGuides, true);
+});

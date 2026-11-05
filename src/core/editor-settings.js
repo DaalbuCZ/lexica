@@ -11,6 +11,7 @@ export function readEditorSettings(storage) {
       followDebugState: saved.followDebugState !== false,
       rerouteWhileDragging: true,
       colorEdges: saved.colorEdges !== false,
+      labelGuides: saved.labelGuides === true,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {
@@ -21,6 +22,7 @@ export function readEditorSettings(storage) {
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      labelGuides: false,
       pinchSensitivity: 1,
     };
   }
