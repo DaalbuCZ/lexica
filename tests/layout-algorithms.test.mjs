@@ -18,7 +18,7 @@ import { circularStartRing } from '../src/core/radial-ring.js';
 import { createViewport } from '../src/editor/viewport.js';
 import { canvasTransform } from '../src/core/canvas-graph.js';
 import { solveLayout } from '../src/core/smart-layout.js';
-import { layoutTopology } from '../src/core/layout-topology.js';
+import { applyLayout, layoutTopology } from '../src/core/layout-topology.js';
 import { alignHorizontal } from '../src/core/horizontal-layout.js';
 import { renderedLabelBox } from '../src/core/label-clearance.js';
 import { interactiveRoutes } from '../src/core/interactive-routes.js';
@@ -610,6 +610,34 @@ test('radial auto groups keeps a circular start ring with long captions and grou
   assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6, `Start ring radii: ${radii}`);
 });
 
+test('a saved overview bend cannot prevent Radial Arrange from forming a start ring', () => {
+  const machine = {
+    start: 'root',
+    states: [{ id: 'root', name: 'Root', token: '', x: 0, y: 0 }],
+    edges: [],
+    groups: [],
+  };
+  for (let i = 0; i < 5; i++) {
+    const id = `s${i}`;
+    machine.states.push({ id, name: id, token: '', x: i * 200, y: 0 });
+    machine.groups.push({ id: `g${i}`, name: `Group ${i}`, stateIds: [id], x: i * 200, y: 0 });
+    machine.edges.push({ from: 'root', to: id, label: String(i) });
+  }
+  machine.edges[0].groupBend = { x: 3, y: 2 };
+  const topology = layoutTopology(machine);
+  assert.equal(topology.edges[0].groupBend, undefined);
+  const result = solveLayout(topology, null, { mode: 'circle', smartGroups: true, spacing: 0.5 });
+  applyLayout(machine, result.machine, null);
+  assert.equal(machine.edges[0].groupBend, undefined);
+  const overview = graphView(machine),
+    root = overview.states.find((state) => state.id === overview.start);
+  const radii = overview.states
+    .filter((state) => state.group)
+    .map((state) => Math.hypot(state.x - root.x, state.y - root.y));
+  assert.equal(radii.length, 5);
+  assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6);
+});
+
 test('a corridor enters an accepting state from below without crossing its token caption', () => {
   const machine = {
     states: [
@@ -621,6 +649,18 @@ test('a corridor enters an accepting state from below without crossing its token
   const routes = corridorRoutes(machine, ['a']);
   assert.ok(routes);
   assert.ok(curveAvoidsBox(routes[0], { left: -73, right: 73, top: 46, bottom: 60 }));
+  const { p0, p3, c1, c2 } = routes[0];
+  for (const [state, port, control] of [
+    [machine.states[0], p0, c1],
+    [machine.states[1], p3, c2],
+  ]) {
+    const dx = port.x - state.x,
+      dy = port.y - state.y;
+    const tx = control.x - port.x,
+      ty = control.y - port.y;
+    assert.ok(Math.abs(dx * ty - dy * tx) < 1e-6);
+    assert.ok(dx * tx + dy * ty > 0);
+  }
 });
 
 test('a feasible start ring remains circular through aesthetic cleanup', () => {

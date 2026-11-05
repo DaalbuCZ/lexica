@@ -299,6 +299,35 @@ function routeLanes(
       index.set(i, routeBounds(chosen, 2));
     }
   }
+  // Keep the certified drawing as a fallback. A radial tangent is only an
+  // improvement if it clears every other route, including later lanes.
+  if (!placement) {
+    for (const [i, e] of machine.edges.entries()) {
+      if (frozen.has(i) || (previous && !dirty?.has(i)) || e.from === e.to) continue;
+      const route = routes[i];
+      const normalPort = (id, control, endpoint) => {
+        const state = nodes.get(id);
+        if (state.group || Math.hypot(control.x - state.x, control.y - state.y) <= 37)
+          return endpoint;
+        return nodePort(state, Math.atan2(control.y - state.y, control.x - state.x));
+      };
+      const p0 = normalPort(e.from, route.c1, route.p0);
+      const p3 = normalPort(e.to, route.c2, route.p3);
+      if (
+        Math.hypot(p0.x - route.p0.x, p0.y - route.p0.y) < 1e-6 &&
+        Math.hypot(p3.x - route.p3.x, p3.y - route.p3.y) < 1e-6
+      )
+        continue;
+      const candidate = { ...route, p0, p3 };
+      index.delete(i);
+      if (valid(candidate, e)) {
+        const center = curvePoint(candidate, 0.5);
+        candidate.label = { ...route.label, x: center.x, y: center.y - 13 };
+        routes[i] = finishRoute(candidate);
+      }
+      index.set(i, routeBounds(routes[i], 2));
+    }
+  }
   return previous ? reflowRouteLabels(machine, routes, dirty) : routes;
 }
 export function labelBox(l) {

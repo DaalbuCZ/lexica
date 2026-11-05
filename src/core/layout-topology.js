@@ -2,7 +2,7 @@ export function layoutTopology(machine, disregardGroups = false) {
   return {
     start: machine.start,
     states: machine.states.map(({ x, y, portalOffset, ...state }) => state),
-    edges: machine.edges.map(({ bend, portalOffset, ...edge }) => edge),
+    edges: machine.edges.map(({ bend, groupBend, portalOffset, ...edge }) => edge),
     groups: disregardGroups
       ? []
       : (machine.groups ?? []).map(({ x, y, contextPositions, ...group }) => group),
@@ -13,7 +13,7 @@ export function layoutTopology(machine, disregardGroups = false) {
 
 export function applyLayout(machine, drawing, focus) {
   delete machine.drawingRoutes;
-  if(drawing.routingPolicy) machine.routingPolicy=drawing.routingPolicy;
+  if (drawing.routingPolicy) machine.routingPolicy = drawing.routingPolicy;
   else delete machine.routingPolicy;
   const members = focus
     ? new Set(machine.groups?.find((group) => group.id === focus)?.stateIds)
@@ -29,6 +29,7 @@ export function applyLayout(machine, drawing, focus) {
   machine.edges.forEach((edge, index) => {
     if (members && !(members.has(edge.from) && members.has(edge.to))) return;
     delete edge.bend;
+    if (!members) delete edge.groupBend;
     delete edge.portalOffset;
     if (drawing.edges[index].bend) edge.bend = drawing.edges[index].bend;
   });
