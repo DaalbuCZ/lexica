@@ -228,6 +228,23 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#app-loading')).toBeHidden();
     await expect.poll(() => intercepted).toBe(true);
+    await page.evaluate(() => {
+      window.paletteTransitions = [];
+      window.paletteMoves = [];
+      document.addEventListener(
+        'transitionend',
+        (event) => {
+          if (event.target.matches('.state-palette') && event.propertyName === 'opacity')
+            window.paletteTransitions.push(event.target.dataset.closing ? 'closed' : 'opened');
+        },
+        true,
+      );
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (frames, options) {
+        if (this.matches('[data-palette-state]')) window.paletteMoves.push(frames[0].transform);
+        return animate.call(this, frames, options);
+      };
+    });
     await page.keyboard.press('Control+p');
     await expect(page.getByRole('combobox', { name: 'Find a state' })).toBeFocused();
     const animation = await page
@@ -237,6 +254,19 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
     const list = page.getByRole('listbox', { name: 'Matching states' });
     await expect(list.getByRole('option')).toHaveCount(10);
     const search = page.getByRole('combobox', { name: 'Find a state' });
+    await expect.poll(() => page.evaluate(() => window.paletteTransitions)).toContain('opened');
+    await search.fill('State 3');
+    await expect(
+      list.getByRole('option', { name: 'State 3 Overview', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.paletteMoves.some((move) => Math.abs(parseFloat(move.slice(11))) > 38),
+        ),
+      )
+      .toBe(true);
+    await search.clear();
     await search.press('ArrowUp');
     await expect(list.getByRole('option', { name: 'State 39 Overview' })).toHaveAttribute(
       'aria-selected',
@@ -244,6 +274,7 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
     );
     await search.press('Escape');
     await expect(search).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.paletteTransitions)).toContain('closed');
   } finally {
     release();
   }

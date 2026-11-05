@@ -1102,9 +1102,33 @@ dialog.react-dialog.state-palette {
   padding: 0;
   overflow: hidden;
   animation: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) translateY(7px) scale(0.98);
+  transition:
+    opacity 140ms ease,
+    transform 140ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+dialog.react-dialog.state-palette[open]:not([data-closing]) {
+  opacity: 1;
+  transform: translate(-50%, -50%);
 }
 dialog.state-palette::backdrop {
   background: #17201f66;
+  backdrop-filter: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+dialog.state-palette[open]:not([data-closing])::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog.react-dialog.state-palette[open]:not([data-closing]) {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(7px) scale(0.98);
+  }
+  dialog.state-palette[open]:not([data-closing])::backdrop {
+    opacity: 0;
+  }
 }
 .state-palette-search,
 .state-palette-footer {
@@ -1194,6 +1218,8 @@ dialog.state-palette::backdrop {
   font-size: 12px;
 }
 @media (prefers-reduced-motion: reduce) {
+  dialog.react-dialog.state-palette,
+  dialog.state-palette::backdrop,
   .state-palette-results li {
     transition: none;
   }

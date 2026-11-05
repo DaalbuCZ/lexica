@@ -31,7 +31,8 @@ export function StatePaletteHost() {
   const listId = useId(),
     dialog = useRef(null),
     list = useRef(null),
-    picked = useRef(false);
+    picked = useRef(false),
+    previousRows = useRef(null);
   const items = useMemo(() => {
     const groups = new Map(
       (machine.groups ?? []).flatMap((group) => group.stateIds.map((id) => [id, group.name])),
@@ -74,21 +75,92 @@ export function StatePaletteHost() {
     element.scrollTop = top;
     setScrollTop(element.scrollTop);
   };
+  const resetSearch = () => {
+    setQuery('');
+    setHighlight(null);
+    scrollTo(0);
+  };
   useLayoutEffect(() => {
     const panel = dialog.current;
     if (open) {
+      if (panel.dataset.closing) {
+        delete panel.dataset.closing;
+        picked.current = false;
+        resetSearch();
+      }
       if (!panel.open) panel.showModal();
-    } else if (panel.open) {
+      return;
+    }
+    if (!panel.open) return;
+    const finishClose = () => {
       panel.close();
+      delete panel.dataset.closing;
       if (picked.current) document.getElementById('canvas')?.focus({ preventScroll: true });
       picked.current = false;
-      setQuery('');
-      setHighlight(null);
-      scrollTo(0);
+      resetSearch();
+    };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finishClose();
+      return;
     }
+    // Keep the native dialog in the top layer until its exit fade ends.
+    panel.dataset.closing = 'true';
+    const onEnd = (event) => {
+      if (event.target === panel && !event.pseudoElement && event.propertyName === 'opacity')
+        finishClose();
+    };
+    const timer = setTimeout(() => {
+      if (panel.open) finishClose();
+    }, 190);
+    panel.addEventListener('transitionend', onEnd);
+    return () => {
+      clearTimeout(timer);
+      panel.removeEventListener('transitionend', onEnd);
+    };
   }, [open]);
+
+  const changeQuery = (value) => {
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      previousRows.current = new Map(
+        Array.from(list.current.querySelectorAll('[data-palette-state]'), (row) => [
+          row.dataset.paletteState,
+          row.getBoundingClientRect().top,
+        ]),
+      );
+    }
+    setQuery(value);
+    setHighlight(null);
+    scrollTo(0);
+  };
+  useLayoutEffect(() => {
+    const before = previousRows.current;
+    previousRows.current = null;
+    if (!before || !open) return;
+    const visible = list.current.getBoundingClientRect();
+    const moves = [];
+    for (const row of list.current.querySelectorAll('[data-palette-state]')) {
+      for (const animation of row.getAnimations())
+        if (animation.id === 'palette-reorder') animation.cancel();
+      const box = row.getBoundingClientRect();
+      if (box.bottom <= visible.top || box.top >= visible.bottom) continue;
+      const oldTop = before.get(row.dataset.paletteState);
+      const offset = oldTop === undefined ? 5 : oldTop - box.top;
+      if (Math.abs(offset) > 0.5) moves.push({ row, offset, entering: oldTop === undefined });
+    }
+    for (const { row, offset, entering } of moves) {
+      const animation = row.animate(
+        [
+          { transform: `translateY(${offset}px)`, opacity: entering ? 0 : 1 },
+          { transform: 'translateY(0)', opacity: 1 },
+        ],
+        { duration: 160, easing: 'cubic-bezier(.2,.75,.25,1)' },
+      );
+      animation.id = 'palette-reorder';
+    }
+  }, [query, open]);
+
   const choose = (item) => {
-    if (!item) return;
+    if (!item || !open) return;
     picked.current = true;
     onClose();
     controller.revealState(item.state.id);
@@ -145,11 +217,7 @@ export function StatePaletteHost() {
           spellCheck={false}
           value={query}
           placeholder="Search states…"
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setHighlight(null);
-            scrollTo(0);
-          }}
+          onChange={(event) => changeQuery(event.target.value)}
           onKeyDown={keyDown}
         />
         <span role="status" aria-label={`${results.length} states found`}>
@@ -185,6 +253,7 @@ export function StatePaletteHost() {
               <li
                 key={state.id}
                 id={`${listId}-${i}`}
+                data-palette-state={state.id}
                 style={{ top: i * rowHeight }}
                 aria-posinset={i + 1}
                 aria-setsize={results.length}
