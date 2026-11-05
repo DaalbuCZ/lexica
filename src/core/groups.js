@@ -1,6 +1,7 @@
 // Groups are a view of the same states and transitions, never a second lexer model.
 import { destination } from './portals.js';
 import { boundaryContext } from './boundary-layout.js';
+import { commentNodeIds } from './comments.js';
 export function groupFor(machine, stateId) {
   return (machine.groups ?? []).find((group) => group.stateIds.includes(stateId));
 }
@@ -86,11 +87,12 @@ export function graphView(machine, focus = null, includeOutside = true) {
       drawingRoutes: machine.drawingRoutes,
       routingPolicy: machine.routingPolicy,
       ...context,
-      comments: (machine.comments ?? []).filter((comment) =>
-        (comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some((id) =>
-          context.states.some((state) => state.id === id),
-        ),
-      ),
+      comments: (machine.comments ?? []).filter((comment) => {
+        const attachments = commentNodeIds(comment);
+        return attachments.length
+          ? attachments.some((id) => context.states.some((state) => state.id === id))
+          : comment.groupId === focus;
+      }),
       labelBoxes: machine.labelBoxes,
     };
   }
@@ -160,12 +162,12 @@ export function graphView(machine, focus = null, includeOutside = true) {
     routingPolicy: machine.routingPolicy,
     states,
     edges,
-    comments: (machine.comments ?? []).filter(
-      (comment) =>
-        !(comment.nodeIds ?? (comment.nodeId ? [comment.nodeId] : [])).some((id) =>
-          membership.has(id),
-        ),
-    ),
+    comments: (machine.comments ?? []).filter((comment) => {
+      const attachments = commentNodeIds(comment);
+      return attachments.length
+        ? !attachments.some((id) => membership.has(id))
+        : !groups.some((group) => group.id === comment.groupId);
+    }),
     labelBoxes: machine.labelBoxes,
   };
 }

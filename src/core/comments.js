@@ -335,6 +335,7 @@ export function connectCommentNode(machine, commentId, nodeId) {
     throw Error('Invalid comment attachment.');
   comment.nodeIds = [...new Set([...commentNodeIds(comment), nodeId])];
   delete comment.nodeId;
+  delete comment.groupId;
 }
 export function removeCommentLinks(machine, keys) {
   for (const comment of machine.comments ?? []) {

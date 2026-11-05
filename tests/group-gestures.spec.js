@@ -306,3 +306,34 @@ for (const presentation of ['canvas', 'overlay'])
     await expect.poll(() => distance(m.states.find((s) => s.id === 'end'))).toBeLessThan(2);
     await expect.poll(zoom).toBeCloseTo(1.15, 4);
   });
+
+test('comments connect in both drag directions and survive removal of their last link', async ({
+  page,
+}) => {
+  await setup(page, 'canvas', {
+    ...machine,
+    groups: [],
+    comments: [{ id: 'note', text: 'Note', x: 0, y: -190, nodeIds: [] }],
+  });
+  const points = await page.locator('#canvas').evaluate((canvas) => {
+    const t = canvas.getContext('2d').getTransform();
+    const r = canvas.getBoundingClientRect();
+    const point = (x, y) => ({ x: r.left + t.e + x * t.a, y: r.top + t.f + y * t.d });
+    return { state: point(0, 0), note: point(40, -170) };
+  });
+  const drag = async (from, to) => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(to.x, to.y, { steps: 4 });
+    await page.mouse.up({ button: 'right' });
+  };
+  const attachments = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('lexica-machine')).comments[0]?.nodeIds);
+  await page.mouse.click(points.state.x, points.state.y);
+  await drag(points.state, points.note);
+  await expect.poll(attachments).toEqual(['a']);
+  await page.locator('#canvas').press('Delete');
+  await expect.poll(attachments).toEqual([]);
+  await drag(points.note, points.state);
+  await expect.poll(attachments).toEqual(['a']);
+});

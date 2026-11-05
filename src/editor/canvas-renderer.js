@@ -119,17 +119,7 @@ export function createCanvasRenderer(context) {
   };
   function connectionPreviewPath(a, p) {
     if (Math.hypot(p.x - a.x, p.y - a.y) <= 36)
-      return routeEdges({
-        ...context.machine,
-        edges: [
-          ...context.machine.edges,
-          {
-            from: a.id,
-            to: a.id,
-            label: context.lastTransitionRule,
-          },
-        ],
-      }).at(-1).d;
+      return `M ${a.x - 22} ${a.y - 27} C ${a.x - 75} ${a.y - 105}, ${a.x + 75} ${a.y - 105}, ${a.x + 22} ${a.y - 27}`;
     return `M ${a.x} ${a.y} L ${p.x} ${p.y}`;
   }
   function draw() {
@@ -262,7 +252,12 @@ export function createCanvasRenderer(context) {
                 ? routeSnapshot.routes
                 : routeEdges(shown, label);
     if (liveSnapshot) lastLiveRepair = { base: routeSnapshot, snapshot: liveSnapshot };
-    if (!dragging || manualEdit?.committing) {
+    if (
+      (!dragging &&
+        (routeSnapshot?.version !== context.documentVersion ||
+          routeSnapshot.signature !== signature)) ||
+      manualEdit?.committing
+    ) {
       routeSnapshot = {
         routes: shownRoutes,
         comments: structuredClone(shown.comments ?? []),
@@ -348,9 +343,10 @@ export function createCanvasRenderer(context) {
             edges: context.graphFailures.edges,
           },
         });
-      mapScene = { machine: shown, routes: shownRoutes };
       if (panelMoved) context.syncGrid();
-    } else mapScene = { machine: shown, routes: shownRoutes };
+    }
+    if (dragging || mapScene?.machine !== shown || mapScene.routes !== shownRoutes)
+      mapScene = { machine: shown, routes: shownRoutes };
     context.graph.draw({
       machine: shown,
       routes: shownRoutes,

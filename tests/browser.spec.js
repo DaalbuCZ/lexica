@@ -55,6 +55,7 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
     [3, 'BLOCK'],
   ]) {
     await memory.getByRole('button', { name: 'Add enum value', exact: true }).click();
+    await expect(memory.getByLabel(`Enum value ${i}`, { exact: true })).toBeFocused();
     await memory.getByLabel(`Enum value ${i}`, { exact: true }).fill(name);
     await memory.getByLabel(`Enum value ${i}`, { exact: true }).press('Enter');
   }
@@ -116,4 +117,20 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   await expect(page.locator('#error-count')).toHaveText('0 errors');
   await page.screenshot({ path: testInfo.outputPath('verified.png') });
   expect(errors).toEqual([]);
+});
+
+test('debugger docks above the input and can be moved back out', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start debugging', exact: true }).click();
+  await expect(page.locator('#step-status')).toBeVisible();
+  const grip = await page.locator('#debugger-grip').boundingBox();
+  const slot = await page.locator('#tester-debugger-slot').boundingBox();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(slot.x + slot.width / 2, slot.y + 10, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('#tester-debugger-slot #step-status')).toBeVisible();
+  await page.locator('#debugger-grip').press('ArrowUp');
+  await expect(page.locator('body')).toHaveAttribute('data-debugger-dock', 'top');
+  await expect(page.locator('#tester-debugger-slot #step-status')).toHaveCount(0);
 });

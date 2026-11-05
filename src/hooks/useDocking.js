@@ -98,8 +98,9 @@ export function useDockGrip(name) {
         preview.dispatchEvent(new CustomEvent('measure-dock-targets', { detail }));
         target.targets = detail.targets;
         target.outlines = new Map();
-        if (name === 'toolbar' || name === 'breadcrumbs') {
+        if (name !== 'tester') {
           for (const box of target.targets) {
+            if (name === 'debugger' && box.zone !== 'tester') continue;
             const outline = document.createElement('div');
             outline.className = 'dock-preview dock-outline';
             setPreviewBounds(outline, box);
@@ -140,7 +141,10 @@ export function useDockGrip(name) {
         event.preventDefault();
         event.stopPropagation();
         const [edge] = (document.body.dataset.debuggerDock || 'top').split('-');
-        applyDock(name, edge + (event.key === 'Home' ? '-start' : '-end'));
+        applyDock(
+          name,
+          (edge === 'tester' ? 'top' : edge) + (event.key === 'Home' ? '-start' : '-end'),
+        );
       } else if (event.key === 'Escape') finish(event, true);
     },
   };

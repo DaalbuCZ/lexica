@@ -16,7 +16,7 @@ const cornerZones = {
   'right-end': 'bottom-end',
 };
 
-export const debuggerZones = [...dockSides, ...Object.keys(cornerZones)];
+export const debuggerZones = [...dockSides, ...Object.keys(cornerZones), 'tester'];
 
 export function nearestDockZone(x, y, width, height) {
   const side = nearestDock(x, y, width, height);

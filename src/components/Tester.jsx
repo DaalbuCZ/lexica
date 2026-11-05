@@ -32,8 +32,7 @@ export function Tester({ debuggerRef }) {
     mirror = useRef(null),
     errorsRef = useRef(null),
     highlights = useRef(null),
-    session = useRef(null),
-    hoverTimer = useRef(null);
+    session = useRef(null);
   const scrollFrame = useRef(null);
   const [frame, setFrame] = useState(null),
     [hover, setHover] = useState(null),
@@ -78,7 +77,6 @@ export function Tester({ debuggerRef }) {
     return () => {
       highlights.current?.dispose();
       highlights.current = null;
-      clearTimeout(hoverTimer.current);
       cancelAnimationFrame(scrollFrame.current);
       scrollFrame.current = null;
     };
@@ -235,25 +233,13 @@ export function Tester({ debuggerRef }) {
   };
   const pointerMove = (event) => {
     if (analysis.pending) return;
-    clearTimeout(hoverTimer.current);
     const x = event.clientX,
       y = event.clientY;
-    hoverTimer.current = setTimeout(() => {
-      const token = highlights.current?.tokenAtPoint(x, y);
-      highlights.current?.hover(token);
-      setHover(
-        token
-          ? {
-              token,
-              x,
-              y,
-            }
-          : null,
-      );
-    }, 50);
+    const token = highlights.current?.tokenAtPoint(x, y);
+    highlights.current?.hover(token);
+    setHover(token ? { token, x, y } : null);
   };
   const clearHover = () => {
-    clearTimeout(hoverTimer.current);
     setHover(null);
     highlights.current?.hover(null);
   };
@@ -297,6 +283,7 @@ export function Tester({ debuggerRef }) {
       {debugPresent && lastFrame.current && (
         <DebuggerWindow
           open={!!frame}
+          testerCollapsed={collapsed}
           frame={frame ?? lastFrame.current}
           canPrevious={canPrevious}
           canNext={canNext}
@@ -306,6 +293,7 @@ export function Tester({ debuggerRef }) {
       )}
       <div className="test-grid">
         <div>
+          <div id="tester-debugger-slot" />
           <div className="input-label">
             <label className="field-label" htmlFor="input">
               INPUT

@@ -4210,9 +4210,7 @@
   .group-overlay {
     transition:
       opacity 160ms ease,
-      scale 160ms ease,
       display 160ms allow-discrete;
-    scale: 1;
     transition-behavior: allow-discrete;
   }
   .group-overlay:not([hidden]) {
@@ -4221,7 +4219,6 @@
   @starting-style {
     .group-overlay:not([hidden]) {
       opacity: 0;
-      scale: 0.98;
     }
   }
   .group-target-dialog {

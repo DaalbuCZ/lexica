@@ -4,6 +4,7 @@ import { canvasTransform } from '../core/canvas-graph.js';
 import { editorSettings } from '../core/editor-settings.js';
 import {
   commentLayout,
+  commentNodeIds,
   commentAnchors,
   positionComments,
   commentLinks,
@@ -39,6 +40,7 @@ export function createCanvasInteractions(context) {
     context.connectPoint = context.point(e);
     context.rightStart = {
       commentId: id,
+      pointerId: e.pointerId,
       x: e.clientX,
       y: e.clientY,
     };
@@ -55,6 +57,12 @@ export function createCanvasInteractions(context) {
       startPan(e);
       return;
     }
+    const draggedComments = (groups) =>
+      (context.machine.comments ?? []).filter(
+        (comment) =>
+          context.selectedComments.has(comment.id) ||
+          (!commentNodeIds(comment).length && groups.some((group) => group.id === comment.groupId)),
+      );
     if (type === 'group') {
       const group = context.machine.groups.find((g) => g.id === key);
       if (!group?.stateIds.length) return;
@@ -78,7 +86,7 @@ export function createCanvasInteractions(context) {
         ...context.machine.states.filter((s) => context.selectedStates.has(s.id)),
         ...groups,
         ...groups.flatMap((g) => Object.values(g.contextPositions ?? {})),
-        ...(context.machine.comments ?? []).filter((c) => context.selectedComments.has(c.id)),
+        ...draggedComments(groups),
       ];
       context.drag = {
         start: context.point(e),
@@ -99,6 +107,9 @@ export function createCanvasInteractions(context) {
     context.markSelection();
     context.properties();
     if (!context.selectionSet(type).has(key)) return;
+    const groups = (context.machine.groups ?? []).filter(
+      (g) => g.stateIds.length && g.stateIds.every((id) => context.selectedStates.has(id)),
+    );
     context.drag = {
       start: context.point(e),
       moved: false,
@@ -107,12 +118,8 @@ export function createCanvasInteractions(context) {
       ),
       items: [
         ...context.machine.states.filter((s) => context.selectedStates.has(s.id)),
-        ...(context.machine.groups ?? [])
-          .filter(
-            (g) => g.stateIds.length && g.stateIds.every((id) => context.selectedStates.has(id)),
-          )
-          .flatMap((g) => [g, ...Object.values(g.contextPositions ?? {})]),
-        ...(context.machine.comments ?? []).filter((c) => context.selectedComments.has(c.id)),
+        ...groups.flatMap((g) => [g, ...Object.values(g.contextPositions ?? {})]),
+        ...draggedComments(groups),
       ].map((item) => ({
         item,
         x: item.x,
@@ -125,15 +132,6 @@ export function createCanvasInteractions(context) {
     if (context.commentSource && (e.button === 0 || e.button === 2)) {
       e.preventDefault();
       context.connectComment(context.commentSource, id);
-      return;
-    }
-    if (e.button === 2 && context.selectedStates.has(id)) {
-      const group = groupFor(context.machine, id);
-      context.showGroupSelectionMenu(
-        e,
-        () => (group ? context.openGroupById(group.id) : context.makeGroup()),
-        true,
-      );
       return;
     }
     if (context.space || e.button === 1) {
@@ -154,6 +152,7 @@ export function createCanvasInteractions(context) {
         context.connectPoint = context.point(e);
         context.rightStart = {
           id,
+          showGroupMenu: e.button === 2 && context.selectedStates.has(id),
           x: e.clientX,
           y: e.clientY,
           insert: e.ctrlKey,
@@ -341,6 +340,10 @@ export function createCanvasInteractions(context) {
       true,
     );
     context.$('canvas').onpointerdown = (e) => {
+      if (e.button === 1 || context.space) {
+        startPan(e);
+        return;
+      }
       context.$('canvas').focus({ preventScroll: true });
       if (e.button === 0 && e.shiftKey) {
         e.preventDefault();
@@ -352,10 +355,6 @@ export function createCanvasInteractions(context) {
         return;
       }
       const hit = context.graph.hitClient(e);
-      if (e.button === 1 || context.space) {
-        startPan(e);
-        return;
-      }
       if (
         ['portal-target', 'start-view'].includes(hit?.type) &&
         (e.button === 0 || e.button === 2) &&
@@ -642,7 +641,7 @@ export function createCanvasInteractions(context) {
         return;
       }
       if (context.source || context.commentSource) {
-        if (context.rightStart && e.ctrlKey) {
+        if (context.source && context.rightStart && e.ctrlKey) {
           context.rightStart.insert = true;
           document.body.classList.toggle('connecting-outside-group', !!context.overviewView);
         }
@@ -732,6 +731,20 @@ export function createCanvasInteractions(context) {
       if (connection?.pointerId != null && canvas.hasPointerCapture(connection.pointerId))
         canvas.releasePointerCapture(connection.pointerId);
       document.body.classList.remove('connecting-outside-group');
+      if (
+        connection?.showGroupMenu &&
+        Math.hypot(e.clientX - connection.x, e.clientY - connection.y) <= 6
+      ) {
+        const group = groupFor(context.machine, connection.id);
+        context.cancelConnect(false);
+        context.showGroupSelectionMenu(
+          e,
+          () => (group ? context.openGroupById(group.id) : context.makeGroup()),
+          true,
+        );
+        context.queueDraw();
+        return;
+      }
       if (connection?.insert && context.overviewView && context.openGroup) {
         const box = context.groupPanel.getBoundingClientRect();
         if (
@@ -921,9 +934,10 @@ export function createCanvasInteractions(context) {
       context.edgeDrag = null;
       context.portalDrag = null;
       context.marquee = null;
-      context.rightStart = null;
+      context.outsideGroupPress = null;
+      context.cancelConnect(false);
       document.body.classList.remove('pan-ready', 'panning');
-      context.draw();
+      context.queueDraw();
     });
     context.listen(window, 'resize', () => {
       context.viewportVersion++;

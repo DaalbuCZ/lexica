@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { Theme } from '@radix-ui/themes';
 import {
   ChevronLeft,
@@ -12,8 +12,24 @@ import {
 import { IconButton } from './ui.jsx';
 import { useDockGrip } from '../hooks/useDocking.js';
 
-export function DebuggerWindow({ open, frame, canPrevious, canNext, onMove, onStop }) {
+export function DebuggerWindow({
+  open,
+  frame,
+  canPrevious,
+  canNext,
+  onMove,
+  onStop,
+  testerCollapsed,
+}) {
   const grip = useDockGrip('debugger');
+  const [docked, setDocked] = useState(() => document.body.dataset.debuggerDock === 'tester');
+  useLayoutEffect(() => {
+    const syncDock = () => setDocked(document.body.dataset.debuggerDock === 'tester');
+    const observer = new MutationObserver(syncDock);
+    observer.observe(document.body, { attributeFilter: ['data-debugger-dock'] });
+    syncDock();
+    return () => observer.disconnect();
+  }, []);
   useLayoutEffect(() => {
     document.body.dataset.debugging = 'true';
     return () => {
@@ -96,6 +112,7 @@ export function DebuggerWindow({ open, frame, canPrevious, canNext, onMove, onSt
         </div>
       </section>
     </Theme>,
-    document.body,
+    (docked && !testerCollapsed && document.getElementById('tester-debugger-slot')) ||
+      document.body,
   );
 }

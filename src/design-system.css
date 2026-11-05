@@ -80,6 +80,7 @@
   animation: backdrop-in 170ms ease-out;
 }
 .modal-backdrop[data-state='closed'] {
+  pointer-events: none;
   animation: backdrop-out 140ms ease-in forwards;
 }
 .react-dialog:is(.import-panel, .export-panel) button {
@@ -549,6 +550,14 @@
   max-height: calc(100dvh - 110px);
   overflow: auto;
 }
+#tester-debugger-slot .debugger-window {
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: 200px;
+  translate: none;
+  margin-bottom: var(--space-2);
+}
 .debugger-window .window-heading {
   margin-bottom: var(--space-3);
 }
@@ -781,6 +790,7 @@ details > summary::before {
 .compact-memory .memory-rule-tools {
   display: flex;
   gap: 4px;
+  margin-top: 4px;
 }
 .compact-memory .memory-rule-tools .app-icon-button {
   width: 26px;
@@ -1229,13 +1239,4 @@ dialog.state-palette[open]:not([data-closing])::backdrop {
   min-width: 24px;
   height: 24px;
   padding: 3px;
-}
-#memory-rules .memory-rule-section {
-  border: 0;
-  display: grid;
-  padding: 7px 0;
-  gap: 7px;
-}
-#memory-rules .stack-rule-or {
-  margin: 0;
 }

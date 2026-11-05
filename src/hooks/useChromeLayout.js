@@ -10,7 +10,8 @@ export function useChromeLayout() {
       crumbs = document.querySelector('.group-navigation'),
       map = document.querySelector('.minimap'),
       mapCanvas = document.querySelector('#minimap'),
-      preview = document.querySelector('#dock-preview');
+      preview = document.querySelector('#dock-preview'),
+      debuggerSlot = document.querySelector('#tester-debugger-slot');
     let debuggerPanel;
     let frame,
       collapsed = document.body.classList.contains('tester-collapsed');
@@ -137,16 +138,23 @@ export function useChromeLayout() {
       let debuggerBounds;
       if (panel) {
         const area = { left: left - gap, right: right + gap, top: top - gap, bottom: bottom + gap };
-        set(panel, {
-          maxWidth: Math.max(1, right - left) + 'px',
-          maxHeight: Math.max(1, bottom - top) + 'px',
-        });
+        const preference = document.body.dataset.debuggerDock || 'top';
+        const debuggerDock = preference === 'tester' && isCollapsed ? 'top' : preference;
+        if (debuggerDock !== 'tester')
+          set(panel, {
+            maxWidth: Math.max(1, right - left) + 'px',
+            maxHeight: Math.max(1, bottom - top) + 'px',
+          });
         const obstacles = [brand, toolbar, crumbs, map, tester]
           .map((element) => element.getBoundingClientRect())
           .filter((rect) => rect.width > 0 && rect.height > 0);
         const size = { width: panel.offsetWidth, height: panel.offsetHeight };
         const crumbBox = crumbs.getBoundingClientRect();
         debuggerBounds = (zone) => {
+          if (zone === 'tester') {
+            const { x, y, width, height } = debuggerSlot.getBoundingClientRect();
+            return width ? { x, y, width, height: Math.max(height, 32) } : null;
+          }
           const bounds = { ...area };
           if (
             crumbBox.width &&
@@ -164,13 +172,18 @@ export function useChromeLayout() {
             bounds.bottom - bounds.top >= size.height + 2 * gap;
           return { ...placeDockedPanel(zone, size, fits ? bounds : area, obstacles, gap), ...size };
         };
-        const { x, y } = debuggerBounds(document.body.dataset.debuggerDock || 'top');
-        set(panel, { left: x + 'px', top: y + 'px', translate: 'none' });
+        if (debuggerDock !== 'tester') {
+          const { x, y } = debuggerBounds(debuggerDock);
+          set(panel, { left: x + 'px', top: y + 'px', translate: 'none' });
+        }
       }
       measureTargets = (name) => {
         if (name === 'debugger')
           return debuggerBounds
-            ? debuggerZones.map((zone) => ({ zone, ...debuggerBounds(zone) }))
+            ? debuggerZones.flatMap((zone) => {
+                const bounds = debuggerBounds(zone);
+                return bounds ? [{ zone, ...bounds }] : [];
+              })
             : [];
 
         // Measure the target orientation without moving the live controls.

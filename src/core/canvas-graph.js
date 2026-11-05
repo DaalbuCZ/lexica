@@ -187,7 +187,8 @@ export function createGraphCanvas(canvas, minimap) {
     paths = [],
     pathRoutes = null;
   function transform() {
-    return canvasTransform(view, canvas.clientWidth, canvas.clientHeight);
+    const { width, height } = canvas.getBoundingClientRect();
+    return canvasTransform(view, width, height);
   }
   function point(event) {
     return clientToWorld(
@@ -201,8 +202,7 @@ export function createGraphCanvas(canvas, minimap) {
   }
   function surface(element, context, v) {
     const ratio = globalThis.devicePixelRatio || 1,
-      width = element.clientWidth,
-      height = element.clientHeight;
+      { width, height } = element.getBoundingClientRect();
     if (!width || !height) return null;
     const w = Math.round(width * ratio),
       h = Math.round(height * ratio);
@@ -213,7 +213,9 @@ export function createGraphCanvas(canvas, minimap) {
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, w, h);
     const t = canvasTransform(v, width, height);
-    context.setTransform(ratio * t.scale, 0, 0, ratio * t.scale, ratio * t.x, ratio * t.y);
+    const scaleX = w / width,
+      scaleY = h / height;
+    context.setTransform(scaleX * t.scale, 0, 0, scaleY * t.scale, scaleX * t.x, scaleY * t.y);
     context.lineJoin = 'round';
     return t;
   }

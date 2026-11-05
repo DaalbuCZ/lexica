@@ -2500,12 +2500,15 @@ test('Canvas paints current routes and hit-tests states, labels, portals and com
         getBoundingClientRect: () => ({
           left: 0,
           top: 0,
+          width: 800.5,
+          height: 600,
         }),
       },
       map = {
         clientWidth: 170,
         clientHeight: 106,
         getContext: () => mini,
+        getBoundingClientRect: () => ({ width: 170, height: 106 }),
       },
       main = context(),
       mini = context(),
@@ -2550,7 +2553,7 @@ test('Canvas paints current routes and hit-tests states, labels, portals and com
     };
     renderer.draw(scene);
     renderer.drawMap();
-    assert.equal(canvas.width, 800);
+    assert.equal(canvas.width, 801);
     assert.equal(map.width, 170);
     assert.ok(calls.some((c) => c.method === 'stroke' && c.stroke === '#a71abb' && c.width === 4));
     assert.deepEqual(renderer.hit(m.states[1]), {
