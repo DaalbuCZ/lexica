@@ -93,7 +93,7 @@ test('IFJ export uses stack rules and ASCII input with no epsilon transitions', 
   assert.match(text, /Γ = \{S, OPEN\}/);
   assert.match(text, /OPEN q0 \) → ε q1/);
   assert.match(text, /S q0 \( → S OPEN q1/);
-  assert.match(text, /ASCII/);
+  assert.doesNotMatch(text, /Input domain:|Groups and portals|This describes|IFJ stack rules:/);
   m.edges[0].label = '';
   assert.throws(() => tokenize(m, '('), /empty/);
 });

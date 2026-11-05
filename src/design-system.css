@@ -313,7 +313,6 @@
   padding: var(--space-3) 0;
   margin: 0;
   border: 0;
-  border-bottom: 1px solid var(--gray-5);
 }
 
 .simple-memory {
@@ -1232,6 +1231,7 @@ dialog.state-palette[open]:not([data-closing])::backdrop {
   padding: 3px;
 }
 #memory-rules .memory-rule-section {
+  border: 0;
   display: grid;
   padding: 7px 0;
   gap: 7px;

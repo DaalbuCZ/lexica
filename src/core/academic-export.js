@@ -98,20 +98,5 @@ export function toAcademic(machine) {
         `${names.get(state.id)} = ${JSON.stringify(state.name).replace(/[^\x20-\x7e]/g, (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'))}`,
     ),
     '',
-    'Input domain: ASCII (0-127).',
-    '0xNN denotes an ASCII code; .. includes every code between the endpoints.',
-    ...(extended
-      ? [
-          'IFJ stack rules: A p a → w q, where A ∈ Γ, a ∈ Σ, and w ∈ Γ*.',
-          'A rule replaces the top A with w. Stack sequences are bottom to top (rightmost on top).',
-          'Every transition consumes one ASCII character; epsilon input transitions are not supported.',
-          'An input alias abbreviates one rule per character; rules are alternatives (OR).',
-          'Initial configuration: S s x. Acceptance: S s x ⇒* w f, f ∈ F (all input consumed).',
-          'No rule applies to an empty stack. Omitted stack rules expand to A → A for every A ∈ Γ.',
-        ]
-      : ['p A → q abbreviates one rule for each character in A.']),
-    'Groups and portals are flattened.',
-    'This describes the automaton graph; token names, skip flags and longest-match tokenization are not part of M.',
-    '',
   ].join('\n');
 }
