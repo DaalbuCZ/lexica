@@ -140,8 +140,8 @@ export function polishRadialBranches(machine, { maxRoutes = 32, stats = {} } = {
   return states;
 }
 
-// Pull small downstream regions toward their sole attachment without changing
-// any of their internal geometry. The first ring and shared branches stay pinned.
+// Pull small downstream regions toward their attachments without changing
+// any of their internal geometry. The first ring and all earlier layers stay pinned.
 export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
   const root = machine.states.find((state) => state.id === machine.start);
   if (
@@ -172,9 +172,16 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
   const radius = (state) => Math.hypot(state.x - root.x, state.y - root.y);
   const reachable = machine.states.filter((state) => depths.has(state.id));
   const outerRadius = reachable.reduce((max, state) => Math.max(max, radius(state)), 0);
+  // Rank a stem by how far its downstream states extend, even if the stem
+  // itself is closer to the start than the outer half of the drawing.
+  const reach = new Map(reachable.map((state) => [state.id, radius(state)]));
+  for (const id of queue.toReversed())
+    for (const previous of adjacent.get(id))
+      if (depths.get(previous) === depths.get(id) - 1)
+        reach.set(previous, Math.max(reach.get(previous), reach.get(id)));
   const candidates = reachable
-    .filter((state) => depths.get(state.id) >= 2 && radius(state) >= outerRadius * 0.5)
-    .sort((a, b) => radius(b) - radius(a) || depths.get(b.id) - depths.get(a.id))
+    .filter((state) => depths.get(state.id) >= 2 && reach.get(state.id) >= outerRadius * 0.5)
+    .sort((a, b) => reach.get(b.id) - reach.get(a.id) || depths.get(b.id) - depths.get(a.id))
     .slice(0, 64);
 
   const labels = machine.edges.map(simpleTransitionLabel);
@@ -183,49 +190,78 @@ export function pullOuterBranches(machine, { maxRoutes = 24 } = {}) {
   let states = machine.states;
   let checked = 0,
     attempts = 0;
+  const triedRegions = new Set();
   for (const { id } of candidates) {
     if (checked >= maxRoutes || attempts >= 160) break;
     const depth = depths.get(id);
-    const parents = [...adjacent.get(id)].filter((next) => depths.get(next) === depth - 1);
-    if (parents.length !== 1) continue;
-    const [parent] = parents;
+    // A depth cut keeps the earlier layers fixed. Explore the whole connected
+    // piece beyond the cut, including cycles and peers with another attachment.
     const region = new Set([id]);
-    let shared = false;
+    let tooLarge = false;
     for (const member of region) {
       for (const next of adjacent.get(member)) {
-        if (next === parent || region.has(next)) continue;
-        if (!(depths.get(next) >= depth) || region.size >= 24) {
-          shared = true;
+        if (!(depths.get(next) >= depth) || region.has(next)) continue;
+        if (region.size >= 24) {
+          tooLarge = true;
           break;
         }
         region.add(next);
       }
-      if (shared) break;
+      if (tooLarge) break;
     }
-    if (shared) continue;
+    if (tooLarge) continue;
+    const key = JSON.stringify([...region].sort());
+    if (triedRegions.has(key)) continue;
+    triedRegions.add(key);
 
     const nodes = new Map(states.map((state) => [state.id, state]));
-    const anchor = nodes.get(parent),
-      tip = nodes.get(id);
-    const dx = anchor.x - tip.x,
-      dy = anchor.y - tip.y;
-    const length = Math.hypot(dx, dy);
-    const minLength = machine.edges.reduce((minimum, edge, i) => {
-      const boundary =
-        (edge.from === parent && region.has(edge.to)) ||
-        (edge.to === parent && region.has(edge.from));
-      return boundary ? Math.max(minimum, labels[i].length * 7 + 110) : minimum;
-    }, 175);
-    if (length <= minLength + 24) continue;
-    const maxShift = length - minLength;
+    const boundary = machine.edges.flatMap((edge, i) => {
+      const fromInside = region.has(edge.from);
+      if (fromInside === region.has(edge.to)) return [];
+      const inside = nodes.get(fromInside ? edge.from : edge.to);
+      const outside = nodes.get(fromInside ? edge.to : edge.from);
+      const dx = outside.x - inside.x,
+        dy = outside.y - inside.y;
+      const length = Math.hypot(dx, dy);
+      const minimum = Math.max(175, labels[i].length * 7 + 110);
+      return [{ dx, dy, length, minimum }];
+    });
+    let dx = 0,
+      dy = 0,
+      pulls = 0;
+    for (const edge of boundary) {
+      const spare = edge.length - edge.minimum;
+      if (spare <= 24) continue;
+      dx += (edge.dx * spare) / edge.length;
+      dy += (edge.dy * spare) / edge.length;
+      pulls++;
+    }
+    if (!pulls) continue;
+    dx /= pulls;
+    dy /= pulls;
+    if (Math.hypot(dx, dy) < 24) continue;
+    const boundaryLength = boundary.reduce((sum, edge) => sum + edge.length, 0);
     const moves = [0.85, 0.6, 0.35, 0.18].flatMap((fraction) =>
       [0, Math.PI / 12, -Math.PI / 12].map((angle) => ({ fraction, angle })),
     );
     for (const { fraction, angle } of moves) {
       if (checked >= maxRoutes || attempts >= 160) break;
-      const factor = (maxShift * fraction) / length;
-      const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * factor,
-        y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * factor;
+      const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * fraction,
+        y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * fraction;
+      let total = 0,
+        fits = true;
+      for (const edge of boundary) {
+        const length = Math.hypot(edge.dx - x, edge.dy - y);
+        if (
+          length < Math.min(edge.length, edge.minimum) - 1e-6 ||
+          length > edge.length + Math.max(12, edge.length * 0.08)
+        ) {
+          fits = false;
+          break;
+        }
+        total += length;
+      }
+      if (!fits || total >= boundaryLength - 1e-6) continue;
       const next = states.map((state) =>
         region.has(state.id) ? { ...state, x: state.x + x, y: state.y + y } : state,
       );
