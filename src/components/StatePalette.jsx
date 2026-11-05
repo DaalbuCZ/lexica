@@ -169,7 +169,8 @@ export function StatePaletteHost() {
     if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter') {
       event.preventDefault();
-      choose(results[active]);
+      if (!open && picked.current) controller.showProperties(true);
+      else choose(results[active]);
     } else if (results.length && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
       event.preventDefault();
       const next =

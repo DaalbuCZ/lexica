@@ -71,6 +71,15 @@ export function useShortcuts(debuggerRef) {
         return;
       }
       if (event.repeat) return;
+      if (
+        key === 'enter' &&
+        scene.selection.type === 'state' &&
+        !event.target.closest('button,a,[role="button"]')
+      ) {
+        event.preventDefault();
+        controller.showProperties(true);
+        return;
+      }
       const action = {
         v: () => controller.setTool('select'),
         h: () => controller.setTool('pan'),
