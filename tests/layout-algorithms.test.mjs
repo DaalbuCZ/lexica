@@ -1,4 +1,5 @@
 import { graphView } from '../src/core/groups.js';
+import { groupWidth } from '../src/core/labels.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { feasibleRadial } from '../src/core/feasible-layout.js';
@@ -1241,4 +1242,66 @@ test('radial spoke cleanup moves multiple attachments together and preserves bra
       );
   }
   assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
+});
+
+test('Arrange reserves long group boxes without stretching group contents', () => {
+  const machine = {
+    start: 'root',
+    states: [{ id: 'root', name: 'Root', x: 0, y: 0 }],
+    groups: [],
+    edges: [],
+    comments: [],
+  };
+  const names = [
+    'Identifiers, S_strings and Dollar expressions',
+    'triple_S_string string and end',
+    'Less than and Control arrow',
+    'Parenthesis and Unit',
+    'Main',
+  ];
+  names.forEach((name, i) => {
+    const ids = [`a${i}`, `b${i}`];
+    machine.states.push(...ids.map((id) => ({ id, name: id, x: 0, y: 0 })));
+    machine.groups.push({ id: `g${i}`, name: name.repeat(3), stateIds: ids, x: 0, y: 0 });
+    machine.edges.push(
+      { from: 'root', to: ids[0], label: String(i) },
+      { from: ids[0], to: ids[1], label: 'x' },
+    );
+  });
+  for (const mode of ['circle', 'tree', 'spring']) {
+    let before;
+    const result = solveLayout(
+      layoutTopology(machine),
+      null,
+      { mode, spacing: 0.35, smartGroups: false },
+      () => {},
+      (phase, drawing) => {
+        if (phase === 'routing') before = drawing;
+      },
+    ).machine;
+    const states = graphView(result).states;
+    for (let i = 0; i < states.length; i++)
+      for (const b of states.slice(i + 1)) {
+        const a = states[i];
+        const width = ((a.group ? groupWidth(a) : 72) + (b.group ? groupWidth(b) : 72)) / 2;
+        assert.ok(
+          Math.abs(a.x - b.x) >= width + 24 - 1e-6 || Math.abs(a.y - b.y) >= 96 - 1e-6,
+          `${mode}: ${a.id} overlaps ${b.id}`,
+        );
+      }
+    for (const group of result.groups) {
+      const oldGroup = before.groups.find((g) => g.id === group.id);
+      for (const id of group.stateIds) {
+        const old = before.states.find((s) => s.id === id);
+        const next = result.states.find((s) => s.id === id);
+        assert.ok(Math.abs(next.x - group.x - (old.x - oldGroup.x)) < 1e-6);
+        assert.ok(Math.abs(next.y - group.y - (old.y - oldGroup.y)) < 1e-6);
+      }
+    }
+    assert.deepEqual(result.edges, machine.edges);
+    assert.deepEqual(
+      machine.groups.map((g) => g.x),
+      [0, 0, 0, 0, 0],
+    );
+  }
 });

@@ -1,4 +1,5 @@
 import { simpleTransitionLabel } from './editor-settings.js';
+import { groupWidth } from './labels.js';
 import { autoLayout, crossingPairs as findCrossings, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
 import { destination } from './portals.js';
@@ -27,6 +28,49 @@ import {
   compactRadialSpokes,
 } from './radial-aesthetics.js';
 const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
+
+// Placement uses circular nodes; reserve the rendered group rectangles after rotation.
+function spaceOverviewGroups(machine) {
+  const view = graphView(machine);
+  let scale = 1;
+  for (let i = 0; i < view.states.length; i++)
+    for (let j = i + 1; j < view.states.length; j++) {
+      const a = view.states[i],
+        b = view.states[j];
+      if (!a.group && !b.group) continue;
+      const width = ((a.group ? groupWidth(a) : 72) + (b.group ? groupWidth(b) : 72)) / 2;
+      scale = Math.max(
+        scale,
+        Math.min(
+          (width + 24) / Math.max(1e-6, Math.abs(a.x - b.x)),
+          96 / Math.max(1e-6, Math.abs(a.y - b.y)),
+        ),
+      );
+    }
+  if (scale <= 1) return;
+  const root = view.states.find((s) => s.id === view.start) ?? { x: 0, y: 0 };
+  for (const state of view.states) {
+    const dx = (state.x - root.x) * (scale - 1),
+      dy = (state.y - root.y) * (scale - 1);
+    if (state.group) {
+      const group = machine.groups.find((g) => g.id === state.id);
+      group.x += dx;
+      group.y += dy;
+      for (const member of machine.states)
+        if (group.stateIds.includes(member.id)) {
+          member.x += dx;
+          member.y += dy;
+        }
+      for (const point of Object.values(group.contextPositions ?? {})) {
+        point.x += dx;
+        point.y += dy;
+      }
+    } else {
+      state.x += dx;
+      state.y += dy;
+    }
+  }
+}
 
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
@@ -1109,6 +1153,7 @@ export function solveLayout(
       if (options.mode === 'tree') align(null);
     }
   }
+  if (!focus && machine.groups?.length) spaceOverviewGroups(machine);
   record('alignment', machine);
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');

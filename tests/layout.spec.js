@@ -84,3 +84,57 @@ test('radial Arrange and local drag survive reload without moving unrelated stat
   await page.screenshot({ path: testInfo.outputPath('radial-drag-reloaded.png') });
   expect(errors).toEqual([]);
 });
+
+test('Arrange keeps long group name boxes apart', async ({ page }) => {
+  const names = [
+    'Identifiers, S_strings and Dollar expressions',
+    'triple_S_string string and end',
+    'Less than and Control arrow',
+    'Parenthesis and Unit',
+    'Main',
+  ];
+  const machine = {
+    start: 'root',
+    states: ['root', ...names.map((_, i) => `s${i}`)].map((id) => ({
+      id,
+      name: id,
+      token: '',
+      x: 0,
+      y: 0,
+    })),
+    groups: names.map((name, i) => ({
+      id: `g${i}`,
+      name: name.repeat(3),
+      stateIds: [`s${i}`],
+      x: 0,
+      y: 0,
+    })),
+    edges: names.map((_, i) => ({ from: 'root', to: `s${i}`, label: String(i) })),
+    comments: [],
+  };
+  await page.addInitScript((m) => {
+    localStorage.setItem('lexica-machine', JSON.stringify(m));
+    localStorage.setItem('lexica-layout-mode', 'circle');
+    localStorage.setItem('lexica-layout-density', '0.35');
+    localStorage.setItem('lexica-layout-smart-groups', 'false');
+  }, machine);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Auto layout', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply layout', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Arrange graph', exact: true })).toHaveCount(0);
+  const overlaps = await page.evaluate(async () => {
+    const { graphView } = await import('/src/core/groups.js');
+    const { groupWidth } = await import('/src/core/labels.js');
+    const states = graphView(JSON.parse(localStorage.getItem('lexica-machine'))).states;
+    return states.flatMap((a, i) =>
+      states
+        .slice(i + 1)
+        .filter((b) => {
+          const half = ((a.group ? groupWidth(a) : 72) + (b.group ? groupWidth(b) : 72)) / 2;
+          return Math.abs(a.x - b.x) < half + 23.99 && Math.abs(a.y - b.y) < 95.99;
+        })
+        .map((b) => [a.id, b.id]),
+    );
+  });
+  expect(overlaps).toEqual([]);
+});
