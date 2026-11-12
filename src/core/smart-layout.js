@@ -15,7 +15,7 @@ import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
 import { placementCorridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
-import { circularStartRing, orientGroupsUp } from './radial-ring.js';
+import { circularStartRing, orientGroupsUp, fitGroupBoxes } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
@@ -27,6 +27,34 @@ import {
   compactRadialSpokes,
 } from './radial-aesthetics.js';
 const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
+
+// Move whole groups so their internal layouts and outside references stay intact.
+function spaceOverviewGroups(machine, radial) {
+  const view = graphView(machine),
+    positions = new Map(fitGroupBoxes(view, radial).map((s) => [s.id, s]));
+  for (const state of view.states) {
+    const next = positions.get(state.id),
+      dx = next.x - state.x,
+      dy = next.y - state.y;
+    if (state.group) {
+      const group = machine.groups.find((g) => g.id === state.id);
+      group.x += dx;
+      group.y += dy;
+      for (const member of machine.states)
+        if (group.stateIds.includes(member.id)) {
+          member.x += dx;
+          member.y += dy;
+        }
+      for (const point of Object.values(group.contextPositions ?? {})) {
+        point.x += dx;
+        point.y += dy;
+      }
+    } else {
+      state.x += dx;
+      state.y += dy;
+    }
+  }
+}
 
 export function simpleBranch(machine) {
   if (!machine.start || machine.states.length > 12) return false;
@@ -1089,6 +1117,8 @@ export function solveLayout(topology, focus = null, options = {}, progress = () 
       if (options.mode === 'tree') align(null);
     }
   }
+  if (!focus && machine.groups?.length)
+    spaceOverviewGroups(machine, (options.mode ?? 'circle') === 'circle');
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');
   placeCommentsAfterLayout(graphView(machine));

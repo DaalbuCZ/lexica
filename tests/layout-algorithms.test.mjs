@@ -1,4 +1,5 @@
 import { graphView } from '../src/core/groups.js';
+import { groupWidth } from '../src/core/labels.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { feasibleRadial } from '../src/core/feasible-layout.js';
@@ -14,7 +15,7 @@ import { createLiveRouting } from '../src/editor/live-routing.js';
 import { compactAesthetics } from '../src/core/aesthetic-layout.js';
 import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
 import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
-import { circularStartRing, orientGroupsUp } from '../src/core/radial-ring.js';
+import { circularStartRing, orientGroupsUp, fitGroupBoxes } from '../src/core/radial-ring.js';
 import { createViewport } from '../src/editor/viewport.js';
 import { canvasTransform } from '../src/core/canvas-graph.js';
 import { solveLayout } from '../src/core/smart-layout.js';
@@ -1241,4 +1242,94 @@ test('radial spoke cleanup moves multiple attachments together and preserves bra
       );
   }
   assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
+});
+
+test('Arrange reserves long group boxes in every layout mode', () => {
+  const machine = {
+    start: 'root',
+    states: [{ id: 'root', name: 'Root', x: 0, y: 0 }],
+    groups: [],
+    edges: [],
+    comments: [],
+  };
+  const names = [
+    'Identifiers, S_strings and Dollar expressions',
+    'triple_S_string string and end',
+    'Less than and Control arrow',
+    'Parenthesis and Unit',
+    'Main',
+  ];
+  names.forEach((name, i) => {
+    const ids = [`a${i}`, `b${i}`];
+    machine.states.push(...ids.map((id) => ({ id, name: id, x: 0, y: 0 })));
+    machine.groups.push({ id: `g${i}`, name: name.repeat(3), stateIds: ids, x: 0, y: 0 });
+    machine.edges.push(
+      { from: 'root', to: ids[0], label: String(i) },
+      { from: ids[0], to: ids[1], label: 'x' },
+    );
+  });
+  for (const mode of ['circle', 'tree', 'spring']) {
+    const result = solveLayout(layoutTopology(machine), null, {
+      mode,
+      spacing: 0.35,
+      smartGroups: false,
+    }).machine;
+    const states = graphView(result).states;
+    for (let i = 0; i < states.length; i++)
+      for (const b of states.slice(i + 1)) {
+        const a = states[i];
+        const width = ((a.group ? groupWidth(a) : 72) + (b.group ? groupWidth(b) : 72)) / 2;
+        assert.ok(
+          Math.abs(a.x - b.x) >= width + 24 - 1e-6 || Math.abs(a.y - b.y) >= 96 - 1e-6,
+          `${mode}: ${a.id} overlaps ${b.id}`,
+        );
+      }
+    assert.deepEqual(result.edges, machine.edges);
+    assert.deepEqual(
+      machine.groups.map((g) => g.x),
+      [0, 0, 0, 0, 0],
+    );
+  }
+});
+
+test('wide group names choose a compact ring orientation before increasing its radius', () => {
+  const names = [
+    'Identifiers, S_strings and Dollar expressions',
+    'triple_S_string string and end',
+    'Less than and Control arrow',
+    'Parenthesis and Unit',
+    'Main',
+  ];
+  const machine = {
+    start: 'root',
+    states: [
+      { id: 'root', name: 'Root', x: 40, y: 70 },
+      ...names.map((name, i) => ({
+        id: `g${i}`,
+        name: name.repeat(3),
+        group: true,
+        x: 40 + 240 * Math.cos(-Math.PI / 2 + (i * 2 * Math.PI) / names.length),
+        y: 70 + 240 * Math.sin(-Math.PI / 2 + (i * 2 * Math.PI) / names.length),
+      })),
+    ],
+    edges: [],
+  };
+  const original = structuredClone(machine);
+  const expanded = fitGroupBoxes(machine, false);
+  const compact = fitGroupBoxes(machine);
+  const radius = (s) => Math.hypot(s.x - 40, s.y - 70);
+  assert.ok(radius(compact[1]) < radius(expanded[1]) * 0.7);
+  assert.deepEqual(compact[0], machine.states[0]);
+  for (let i = 1; i < compact.length; i++) {
+    assert.ok(Math.abs(radius(compact[i]) - radius(compact[1])) < 1e-6);
+    for (const b of compact.slice(i + 1)) {
+      const a = compact[i];
+      assert.ok(
+        Math.abs(a.x - b.x) >= (groupWidth(a) + groupWidth(b)) / 2 + 23.99 ||
+          Math.abs(a.y - b.y) >= 95.99,
+      );
+    }
+  }
+  assert.deepEqual(machine, original);
+  assert.deepEqual(fitGroupBoxes(machine), compact);
 });
