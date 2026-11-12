@@ -1,3 +1,4 @@
+import { groupWidth } from './labels.js';
 import { drawingClearance } from './planar-layout.js';
 import { corridorRoutes, placementCorridorRoutes } from './corridor-routing.js';
 import { simpleTransitionLabel } from './editor-settings.js';
@@ -246,4 +247,56 @@ export function orientGroupsUp(machine) {
     if (corridorRoutes({ ...machine, states, comments: [] }, labels)) return states;
   }
   return machine.states;
+}
+
+// Compare rendered footprints before expanding the ring for wide group names.
+export function fitGroupBoxes(machine, radial = true) {
+  const root = machine.states.find((s) => s.id === machine.start) ?? { x: 0, y: 0 };
+  const widths = machine.states.map((s) => (s.group ? groupWidth(s) : 72));
+  const angles = [0];
+  if (radial) {
+    for (let i = 1; i < 24; i++) angles.push((i * Math.PI) / 12);
+    const widest = machine.states
+      .filter((s) => s.group && s.id !== root.id)
+      .sort((a, b) => groupWidth(b) - groupWidth(a))[0];
+    if (widest) angles.push(-Math.atan2(widest.y - root.y, widest.x - root.x));
+  }
+  let best = machine.states,
+    bestArea = Infinity;
+  for (const angle of angles) {
+    const cos = Math.cos(angle),
+      sin = Math.sin(angle);
+    const states = machine.states.map((s) => {
+      const x = s.x - root.x,
+        y = s.y - root.y;
+      return { ...s, x: x * cos - y * sin, y: x * sin + y * cos };
+    });
+    let scale = 1;
+    for (let i = 0; i < states.length; i++)
+      for (let j = i + 1; j < states.length; j++) {
+        if (!states[i].group && !states[j].group) continue;
+        scale = Math.max(
+          scale,
+          Math.min(
+            ((widths[i] + widths[j]) / 2 + 24) /
+              Math.max(1e-6, Math.abs(states[i].x - states[j].x)),
+            96 / Math.max(1e-6, Math.abs(states[i].y - states[j].y)),
+          ),
+        );
+      }
+    for (const s of states) {
+      s.x = root.x + s.x * scale;
+      s.y = root.y + s.y * scale;
+    }
+    const width =
+      Math.max(...states.map((s, i) => s.x + widths[i] / 2)) -
+      Math.min(...states.map((s, i) => s.x - widths[i] / 2));
+    const height = Math.max(...states.map((s) => s.y)) - Math.min(...states.map((s) => s.y)) + 72;
+    const area = width * height;
+    if (area < bestArea - 1e-6) {
+      best = states;
+      bestArea = area;
+    }
+  }
+  return best;
 }

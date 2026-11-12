@@ -1,5 +1,4 @@
 import { simpleTransitionLabel } from './editor-settings.js';
-import { groupWidth } from './labels.js';
 import { autoLayout, crossingPairs as findCrossings, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
 import { destination } from './portals.js';
@@ -16,7 +15,7 @@ import { applyLayout, layoutTopology } from './layout-topology.js';
 import { feasibleRadial } from './feasible-layout.js';
 import { placementCorridorRoutes } from './corridor-routing.js';
 import { compactAesthetics } from './aesthetic-layout.js';
-import { circularStartRing, orientGroupsUp } from './radial-ring.js';
+import { circularStartRing, orientGroupsUp, fitGroupBoxes } from './radial-ring.js';
 import { solveComponents } from './layout-components.js';
 import { alignHorizontal } from './horizontal-layout.js';
 import { cycleAnalysis } from './cycle-aesthetics.js';
@@ -29,29 +28,14 @@ import {
 } from './radial-aesthetics.js';
 const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
 
-// Placement uses circular nodes; reserve the rendered group rectangles after rotation.
-function spaceOverviewGroups(machine) {
-  const view = graphView(machine);
-  let scale = 1;
-  for (let i = 0; i < view.states.length; i++)
-    for (let j = i + 1; j < view.states.length; j++) {
-      const a = view.states[i],
-        b = view.states[j];
-      if (!a.group && !b.group) continue;
-      const width = ((a.group ? groupWidth(a) : 72) + (b.group ? groupWidth(b) : 72)) / 2;
-      scale = Math.max(
-        scale,
-        Math.min(
-          (width + 24) / Math.max(1e-6, Math.abs(a.x - b.x)),
-          96 / Math.max(1e-6, Math.abs(a.y - b.y)),
-        ),
-      );
-    }
-  if (scale <= 1) return;
-  const root = view.states.find((s) => s.id === view.start) ?? { x: 0, y: 0 };
+// Move whole groups so their internal layouts and outside references stay intact.
+function spaceOverviewGroups(machine, radial) {
+  const view = graphView(machine),
+    positions = new Map(fitGroupBoxes(view, radial).map((s) => [s.id, s]));
   for (const state of view.states) {
-    const dx = (state.x - root.x) * (scale - 1),
-      dy = (state.y - root.y) * (scale - 1);
+    const next = positions.get(state.id),
+      dx = next.x - state.x,
+      dy = next.y - state.y;
     if (state.group) {
       const group = machine.groups.find((g) => g.id === state.id);
       group.x += dx;
@@ -1153,7 +1137,8 @@ export function solveLayout(
       if (options.mode === 'tree') align(null);
     }
   }
-  if (!focus && machine.groups?.length) spaceOverviewGroups(machine);
+  if (!focus && machine.groups?.length)
+    spaceOverviewGroups(machine, (options.mode ?? 'circle') === 'circle');
   record('alignment', machine);
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');

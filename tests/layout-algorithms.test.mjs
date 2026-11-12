@@ -15,7 +15,7 @@ import { createLiveRouting } from '../src/editor/live-routing.js';
 import { compactAesthetics } from '../src/core/aesthetic-layout.js';
 import { curvePoint, curveAvoidsBox } from '../src/core/route-geometry.js';
 import { placeCommentsAfterLayout, commentLayout } from '../src/core/comments.js';
-import { circularStartRing, orientGroupsUp } from '../src/core/radial-ring.js';
+import { circularStartRing, orientGroupsUp, fitGroupBoxes } from '../src/core/radial-ring.js';
 import { createViewport } from '../src/editor/viewport.js';
 import { canvasTransform } from '../src/core/canvas-graph.js';
 import { solveLayout } from '../src/core/smart-layout.js';
@@ -1304,4 +1304,46 @@ test('Arrange reserves long group boxes without stretching group contents', () =
       [0, 0, 0, 0, 0],
     );
   }
+});
+
+test('wide group names choose a compact ring orientation before increasing its radius', () => {
+  const names = [
+    'Identifiers, S_strings and Dollar expressions',
+    'triple_S_string string and end',
+    'Less than and Control arrow',
+    'Parenthesis and Unit',
+    'Main',
+  ];
+  const machine = {
+    start: 'root',
+    states: [
+      { id: 'root', name: 'Root', x: 40, y: 70 },
+      ...names.map((name, i) => ({
+        id: `g${i}`,
+        name: name.repeat(3),
+        group: true,
+        x: 40 + 240 * Math.cos(-Math.PI / 2 + (i * 2 * Math.PI) / names.length),
+        y: 70 + 240 * Math.sin(-Math.PI / 2 + (i * 2 * Math.PI) / names.length),
+      })),
+    ],
+    edges: [],
+  };
+  const original = structuredClone(machine);
+  const expanded = fitGroupBoxes(machine, false);
+  const compact = fitGroupBoxes(machine);
+  const radius = (s) => Math.hypot(s.x - 40, s.y - 70);
+  assert.ok(radius(compact[1]) < radius(expanded[1]) * 0.7);
+  assert.deepEqual(compact[0], machine.states[0]);
+  for (let i = 1; i < compact.length; i++) {
+    assert.ok(Math.abs(radius(compact[i]) - radius(compact[1])) < 1e-6);
+    for (const b of compact.slice(i + 1)) {
+      const a = compact[i];
+      assert.ok(
+        Math.abs(a.x - b.x) >= (groupWidth(a) + groupWidth(b)) / 2 + 23.99 ||
+          Math.abs(a.y - b.y) >= 95.99,
+      );
+    }
+  }
+  assert.deepEqual(machine, original);
+  assert.deepEqual(fitGroupBoxes(machine), compact);
 });
