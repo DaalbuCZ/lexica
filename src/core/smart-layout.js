@@ -244,7 +244,8 @@ function place(machine, focus, options) {
   const feasible =
     !focus && (options.mode ?? 'circle') === 'circle'
       ? feasibleRadial(copy, spacing, (branch) => {
-          if (copy.states.length <= 32 || copy.states.some((s) => s.group)) return null;
+          if ((copy.states.length <= 32 && analytical.planar) || copy.states.some((s) => s.group))
+            return null;
           const trial = structuredClone(copy);
           trial.groups = [];
           const group = createGroup(trial, branch, 'Branch', () => 'layout-branch');

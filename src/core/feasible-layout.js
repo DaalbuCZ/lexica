@@ -5,6 +5,73 @@ import { blockLayout } from './block-layout.js';
 const compare = (a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0);
 const length = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// Keep independent branches apart even when one branch has unavoidable crossings.
+function packNonplanarBranches(model, branches, branchSeed) {
+  let crossings = 0;
+  const seeded = branches.map((branch) => {
+    const candidate = branchSeed(branch);
+    if (!candidate?.states) return null;
+    const ids = new Set([model.start, ...branch]);
+    crossings += drawingClearance(
+      candidate.states,
+      model.edges.filter((e) => ids.has(e.from) && ids.has(e.to)),
+    ).crossings;
+    const root = candidate.states.find((s) => s.id === model.start);
+    if (!root) return null;
+    const points = candidate.states
+      .filter((s) => s.id !== root.id)
+      .map((s) => ({
+        ...s,
+        x: s.x - root.x,
+        y: s.y - root.y,
+      }));
+    const angles = points.map((p) => Math.atan2(p.y, p.x)).sort((a, b) => a - b);
+    let gap = -1,
+      begin = 0;
+    for (let i = 0; i < angles.length; i++) {
+      const next = i + 1 < angles.length ? angles[i + 1] : angles[0] + Math.PI * 2;
+      if (next - angles[i] > gap) {
+        gap = next - angles[i];
+        begin = next;
+      }
+    }
+    const span = Math.PI * 2 - gap;
+    if (span >= Math.PI - 1e-5) return null;
+    const center = begin + span / 2;
+    const scale = Math.max(1, 201 / drawingClearance(candidate.states, []).node);
+    return points.map((p) => ({
+      ...p,
+      x: (p.x * Math.cos(center) + p.y * Math.sin(center)) * scale,
+      y: (-p.x * Math.sin(center) + p.y * Math.cos(center)) * scale,
+    }));
+  });
+  if (seeded.some((points) => !points)) return null;
+  const total = branches.reduce((sum, branch) => sum + Math.sqrt(branch.length), 0);
+  const states = [{ ...model.states.find((s) => s.id === model.start), x: 0, y: 0 }];
+  let cursor = -Math.PI;
+  for (let i = 0; i < branches.length; i++) {
+    const sector = (Math.PI * 2 * Math.sqrt(branches[i].length)) / total;
+    const half = Math.min(sector / 2, Math.PI * 0.45),
+      direction = cursor + sector / 2;
+    cursor += sector;
+    const points = seeded[i];
+    // Translate the whole branch into its wedge, reserving room for neighboring nodes.
+    const advance = Math.max(
+      0,
+      ...points.map((p) => (110 + Math.abs(p.y) * Math.cos(half)) / Math.sin(half) - p.x),
+    );
+    for (const p of points)
+      states.push({
+        ...p,
+        x: (p.x + advance) * Math.cos(direction) - p.y * Math.sin(direction),
+        y: (p.x + advance) * Math.sin(direction) + p.y * Math.cos(direction),
+      });
+  }
+  const skeleton = drawingClearance(states, model.edges);
+  if (skeleton.crossings > crossings || skeleton.node < 200) return null;
+  return { states, planar: false, skeleton };
+}
+
 // A bounded candidate family. All inputs are solver copies, never editor objects.
 export function feasibleRadial(machine, spacing = 0.75, branchSeed) {
   const model = {
@@ -58,6 +125,10 @@ export function feasibleRadial(machine, spacing = 0.75, branchSeed) {
     branches.length > 1 &&
     branches.every((b) => b.some((id) => adjacency.get(id)?.has(rootId)))
   ) {
+    if (!analysis.planar && branchSeed) {
+      const packed = packNonplanarBranches(model, branches, branchSeed);
+      if (packed) return packed;
+    }
     const total = branches.reduce((sum, b) => sum + Math.sqrt(b.length), 0),
       packed = [{ ...model.states.find((s) => s.id === rootId), x: 0, y: 0 }];
     let cursor = -Math.PI;

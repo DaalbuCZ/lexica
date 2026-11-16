@@ -1385,3 +1385,44 @@ test('nonplanar group boundaries trade unavoidable crossings for a compact drawi
     }
   }
 });
+
+test('ungrouped radial layout keeps nonplanar branches from crossing independent branches', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const count of [2, 24]) {
+    const source = JSON.parse(
+      readFileSync(new URL('../fixtures/numbers-and-floats.json', import.meta.url)),
+    );
+    const numbers = new Set(source.states.map((s) => s.id));
+    for (let branch = 0; branch < count; branch++) {
+      const first = `branch-${branch}-a`,
+        second = `branch-${branch}-b`;
+      source.states.push(...[first, second].map((id) => ({ id, name: id, token: '', x: 0, y: 0 })));
+      source.edges.push(
+        { from: source.start, to: first, label: 'x' },
+        { from: first, to: second, label: 'y' },
+      );
+    }
+    const edges = structuredClone(source.edges);
+    const { machine } = solveLayout(layoutTopology(source, true), null, {
+      mode: 'circle',
+      spacing: 0.5,
+      smartGroups: false,
+    });
+    assert.equal(machine.groups.length, 0);
+    assert.deepEqual(machine.edges, edges);
+    assert.ok(drawingClearance(machine.states, machine.edges).node >= 199.99);
+    const crossings = (await import('../src/core/layout.js')).crossingPairs(
+      machine,
+      true,
+      simpleTransitionLabel,
+      true,
+    );
+    assert.ok(crossings.length >= 1 && crossings.length <= 3);
+    for (const pair of crossings)
+      for (const i of pair) {
+        assert.ok(numbers.has(machine.edges[i].from));
+        assert.ok(numbers.has(machine.edges[i].to));
+      }
+    assert.ok(Math.max(...machine.states.map((s) => Math.hypot(s.x, s.y))) < 6000);
+  }
+});

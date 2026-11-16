@@ -152,3 +152,43 @@ test('dragging a group boundary edge stays attached to the displayed start and p
     .toEqual(draggedPath);
   expect(saved.drawingRoutes.length).toBeGreaterThan(0);
 });
+
+test('disregarding groups keeps independent branches clear of a nonplanar numeric branch', async ({
+  page,
+}, testInfo) => {
+  const machine = structuredClone(numbers);
+  for (let i = 0; i < 24; i++) {
+    const a = `branch-${i}-a`,
+      b = `branch-${i}-b`;
+    machine.states.push(...[a, b].map((id) => ({ id, name: id, token: '', x: 0, y: 0 })));
+    machine.edges.push({ from: machine.start, to: a, label: 'x' }, { from: a, to: b, label: 'y' });
+  }
+  await page.addInitScript((m) => {
+    localStorage.setItem('lexica-machine', JSON.stringify(m));
+    localStorage.setItem('lexica-layout-mode', 'circle');
+    localStorage.setItem('lexica-layout-disregard-groups', 'true');
+    localStorage.setItem('lexica-layout-smart-groups', 'false');
+    localStorage.setItem('lexica-tester-collapsed', 'true');
+  }, machine);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Auto layout', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply layout', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Arrange graph', exact: true })).toHaveCount(0);
+  const result = await page.evaluate(async () => {
+    const { useStudio } = await import('/src/state/studio.js');
+    const { crossingPairs } = await import('/src/core/layout.js');
+    const { simpleTransitionLabel } = await import('/src/core/editor-settings.js');
+    const m = useStudio.getState().scene.machine;
+    return {
+      groups: m.groups,
+      states: m.states.length,
+      edges: m.edges,
+      crossings: crossingPairs(m, true, simpleTransitionLabel, true).length,
+    };
+  });
+  expect(result.groups).toEqual([]);
+  expect(result.states).toBe(machine.states.length);
+  expect(result.edges).toEqual(machine.edges);
+  expect(result.crossings).toBe(1);
+  await page.screenshot({ path: testInfo.outputPath('ungrouped-radial.png') });
+});
