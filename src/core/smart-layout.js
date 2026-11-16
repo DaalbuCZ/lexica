@@ -129,6 +129,8 @@ function place(machine, focus, options) {
     copy.start = [...inbound].sort((a, b) => b[1] - a[1])[0]?.[0] ?? copy.states[0]?.id;
   }
   for (const edge of copy.edges) delete edge.bend;
+  const boundary = focus ? graphView(machine, focus) : null;
+  const nonplanar = boundary && !planarCoordinates(boundary).planar;
   const analytical = planarCoordinates(copy);
   // Small directed branches read as a flow even when the surrounding graph uses a radial layout.
   const compactBranch = focus && simpleBranch(copy);
@@ -205,6 +207,24 @@ function place(machine, focus, options) {
       const left = Math.min(...projected.states.filter((s) => !s.outside).map((s) => s.x));
       for (const outside of projected.states.filter((s) => s.outside))
         if (outside.x > left - 140) outsidePenalty += 10000 + outside.x - left + 140;
+      if (nonplanar) {
+        // A nonplanar boundary cannot be untangled by stretching its planar interior.
+        const nodes = new Map(projected.states.map((state) => [state.id, state]));
+        const lengths = projected.edges.map((edge) => {
+          const a = nodes.get(edge.from),
+            b = nodes.get(edge.to);
+          return Math.hypot(a.x - b.x, a.y - b.y);
+        });
+        return (
+          outsidePenalty +
+          Math.max(0, 160 - clearance.node) * 10000 +
+          crossingPairs(projected, true, simpleTransitionLabel).length * 250 +
+          lengths.reduce((sum, length) => sum + length, 0) / 5 +
+          Math.max(0, ...lengths) / 2 +
+          extent(projected.states) / 5 +
+          Math.max(0, extent(projected.states) - 2200) * 1000
+        );
+      }
       if (clearance.wire < 64.99 || clearance.node < 159.99) boundaryObstruction = 100000000;
       routedCrossings += crossingPairs(projected, true, simpleTransitionLabel).length * 1000000;
     }
@@ -351,7 +371,7 @@ function place(machine, focus, options) {
   if (focus && copy.states.length <= 60) {
     for (const rankdir of ['LR', 'TB'])
       for (const reverse of [false, true]) {
-        const candidate = structuredClone(copy),
+        const candidate = structuredClone(nonplanar ? boundary : copy),
           graph = new dagre.graphlib.Graph({ multigraph: true });
         graph.setGraph({
           rankdir,

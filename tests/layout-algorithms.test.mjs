@@ -1333,3 +1333,41 @@ test('wide group names choose a compact ring orientation before increasing its r
   assert.deepEqual(machine, original);
   assert.deepEqual(fitGroupBoxes(machine), compact);
 });
+
+test('nonplanar group boundaries trade unavoidable crossings for a compact drawing', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = JSON.parse(
+    readFileSync(new URL('../fixtures/numbers-and-floats.json', import.meta.url)),
+  );
+  for (const mode of ['tree', 'circle']) {
+    for (const focus of [null, 'auto-group-1']) {
+      const machine = structuredClone(source);
+      const root = structuredClone(machine.states.find((s) => s.id === machine.start));
+      const edges = structuredClone(machine.edges);
+      const result = solveLayout(layoutTopology(machine), focus, {
+        mode,
+        spacing: 0.5,
+        smartGroups: false,
+      });
+      applyLayout(machine, result.machine, focus);
+      const view = graphView(machine, 'auto-group-1');
+      const width =
+        Math.max(...view.states.map((s) => s.x)) - Math.min(...view.states.map((s) => s.x));
+      const height =
+        Math.max(...view.states.map((s) => s.y)) - Math.min(...view.states.map((s) => s.y));
+      assert.ok(width < 1500, `${mode}: width ${width}`);
+      assert.ok(height < 800, `${mode}: height ${height}`);
+      assert.ok(drawingClearance(view.states, view.edges).node >= 160);
+      assert.deepEqual(machine.edges, edges);
+      assert.deepEqual(
+        machine.groups.map((g) => g.stateIds),
+        source.groups.map((g) => g.stateIds),
+      );
+      if (focus)
+        assert.deepEqual(
+          machine.states.find((s) => s.id === machine.start),
+          root,
+        );
+    }
+  }
+});
