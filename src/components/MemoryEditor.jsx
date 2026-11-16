@@ -1,3 +1,4 @@
+import { Fragment, useLayoutEffect, useRef } from 'react';
 import { IconButton, Field, Select } from './ui.jsx';
 import { Copy, ClipboardPaste, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useStudio } from '../state/studio.js';
@@ -16,6 +17,13 @@ export function StackAlphabet({ heading = true }) {
   const machine = useStudio((s) => s.scene.machine),
     controller = useStudio((s) => s.controller);
   const stack = stackDefinition(machine);
+  const enumValues = useRef(null);
+  const newIndex = useRef(null);
+  useLayoutEffect(() => {
+    if (newIndex.current === null) return;
+    enumValues.current.children[newIndex.current]?.querySelector('input')?.focus();
+    newIndex.current = null;
+  }, [stack.alphabet.length]);
   return (
     <>
       {heading && <h2 className="property-name">Stack alphabet</h2>}
@@ -24,18 +32,20 @@ export function StackAlphabet({ heading = true }) {
         <IconButton
           icon={Plus}
           label="Add enum value"
-          onClick={() =>
-            controller.update((next) => {
+          onClick={() => {
+            newIndex.current = stack.alphabet.length;
+            const added = controller.update((next) => {
               const definition = (next.stack ??= structuredClone(stack));
               let name = 'VALUE',
                 n = 2;
               while (definition.alphabet.includes(name)) name = 'VALUE_' + n++;
               definition.alphabet.push(name);
-            })
-          }
+            });
+            if (!added) newIndex.current = null;
+          }}
         />
       </div>
-      <div className="stack-enum-values">
+      <div className="stack-enum-values" ref={enumValues}>
         {stack.alphabet.map((value, i) => (
           <div className="stack-enum-row" key={i}>
             <Field
@@ -94,9 +104,8 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
     state.controller.update((next) => pasteStackRules(next.edges[index], text));
   };
   const open = useStudio((s) => s.settings.stackRulesOpen);
-  const Container = 'details';
   return (
-    <Container
+    <details
       id="memory-rules"
       open={!!open}
       onToggle={(event) => {
@@ -110,7 +119,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
       <div className="simple-memory-content">
         {!rules.length && <p className="prop-note">Any top → (keep)</p>}
         {rules.map((rule, i) => (
-          <section className="memory-rule-section" key={i}>
+          <Fragment key={i}>
             {i > 0 && <p className="stack-rule-or">OR</p>}
             <div className="stack-rule-row">
               <Select
@@ -177,7 +186,7 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
                 }
               />
             </div>
-          </section>
+          </Fragment>
         ))}
         <div className="memory-rule-tools">
           <IconButton icon={Copy} label="Copy stack rules" onClick={copy} />
@@ -194,6 +203,6 @@ export function MemoryRules({ edge, index, edit, machine, simple = false }) {
           />
         </div>
       </div>
-    </Container>
+    </details>
   );
 }

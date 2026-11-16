@@ -1244,7 +1244,7 @@ test('radial spoke cleanup moves multiple attachments together and preserves bra
   assert.equal(validateRouteSeparation(routeEdges({ ...machine, states: result })).status, 'clear');
 });
 
-test('Arrange reserves long group boxes in every layout mode', () => {
+test('Arrange reserves long group boxes without stretching group contents', () => {
   const machine = {
     start: 'root',
     states: [{ id: 'root', name: 'Root', x: 0, y: 0 }],
@@ -1269,11 +1269,16 @@ test('Arrange reserves long group boxes in every layout mode', () => {
     );
   });
   for (const mode of ['circle', 'tree', 'spring']) {
-    const result = solveLayout(layoutTopology(machine), null, {
-      mode,
-      spacing: 0.35,
-      smartGroups: false,
-    }).machine;
+    let before;
+    const result = solveLayout(
+      layoutTopology(machine),
+      null,
+      { mode, spacing: 0.35, smartGroups: false },
+      () => {},
+      (phase, drawing) => {
+        if (phase === 'routing') before = drawing;
+      },
+    ).machine;
     const states = graphView(result).states;
     for (let i = 0; i < states.length; i++)
       for (const b of states.slice(i + 1)) {
@@ -1284,6 +1289,15 @@ test('Arrange reserves long group boxes in every layout mode', () => {
           `${mode}: ${a.id} overlaps ${b.id}`,
         );
       }
+    for (const group of result.groups) {
+      const oldGroup = before.groups.find((g) => g.id === group.id);
+      for (const id of group.stateIds) {
+        const old = before.states.find((s) => s.id === id);
+        const next = result.states.find((s) => s.id === id);
+        assert.ok(Math.abs(next.x - group.x - (old.x - oldGroup.x)) < 1e-6);
+        assert.ok(Math.abs(next.y - group.y - (old.y - oldGroup.y)) < 1e-6);
+      }
+    }
     assert.deepEqual(result.edges, machine.edges);
     assert.deepEqual(
       machine.groups.map((g) => g.x),

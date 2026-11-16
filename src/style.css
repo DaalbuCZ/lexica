@@ -404,13 +404,16 @@
   }
   .test-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
     gap: 22px;
     margin-top: 10px;
     height: calc(100% - 40px);
     min-height: 0;
   }
   .test-grid > div {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
   }
@@ -1918,7 +1921,7 @@
   }
   body:is([data-tester-dock='left'], [data-tester-dock='right']) .test-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
   body:is([data-tester-dock='left'], [data-tester-dock='right']).tester-collapsed .tester {
@@ -2078,7 +2081,7 @@
   }
 
   body {
-    --tester: var(--tester-height, 190px);
+    --tester: max(var(--tester-height, 190px), var(--docked-debugger-min-height, 0px));
   }
   body.tester-collapsed {
     --tester: 48px;
@@ -2484,8 +2487,10 @@
   .input-label > .field-label {
     margin: 0;
   }
-  .input-label + .input-wrap {
-    height: calc(100% - 23px);
+  .test-grid .input-wrap,
+  .test-grid #tokens {
+    height: auto;
+    min-height: 0;
   }
   .lexer-error-actions {
     display: flex;
@@ -3529,6 +3534,8 @@
     position: fixed;
     z-index: 100;
     max-width: calc(100vw - 12px);
+    left: var(--hover-x);
+    translate: clamp(6px - var(--hover-x), -50%, 100vw - 6px - var(--hover-x) - 100%);
   }
   ::highlight(lexica-current-token) {
     background-color: #e6a5ef35;

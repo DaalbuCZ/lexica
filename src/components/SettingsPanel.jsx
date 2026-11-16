@@ -58,12 +58,6 @@ export function SettingsPanel({ dialog, onClose }) {
             onChange={(colorEdges) => change({ colorEdges })}
           />
           <Check
-            id="label-guides"
-            label="Guides from labels to transitions"
-            checked={settings.labelGuides}
-            onChange={(labelGuides) => change({ labelGuides })}
-          />
-          <Check
             id="label-boxes"
             label="Label backgrounds"
             checked={machine.labelBoxes}

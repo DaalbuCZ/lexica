@@ -65,7 +65,15 @@ test('overlay groups, memory rules, docking and large inputs remain interactive'
   await page.locator('#memory-rules summary').click();
   await page.getByRole('button', { name: 'Add stack rule', exact: true }).click();
   await page.getByRole('button', { name: 'Add stack rule', exact: true }).click();
-  await expect(page.locator('.stack-rule-or')).toHaveText('OR');
+  const separator = page.locator('.stack-rule-or');
+  await expect(separator).toHaveText('OR');
+  const upper = await page.locator('.stack-rule-row').first().boundingBox();
+  const lower = await page.locator('.stack-rule-row').last().boundingBox();
+  const or = await separator.boundingBox();
+  expect(or.y - upper.y - upper.height).toBeCloseTo(lower.y - or.y - or.height);
+  expect((await page.locator('.memory-rule-tools').boundingBox()).y).toBeGreaterThan(
+    lower.y + lower.height,
+  );
   await expect(page.getByLabel('Combine conditions', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Epsilon input (ε)')).toHaveCount(0);
   await page.getByLabel('Stack action 1', { exact: true }).click();

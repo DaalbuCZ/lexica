@@ -89,7 +89,7 @@ export function pasteSelection(
         }
       : {}),
   }));
-  const comments = fragment.comments.map(({ nodeId, ...c }) => ({
+  const comments = fragment.comments.map(({ nodeId, groupId: _groupId, ...c }) => ({
     ...c,
     id: idFactory(),
     x: c.x + offset.x,

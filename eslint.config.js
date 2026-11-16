@@ -3,9 +3,9 @@ import globals from 'globals';
 import react from 'eslint-plugin-react';
 import hooks from 'eslint-plugin-react-hooks';
 export default [
-  { ignores: ['node_modules/**', 'build/**', '.migration/**', 'dist/**'] },
+  { ignores: ['node_modules/**', '**/build/**', '.migration/**', 'dist/**'] },
   {
-    files: ['src/**/*.{js,jsx}'],
+    files: ['src/**/*.{js,jsx}', 'writeup/src/**/*.{js,jsx}'],
     plugins: { react, 'react-hooks': hooks },
     languageOptions: {
       ecmaVersion: 'latest',

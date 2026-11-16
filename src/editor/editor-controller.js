@@ -4,8 +4,8 @@ import { createGroupNavigation } from './group-navigation.js';
 import { createCanvasInteractions } from './canvas-interactions.js';
 import { createGraphCanvas } from '../core/canvas-graph.js';
 import { insertState } from '../core/transitions.js';
+import { commentPlacement } from '../core/placement.js';
 import {
-  makeComment,
   commentAnchors,
   commentNodeIds,
   commentLinks,
@@ -51,6 +51,7 @@ export function createEditorController(
   context.choose = choose;
   context.edgeSelected = edgeSelected;
   context.addComment = addComment;
+  context.commentPlacementView = commentPlacementView;
   context.checkpoint = checkpoint;
   context.point = point;
   context.markSelection = markSelection;
@@ -333,16 +334,15 @@ export function createEditorController(
     publish();
   }
   function beginPlacement(type) {
-    if (type === 'comment' && !context.machine.states.length) {
-      toast('Create a state before adding a comment.');
-      return;
-    }
     cancelConnect();
     context.placingState = type === 'state';
     context.placingComment = type === 'comment';
     showProperties(false);
     document.body.classList.add('placing-' + type);
-    $('modehint').textContent = 'Click to place a ' + type + ' · Esc to cancel';
+    $('modehint').textContent =
+      type === 'comment'
+        ? 'Click where the comment shows a connection · Esc to cancel'
+        : 'Click to place a state · Esc to cancel';
     $('canvas').focus({
       preventScroll: true,
     });
@@ -350,31 +350,17 @@ export function createEditorController(
   function beginComment() {
     beginPlacement('comment');
   }
+  function commentPlacementView() {
+    const shown = graphView(context.machine, context.openGroup, false);
+    return { states: shown.states.filter((state) => !state.group) };
+  }
   function addComment(position) {
-    if (!context.machine.states.length) {
-      toast('Create a state before adding a comment.');
-      return;
-    }
     if (!position) {
       beginComment();
       return;
     }
-    context.placingComment = false;
-    context.placementPoint = null;
-    document.body.classList.remove('placing-comment');
-    const c = makeComment(context.machine, position);
-    if (context.openGroup) {
-      const members =
-          context.machine.groups.find((g) => g.id === context.openGroup)?.stateIds ?? [],
-        state = context.machine.states
-          .filter((s) => members.includes(s.id))
-          .sort(
-            (a, b) =>
-              Math.hypot(a.x - position.x, a.y - position.y) -
-              Math.hypot(b.x - position.x, b.y - position.y),
-          )[0];
-      c.nodeIds = state ? [state.id] : [];
-    }
+    const c = commentPlacement(commentPlacementView(), position);
+    if (!c) return;
     checkpoint();
     (context.machine.comments ??= []).push(c);
     choose('comment', c.id);
@@ -420,27 +406,14 @@ export function createEditorController(
           x: 40 * (context.pasteCount + 1),
           y: 40 * (context.pasteCount + 1),
         });
-      for (const comment of next.comments ?? [])
-        if (result.comments.has(comment.id) && !commentNodeIds(comment).length) {
-          const candidates = context.openGroup
-            ? next.states.filter(
-                (s) =>
-                  next.groups.find((g) => g.id === context.openGroup)?.stateIds.includes(s.id) ||
-                  result.states.has(s.id),
-              )
-            : next.states;
-          const nearest = candidates.toSorted(
-            (a, b) =>
-              Math.hypot(a.x - comment.x, a.y - comment.y) -
-              Math.hypot(b.x - comment.x, b.y - comment.y),
-          )[0];
-          if (!nearest) throw Error('Create a state before pasting a comment.');
-          comment.nodeIds = [nearest.id];
-        }
-      if (context.openGroup)
+      if (context.openGroup) {
         next.groups
           ?.find((group) => group.id === context.openGroup)
           ?.stateIds.push(...result.states);
+        for (const comment of next.comments)
+          if (result.comments.has(comment.id) && !commentNodeIds(comment).length)
+            comment.groupId = context.openGroup;
+      }
       context.clipboardText = text;
       checkpoint();
       context.machine = next;
@@ -475,22 +448,13 @@ export function createEditorController(
       !context.selectedCommentLinks.size
     )
       return;
-    const orphanedByLinks = (context.machine.comments ?? []).some(
-      (comment) =>
-        !context.selectedComments.has(comment.id) &&
-        commentNodeIds(comment).length &&
-        commentNodeIds(comment).every((id) =>
-          context.selectedCommentLinks.has(commentLinkKey(comment.id, id)),
-        ) &&
-        !commentNodeIds(comment).some((id) => context.selectedStates.has(id)),
-    );
-    if (orphanedByLinks) {
-      toast(
-        'A comment must stay attached to a state. Delete the comment to remove its last connection.',
-      );
-      return;
-    }
     checkpoint();
+    const groupsByComment = new Map();
+    for (const comment of context.machine.comments ?? []) {
+      const groups = commentNodeIds(comment).map((id) => groupFor(context.machine, id)?.id);
+      const group = groups.includes(context.openGroup) ? context.openGroup : groups.find(Boolean);
+      if (group) groupsByComment.set(comment.id, group);
+    }
     removeCommentLinks(context.machine, context.selectedCommentLinks);
     context.machine.states = context.machine.states.filter(
       (s) => !context.selectedStates.has(s.id),
@@ -513,8 +477,8 @@ export function createEditorController(
     for (const c of context.machine.comments) {
       c.nodeIds = commentNodeIds(c).filter((id) => !context.selectedStates.has(id));
       delete c.nodeId;
+      if (!c.nodeIds.length && groupsByComment.has(c.id)) c.groupId = groupsByComment.get(c.id);
     }
-    context.machine.comments = context.machine.comments.filter((c) => commentNodeIds(c).length);
     if (context.selectedComments.has(context.commentSource)) context.commentSource = null;
     if (context.selectedStates.has(context.machine.start)) context.machine.start = null;
     if (context.selectedStates.has(context.source)) {
@@ -754,6 +718,7 @@ export function createEditorController(
       queueDraw();
     },
     setTrace(trace, failures) {
+      if (trace === context.graphTrace && !failures) return;
       context.graphTrace = trace;
       if (failures) context.graphFailures = failures;
       if (trace?.kind) {

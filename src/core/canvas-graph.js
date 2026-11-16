@@ -258,7 +258,7 @@ export function createGraphCanvas(canvas, minimap) {
       current = trace?.kind ? (trace.state ?? trace.traceStates?.at(-1)) : null,
       currentEdge = trace?.kind === 'character' ? trace.traceEdges?.at(-1) : null;
     const edgeColors = scene.edgeColor ? machine.edges.map(scene.edgeColor) : [];
-    const guides = scene.labelGuides ? labelGuidesFor(machine, routes) : [];
+    const guides = labelGuidesFor(machine, routes);
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = c.noteLine;
     ctx.setLineDash([6 / transform().scale, 5 / transform().scale]);
@@ -294,18 +294,16 @@ export function createGraphCanvas(canvas, minimap) {
                 ? c.trace
                 : c.edge;
       ctx.lineWidth = active ? 4 : bad || traceEdges.has(index) || edgeSelected(e, i) ? 3 : 1.6;
-      if (scene.labelGuides) {
-        const guide = guides[i];
-        if (guide) {
-          ctx.save();
-          ctx.lineWidth = (edgeSelected(e, i) ? 2.5 : 1) / transform().scale;
-          ctx.setLineDash([]);
-          ctx.beginPath();
-          ctx.moveTo(guide.from.x, guide.from.y);
-          for (const point of guide.points.slice(1)) ctx.lineTo(point.x, point.y);
-          ctx.stroke();
-          ctx.restore();
-        }
+      const guide = guides[i];
+      if (guide) {
+        ctx.save();
+        ctx.lineWidth = (edgeSelected(e, i) ? 2.5 : 1) / transform().scale;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(guide.from.x, guide.from.y);
+        for (const point of guide.points.slice(1)) ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+        ctx.restore();
       }
       ctx.stroke(paths[i]);
       arrow(ctx, r, ctx.strokeStyle);
