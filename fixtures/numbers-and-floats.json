@@ -1,0 +1,314 @@
+{
+  "start": "s0",
+  "states": [
+    {
+      "id": "s0",
+      "name": "start",
+      "token": "",
+      "x": 1181.5290071003958,
+      "y": 1181.5290071003958
+    },
+    {
+      "id": "s2",
+      "name": "integer",
+      "token": "NUMBER_INT",
+      "x": 833.5492580514285,
+      "y": 733.7293140156687
+    },
+    {
+      "id": "e6a8302b-7e46-4cbc-8312-e65c124bdd99",
+      "name": "[0-9].",
+      "token": "",
+      "x": 1337.3744505294655,
+      "y": 1022.7275346513151
+    },
+    {
+      "id": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "name": "double",
+      "token": "NUMBER_DOUBLE",
+      "x": 1689.3173894248914,
+      "y": 863.9085509827472,
+      "accepting": true
+    },
+    {
+      "id": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "name": "[0-9].[0-9]e",
+      "token": "",
+      "x": 1116.2310560591498,
+      "y": 679.6518981994484
+    },
+    {
+      "id": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "name": "double with exponent",
+      "token": "NUMBER_DOUBLE",
+      "x": 1305.221814264102,
+      "y": 320.1855073709179,
+      "accepting": true
+    },
+    {
+      "id": "6f101bbc-faad-4e56-a133-e018a18877a6",
+      "name": "underscore",
+      "token": "",
+      "x": 793.1316600045534,
+      "y": 581.8496335881814,
+      "accepting": false
+    },
+    {
+      "id": "23496a9b-1cde-4352-b6d1-3777896652a0",
+      "name": "underscore",
+      "token": "",
+      "x": 1602.7221584495285,
+      "y": 1007.7289324587767,
+      "accepting": false
+    },
+    {
+      "id": "f7874598-b6c6-40e9-8d67-20979e4037b6",
+      "name": "underscore",
+      "token": "",
+      "x": 1575.5446079463704,
+      "y": 96.65379692193017
+    },
+    {
+      "id": "7b06c53e-26da-46bd-900e-1150a6b5d483",
+      "name": "double with signed exponent",
+      "token": "",
+      "x": 1145.068329327946,
+      "y": 397.48604168183476
+    },
+    {
+      "id": "ae4a2671-60b0-4c15-9dda-da06a2f68bbf",
+      "name": "period",
+      "token": "PERIOD",
+      "x": 1634.3719494305487,
+      "y": 1134.0078180159676,
+      "accepting": true
+    },
+    {
+      "id": "26ce7621-3cf4-46d6-a138-bb14f166f05a",
+      "name": "0",
+      "token": "NUMBER_INT",
+      "x": 926.9286455394772,
+      "y": 936.4603329472139,
+      "accepting": true
+    },
+    {
+      "id": "f29f716e-10cc-417b-9ef9-9a43c11de340",
+      "name": "double with d suffix",
+      "token": "NUMBER_DOUBLE",
+      "x": 1788.026227803061,
+      "y": 1011.049878461249,
+      "accepting": true
+    },
+    {
+      "id": "aa6a1019-9208-47bc-bd33-8ee1b7f15a21",
+      "name": "double with d suffix",
+      "token": "NUMBER_DOUBLE",
+      "x": 1429.3085961613954,
+      "y": 437.86681833052796,
+      "accepting": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "s0",
+      "to": "s2",
+      "label": "[1-9]",
+      "stackRules": [
+        {
+          "top": "EMPTY",
+          "replace": ["EMPTY"]
+        },
+        {
+          "top": "DOLLAR_EXPR",
+          "replace": ["DOLLAR_EXPR"]
+        }
+      ]
+    },
+    {
+      "from": "s2",
+      "to": "s2",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s2",
+      "to": "e6a8302b-7e46-4cbc-8312-e65c124bdd99",
+      "label": "\\."
+    },
+    {
+      "from": "e6a8302b-7e46-4cbc-8312-e65c124bdd99",
+      "to": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "label": "[0-9]"
+    },
+    {
+      "from": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "to": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "label": "[0-9]"
+    },
+    {
+      "from": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "to": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "label": "[eE]"
+    },
+    {
+      "from": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "to": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "label": "[0-9]"
+    },
+    {
+      "from": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "to": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s2",
+      "to": "6f101bbc-faad-4e56-a133-e018a18877a6",
+      "label": "_"
+    },
+    {
+      "from": "6f101bbc-faad-4e56-a133-e018a18877a6",
+      "to": "s2",
+      "label": "[0-9]"
+    },
+    {
+      "from": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "to": "23496a9b-1cde-4352-b6d1-3777896652a0",
+      "label": "_"
+    },
+    {
+      "from": "23496a9b-1cde-4352-b6d1-3777896652a0",
+      "to": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "label": "[0-9]"
+    },
+    {
+      "from": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "to": "f7874598-b6c6-40e9-8d67-20979e4037b6",
+      "label": "_"
+    },
+    {
+      "from": "f7874598-b6c6-40e9-8d67-20979e4037b6",
+      "to": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "label": "[0-9]"
+    },
+    {
+      "from": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "to": "7b06c53e-26da-46bd-900e-1150a6b5d483",
+      "label": "[+-]"
+    },
+    {
+      "from": "7b06c53e-26da-46bd-900e-1150a6b5d483",
+      "to": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s0",
+      "to": "ae4a2671-60b0-4c15-9dda-da06a2f68bbf",
+      "label": "[\\.]",
+      "invert": false,
+      "stackRules": [
+        {
+          "top": "EMPTY",
+          "replace": ["EMPTY"]
+        },
+        {
+          "top": "DOLLAR_EXPR",
+          "replace": ["DOLLAR_EXPR"]
+        }
+      ]
+    },
+    {
+      "from": "ae4a2671-60b0-4c15-9dda-da06a2f68bbf",
+      "to": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "label": "[0-9]"
+    },
+    {
+      "from": "s0",
+      "to": "26ce7621-3cf4-46d6-a138-bb14f166f05a",
+      "label": "0",
+      "stackRules": [
+        {
+          "top": "EMPTY",
+          "replace": ["EMPTY"]
+        },
+        {
+          "top": "DOLLAR_EXPR",
+          "replace": ["DOLLAR_EXPR"]
+        }
+      ]
+    },
+    {
+      "from": "26ce7621-3cf4-46d6-a138-bb14f166f05a",
+      "to": "e6a8302b-7e46-4cbc-8312-e65c124bdd99",
+      "label": "\\."
+    },
+    {
+      "from": "d820b999-30be-4871-ad30-11cd13f67ac1",
+      "to": "f29f716e-10cc-417b-9ef9-9a43c11de340",
+      "label": "[dD]"
+    },
+    {
+      "from": "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+      "to": "aa6a1019-9208-47bc-bd33-8ee1b7f15a21",
+      "label": "[dD]"
+    },
+    {
+      "from": "6f101bbc-faad-4e56-a133-e018a18877a6",
+      "to": "6f101bbc-faad-4e56-a133-e018a18877a6",
+      "label": "[_]",
+      "invert": false
+    },
+    {
+      "from": "f7874598-b6c6-40e9-8d67-20979e4037b6",
+      "to": "f7874598-b6c6-40e9-8d67-20979e4037b6",
+      "label": "[_]",
+      "invert": false
+    },
+    {
+      "from": "23496a9b-1cde-4352-b6d1-3777896652a0",
+      "to": "23496a9b-1cde-4352-b6d1-3777896652a0",
+      "label": "[_]",
+      "invert": false
+    },
+    {
+      "from": "s2",
+      "to": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "label": "[eE]",
+      "invert": false
+    },
+    {
+      "from": "26ce7621-3cf4-46d6-a138-bb14f166f05a",
+      "to": "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+      "label": "[eE]",
+      "invert": false
+    }
+  ],
+  "groups": [
+    {
+      "id": "auto-group-1",
+      "name": "Numbers and Floats",
+      "stateIds": [
+        "s2",
+        "e6a8302b-7e46-4cbc-8312-e65c124bdd99",
+        "6f101bbc-faad-4e56-a133-e018a18877a6",
+        "0a5bc2aa-51b1-4402-b7a0-cd502c6af8d8",
+        "d820b999-30be-4871-ad30-11cd13f67ac1",
+        "26ce7621-3cf4-46d6-a138-bb14f166f05a",
+        "b1436c07-10bc-4c4f-985a-5c6b9e08b31b",
+        "7b06c53e-26da-46bd-900e-1150a6b5d483",
+        "23496a9b-1cde-4352-b6d1-3777896652a0",
+        "ae4a2671-60b0-4c15-9dda-da06a2f68bbf",
+        "f29f716e-10cc-417b-9ef9-9a43c11de340",
+        "f7874598-b6c6-40e9-8d67-20979e4037b6",
+        "aa6a1019-9208-47bc-bd33-8ee1b7f15a21"
+      ],
+      "automatic": true,
+      "x": 1497.061241768609,
+      "y": 492.3468332825138
+    }
+  ],
+  "comments": [],
+  "stack": {
+    "alphabet": ["EMPTY", "DOLLAR_EXPR", "NESTED_COMMENT", "S_STRING", "MULTILINE_S_STRING"],
+    "initial": "EMPTY"
+  },
+  "machineType": "extended"
+}

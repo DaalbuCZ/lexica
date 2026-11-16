@@ -468,10 +468,10 @@ export function createCanvasInteractions(context) {
           if (hit.type === 'edge' && context.graph.edgeRoute(hit.index)) {
             const edge = context.machine.edges[hit.index];
             const route = context.graph.edgeRoute(hit.index);
-            const shown = groupEdge ? graphView(context.machine) : context.machine;
-            const displayedEdge = groupEdge
-              ? shown.edges.find((item) => item.originalIndex === hit.index)
-              : edge;
+            const shown = graphView(context.machine, context.openGroup);
+            const displayedEdge = shown.edges.find(
+              (item, index) => (item.originalIndex ?? index) === hit.index,
+            );
             const from = shown.states.find((state) => state.id === displayedEdge.from);
             const to =
               displayedEdge.portal == null
