@@ -257,7 +257,11 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
     await expect.poll(() => page.evaluate(() => window.paletteTransitions)).toContain('opened');
     await search.fill('State 3');
     await expect(
-      list.getByRole('option', { name: 'State 3 Overview', exact: true }),
+      list.getByRole('option', { name: 'State 3 q3 Overview', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await search.fill('q21');
+    await expect(
+      list.getByRole('option', { name: 'State 21 q21 Overview', exact: true }),
     ).toHaveAttribute('aria-selected', 'true');
     await expect
       .poll(() =>
@@ -268,7 +272,7 @@ test('Ctrl+P is ready before the lazy dialogs finish loading', async ({ page }) 
       .toBe(true);
     await search.clear();
     await search.press('ArrowUp');
-    await expect(list.getByRole('option', { name: 'State 39 Overview' })).toHaveAttribute(
+    await expect(list.getByRole('option', { name: 'State 39 q39 Overview' })).toHaveAttribute(
       'aria-selected',
       'true',
     );

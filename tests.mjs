@@ -3969,7 +3969,7 @@ import './tests/curve-clearance.test.mjs';
 import './tests/layout-algorithms.test.mjs';
 
 test('academic IFJ export expands characters, resolves portals and uses unique state names', async () => {
-  const { toAcademic } = await import('./src/core/academic-export.js');
+  const { academicStateNames, toAcademic } = await import('./src/core/academic-export.js');
   const m = {
     start: 'a',
     states: [
@@ -3979,6 +3979,7 @@ test('academic IFJ export expands characters, resolves portals and uses unique s
     edges: [{ from: 'a', portal: 'target', label: '[a-c]' }],
   };
   const before = structuredClone(m);
+  assert.deepEqual([...academicStateNames(m).values()], ['q0', 'q1']);
   const text = toAcademic(m);
   assert.match(text, /M = \(Q, Σ, R, s, F\)/);
   assert.match(text, /Q = \{q0, q1\}/);

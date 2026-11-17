@@ -277,7 +277,7 @@ for (const presentation of ['canvas', 'overlay'])
     await page.keyboard.press('Control+p');
     await expect(search).toBeFocused();
     await search.fill('group target');
-    const target = page.getByRole('option', { name: 'B Group' });
+    const target = page.getByRole('option', { name: 'B q2 Group' });
     await expect(target).toHaveAttribute('aria-selected', 'true');
     await expect(target.locator('.state-palette-name')).toHaveAttribute('style', /--token-accent/);
     await search.press('Enter');

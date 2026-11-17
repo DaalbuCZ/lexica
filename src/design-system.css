@@ -1156,9 +1156,25 @@ dialog.state-palette[open]:not([data-closing])::backdrop {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.state-palette-name {
+.state-palette-label {
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.state-palette-name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-weight: 600;
+}
+.state-palette-academic {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font: 10px/16px var(--code-font-family);
 }
 .state-palette-group {
   max-width: 45%;

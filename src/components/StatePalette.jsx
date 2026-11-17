@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
+import { academicStateNames } from '../core/academic-export.js';
 import { isAccepting } from '../core/lexer.js';
 import { tokenColorClass } from '../core/token-colors.js';
 import { useStudio } from '../state/studio.js';
@@ -15,6 +16,12 @@ function matchScore(text, query) {
     position = next + 1;
   }
   return 100 + position;
+}
+
+// Academic exports name states q0, q1, … Search those names only when the
+// query looks like that notation, so ordinary terms keep matching state names.
+function academicScore(name, term) {
+  return /^q\d+$/.test(term) ? matchScore(name, term) : Infinity;
 }
 
 // Interior.dev Command Palette adapted to Lexica's modal and token palette.
@@ -37,19 +44,29 @@ export function StatePaletteHost() {
     const groups = new Map(
       (machine.groups ?? []).flatMap((group) => group.stateIds.map((id) => [id, group.name])),
     );
-    return machine.states.map((state) => ({ state, group: groups.get(state.id) }));
+    const academic = academicStateNames(machine);
+    return machine.states.map((state) => ({
+      state,
+      group: groups.get(state.id),
+      academic: academic.get(state.id),
+    }));
   }, [machine, version]);
   const results = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (!terms.length) return items;
     return items
       .map((item) => {
-        const { state, group } = item;
+        const { state, group, academic } = item;
         const name = state.name.toLowerCase(),
           context = `${state.token} ${group ?? ''}`.toLowerCase();
         const score = terms.reduce(
           (sum, term) =>
-            sum + Math.min(matchScore(name, term), context.includes(term) ? 50 : Infinity),
+            sum +
+            Math.min(
+              matchScore(name, term),
+              academicScore(academic, term),
+              context.includes(term) ? 50 : Infinity,
+            ),
           0,
         );
         return { item, score };
@@ -217,7 +234,7 @@ export function StatePaletteHost() {
           autoComplete="off"
           spellCheck={false}
           value={query}
-          placeholder="Search states…"
+          placeholder="Search states or q21…"
           onChange={(event) => changeQuery(event.target.value)}
           onKeyDown={keyDown}
         />
@@ -245,7 +262,7 @@ export function StatePaletteHost() {
             style={{ height: results.length * rowHeight }}
           />
           {rows.map(({ item, index: i }) => {
-            const { state, group } = item;
+            const { state, group, academic } = item;
             const color =
               isAccepting(state) && !state.skip
                 ? `var(--token-accent-${tokenColorClass(state.token).slice(-1)})`
@@ -263,8 +280,13 @@ export function StatePaletteHost() {
                 onPointerMove={() => setHighlight(state.id)}
                 onClick={() => choose(item)}
               >
-                <span className="state-palette-name" style={{ color }}>
-                  {state.name || 'Unnamed state'}
+                <span className="state-palette-label">
+                  <span className="state-palette-name" style={{ color }}>
+                    {state.name || 'Unnamed state'}
+                  </span>
+                  <span className="state-palette-academic" title="Academic notation">
+                    {academic}
+                  </span>
                 </span>
                 <span className="state-palette-group">{group ?? 'Overview'}</span>
               </li>

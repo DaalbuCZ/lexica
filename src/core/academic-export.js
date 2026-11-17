@@ -51,12 +51,18 @@ function sourceExpression({ label, invert }) {
   return label.replace(/[\r\n]/g, (char) => (char === '\n' ? '\\n' : '\\r'));
 }
 
+// Academic notation numbers states by their position in the machine: q0, q1, …
+// Keep this shared with the state search so it finds the exported names.
+export function academicStateNames(machine) {
+  return new Map(machine.states.map((state, i) => [state.id, `q${i}`]));
+}
+
 export function toAcademic(machine) {
   validate(machine);
   if (!machine.start) throw Error('Choose a start state before exporting an automaton.');
   const extended = isStackMachine(machine),
     stack = stackDefinition(machine);
-  const names = new Map(machine.states.map((state, i) => [state.id, `q${i}`]));
+  const names = academicStateNames(machine);
   const sets = machine.edges.map((edge) => rangesFor(edge));
   const alphabet = [];
   for (const [a, b] of sets.flat().sort((a, b) => a[0] - b[0])) {
