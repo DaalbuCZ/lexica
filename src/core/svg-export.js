@@ -85,10 +85,11 @@ export function machineSvg(
         invalid = !!issue;
       const token = colorEdges && !invalid ? edgeTokenIndex(e, i) : null;
       const color = palette[token];
+      const borderStyle = color ? ` style="stroke:${color}"` : '';
       const labelStyle = color ? ` style="fill:${color}"` : '';
       const edgeStyle = color ? ` style="stroke:${color};marker-end:url(#arrow-${token})"` : '';
       html += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title><path class="edge ${edgeSelected(e, i) ? 'selected-edge' : ''}"${edgeStyle} d="${r.d}"/><path class="edge-hit" d="${r.d}"/></g>`;
-      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box" x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}"${labelStyle} x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
+      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box"${borderStyle} x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}"${labelStyle} x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
     }
     for (const s of visualMachine(machine).states) {
       const color = palette[tokenIndex(s)];

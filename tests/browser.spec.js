@@ -45,6 +45,7 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   expect(svg).toContain(`--token-accent:${tokenAccent};`);
   expect(svg).toContain(`style="stroke:${tokenAccent};marker-end:url(#arrow-`);
   expect(svg).toMatch(new RegExp(`<text class="edge-text [^"]*" style="fill:${tokenAccent}"`));
+  expect(svg).toContain(`<rect class="edge-label-box" style="stroke:${tokenAccent}"`);
 
   await choose(page, '#format', 'LaTeX / TikZ (.tex)');
   await expect(page.locator('#export-preview')).toHaveValue(/documentclass/);
