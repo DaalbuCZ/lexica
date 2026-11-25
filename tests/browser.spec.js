@@ -34,7 +34,17 @@ test('editor workflows preserve machine data and preferences', async ({ page }, 
   expect(data.version).toBe(2);
   expect(data.type).toBe('standard');
   await choose(page, '#format', 'Vector diagram (.svg)');
-  await expect(page.getByRole('img', { name: 'Main graph SVG preview' })).toBeVisible();
+  const svgPreview = page.getByRole('img', { name: 'Main graph SVG preview' });
+  await expect(svgPreview).toBeVisible();
+  const tokenAccent = await page
+    .locator('#tokens .token-tinted')
+    .first()
+    .evaluate((token) => getComputedStyle(token).getPropertyValue('--token-accent').trim());
+  const svg = decodeURIComponent((await svgPreview.getAttribute('src')).split(',')[1]);
+  expect(tokenAccent).toMatch(/^#[0-9a-f]{6}$/i);
+  expect(svg).toContain(`--token-accent:${tokenAccent};`);
+  expect(svg).toContain(`style="stroke:${tokenAccent};marker-end:url(#arrow-`);
+
   await choose(page, '#format', 'LaTeX / TikZ (.tex)');
   await expect(page.locator('#export-preview')).toHaveValue(/documentclass/);
   await page.getByRole('button', { name: 'Close Export your machine', exact: true }).click();

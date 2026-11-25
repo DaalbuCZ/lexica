@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export function useSvgExport(machine, simplified, enabled) {
+export function useSvgExport(machine, simplified, colorEdges, enabled) {
   const [result, setResult] = useState({ files: [], pending: true, error: '' });
   useEffect(() => {
     if (!enabled) return;
@@ -17,8 +17,12 @@ export function useSvgExport(machine, simplified, enabled) {
       });
     worker.onerror = () =>
       setResult({ files: [], pending: false, error: 'Could not generate SVG files.' });
-    worker.postMessage({ machine, options: { simplified } });
+    const style = getComputedStyle(document.documentElement);
+    const tokenPalette = Array.from({ length: 10 }, (_, index) =>
+      style.getPropertyValue(`--token-accent-${index}`).trim(),
+    );
+    worker.postMessage({ machine, options: { simplified, colorEdges, tokenPalette } });
     return () => worker.terminate();
-  }, [machine, simplified, enabled]);
+  }, [machine, simplified, colorEdges, enabled]);
   return result;
 }

@@ -134,8 +134,9 @@ function ExportDialog({ onClose, dialog }) {
     [standalone, setStandalone] = useState(true),
     [svgId, setSvgId] = useState('main');
   const source = useStudio((s) => s.scene.machine),
-    simplified = useStudio((s) => s.settings.simplified);
-  const svg = useSvgExport(source, simplified, format === 'svg');
+    simplified = useStudio((s) => s.settings.simplified),
+    colorEdges = useStudio((s) => s.settings.colorEdges);
+  const svg = useSvgExport(source, simplified, colorEdges, format === 'svg');
   const svgFile = svg.files.find((file) => file.id === svgId) ?? svg.files[0];
   const version = useStudio((s) => s.scene.version);
   const academic = useMemo(() => {
