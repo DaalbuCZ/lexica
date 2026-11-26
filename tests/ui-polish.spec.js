@@ -21,13 +21,14 @@ test('transition label size updates the canvas and persists across reloads', asy
   const size = page.getByRole('combobox', { name: 'Transition label size' });
   await expect(size).toHaveText('100%');
   await size.click();
-  await page.getByRole('option', { name: '400%', exact: true }).click();
+  await expect(page.getByRole('option')).toHaveText(['100%', '125%', '150%', '175%', '200%']);
+  await page.getByRole('option', { name: '175%', exact: true }).click();
   await expect
     .poll(async () => Number(await canvas.getAttribute('data-transition-text-scale')))
-    .toBeCloseTo(original * 4);
+    .toBeCloseTo(original * 1.75);
   await page.reload();
   await openSettings();
-  await expect(size).toHaveText('400%');
+  await expect(size).toHaveText('175%');
 });
 
 test('HTML loader stays visible until the bundle and initial lexer are ready', async ({ page }) => {

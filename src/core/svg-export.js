@@ -1,6 +1,6 @@
 import { graphBounds } from './canvas-graph.js';
 import { editorSettings, graphTransitionLabel } from './editor-settings.js';
-import { stateLabel, groupWidth } from './labels.js';
+import { stateLabel, groupLabel, groupWidth } from './labels.js';
 import { sizedTransitionRoutes } from './label-clearance.js';
 import { labelGuidesFor } from './label-guides.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
@@ -103,9 +103,7 @@ export function machineSvg(
     }
     for (const s of visual.states) {
       const color = palette[tokenIndex(s)];
-      const label = s.group
-        ? { lines: [s.name], fontSize: 12, y: 4, lineHeight: 13.2 }
-        : stateLabel(s.name);
+      const label = s.group ? groupLabel(s) : stateLabel(s.name);
       if (s.id === machine.start || s.startView !== undefined) {
         const tipX = s.x - (s.group ? groupWidth(s) / 2 + 4 : 40);
         html += `<path class="edge" d="M ${tipX - 45} ${s.y} L ${tipX} ${s.y}"/>`;

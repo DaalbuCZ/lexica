@@ -3,6 +3,7 @@ import { Moon, Sun } from 'lucide-react';
 import { useStudio, machineType } from '../state/studio.js';
 import { setTheme } from '../hooks/useTheme.js';
 import { Modal, Check, Select } from './ui.jsx';
+import { transitionLabelScales } from '../core/editor-settings.js';
 
 export function SettingsPanel({ dialog, onClose }) {
   const { appearance } = useThemeContext();
@@ -73,10 +74,11 @@ export function SettingsPanel({ dialog, onClose }) {
             value={String(settings.transitionLabelScale)}
             onChange={(size) => change({ transitionLabelScale: Number(size) })}
           >
-            <option value="1">100%</option>
-            <option value="2">200%</option>
-            <option value="3">300%</option>
-            <option value="4">400%</option>
+            {transitionLabelScales.map((scale) => (
+              <option key={scale} value={String(scale)}>
+                {scale * 100}%
+              </option>
+            ))}
           </Select>
           <Select
             id="group-presentation"

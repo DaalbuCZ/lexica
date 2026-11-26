@@ -1,5 +1,5 @@
 import { labelGuidesFor } from './label-guides.js';
-import { stateLabel, transitionLabel, groupWidth, tokenCaption } from './labels.js';
+import { stateLabel, transitionLabel, groupLabel, groupWidth, tokenCaption } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
 import { visualMachine } from './start-views.js';
@@ -423,9 +423,7 @@ export function createGraphCanvas(canvas, minimap) {
         ctx.lineWidth = 1.7;
         ctx.stroke();
       }
-      const label = s.group
-        ? { lines: [s.name], fontSize: 12, y: 4, lineHeight: 13.2 }
-        : stateLabel(s.name);
+      const label = s.group ? groupLabel(s) : stateLabel(s.name);
       ctx.font = `${label.fontSize}px "DM Sans",sans-serif`;
       ctx.fillStyle = bad
         ? c.error
@@ -438,8 +436,7 @@ export function createGraphCanvas(canvas, minimap) {
               : c.text;
       ctx.textAlign = 'center';
       for (let i = 0; i < label.lines.length; i++)
-        if (s.group) ctx.fillText(s.name, s.x, s.y + label.y);
-        else ctx.fillText(label.lines[i], s.x, s.y + label.y + i * label.lineHeight, label.width);
+        ctx.fillText(label.lines[i], s.x, s.y + label.y + i * label.lineHeight, label.width);
       if (!s.group && isAccepting(s)) {
         ctx.font = `${9 * scale}px "IBM Plex Mono",monospace`;
         ctx.fillText(s.token + (s.skip ? ' · skip' : ''), s.x, s.y + 46 + 11 * scale);

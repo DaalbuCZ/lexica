@@ -41,19 +41,19 @@ for (const presentation of ['canvas', 'overlay']) {
         return fillText.call(this, text, x, y, ...args);
       };
     });
-    await setup(page, presentation, machine, 4);
+    await setup(page, presentation, machine, 2);
     const labelScale = (selector, label) =>
       page.locator(selector).evaluate((canvas, text) => {
         const paintScale = Number(canvas.dataset['transition' + text.toUpperCase()]);
         return paintScale / canvas.getContext('2d').getTransform().a;
       }, label);
-    await expect.poll(() => labelScale('#canvas', 'a')).toBeCloseTo(4);
+    await expect.poll(() => labelScale('#canvas', 'a')).toBeCloseTo(2);
     const p = await groupPoint(page);
     await page.mouse.dblclick(p.x, p.y);
     await expect(page.locator('.group-navigation [data-current]')).toHaveCount(1);
-    await expect.poll(() => labelScale('#canvas', 'b')).toBeCloseTo(4);
+    await expect.poll(() => labelScale('#canvas', 'b')).toBeCloseTo(2);
     if (presentation === 'overlay')
-      await expect.poll(() => labelScale('.group-overview-backdrop', 'a')).toBeCloseTo(4);
+      await expect.poll(() => labelScale('.group-overview-backdrop', 'a')).toBeCloseTo(2);
   });
 }
 

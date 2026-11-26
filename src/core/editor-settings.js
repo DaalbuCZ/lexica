@@ -1,6 +1,8 @@
 import { stackRuleSuffix } from './memory.js';
 import { transitionLabel } from './labels.js';
 const STORAGE_KEY = 'lexica-editor-settings';
+export const transitionLabelScales = [1, 1.25, 1.5, 1.75, 2];
+
 export function readEditorSettings(storage) {
   try {
     const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(STORAGE_KEY) || '{}');
@@ -12,9 +14,11 @@ export function readEditorSettings(storage) {
       followDebugState: saved.followDebugState !== false,
       rerouteWhileDragging: true,
       colorEdges: saved.colorEdges !== false,
-      transitionLabelScale: [1, 2, 3, 4].includes(saved.transitionLabelScale)
+      transitionLabelScale: transitionLabelScales.includes(saved.transitionLabelScale)
         ? saved.transitionLabelScale
-        : 1,
+        : [3, 4].includes(saved.transitionLabelScale)
+          ? 2
+          : 1,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {

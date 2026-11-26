@@ -41,6 +41,10 @@ export function groupWidth(state) {
   );
 }
 
+export function groupLabel(state) {
+  return { lines: [state.name], fontSize: 14, y: 5, lineHeight: 0, width: groupWidth(state) - 16 };
+}
+
 export function nodePort(state, angle, placement = false) {
   const x = Math.cos(angle),
     y = Math.sin(angle);
