@@ -1,6 +1,6 @@
 import { graphBounds } from './canvas-graph.js';
 import { editorSettings, graphTransitionLabel } from './editor-settings.js';
-import { stateLabel, groupLabel, groupWidth } from './labels.js';
+import { stateLabel, groupCardHeight, groupLabel, groupWidth } from './labels.js';
 import { sizedTransitionRoutes } from './label-clearance.js';
 import { labelGuidesFor } from './label-guides.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
@@ -108,7 +108,7 @@ export function machineSvg(
         const tipX = s.x - (s.group ? groupWidth(s) / 2 + 4 : 40);
         html += `<path class="edge" d="M ${tipX - 45} ${s.y} L ${tipX} ${s.y}"/>`;
       }
-      html += `<g class="node ${s.outside ? 'outside' : ''} ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" ${color ? `style="--token-accent:${color};--token-fill:${color}33"` : ''} data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})">${s.group ? `<rect x="${-groupWidth(s) / 2}" y="-36" width="${groupWidth(s)}" height="72" rx="12"/>` : '<circle r="36"/>'}${
+      html += `<g class="node ${s.outside ? 'outside' : ''} ${selectedStates.has(s.id) ? 'selected' : ''} ${source === s.id ? 'connecting' : ''}" ${color ? `style="--token-accent:${color};--token-fill:${color}33"` : ''} data-node="${esc(s.id)}" transform="translate(${s.x} ${s.y})">${s.group ? `<rect x="${-groupWidth(s) / 2}" y="${-groupCardHeight / 2}" width="${groupWidth(s)}" height="${groupCardHeight}" rx="12"/>` : '<circle r="36"/>'}${
         s.portal
           ? (() => {
               const box = statePortalBox(s),

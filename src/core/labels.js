@@ -41,8 +41,10 @@ export function groupWidth(state) {
   );
 }
 
+export const groupCardHeight = 56;
+
 export function groupLabel(state) {
-  return { lines: [state.name], fontSize: 14, y: 5, lineHeight: 0, width: groupWidth(state) - 16 };
+  return { lines: [state.name], fontSize: 16, y: 5, lineHeight: 0, width: groupWidth(state) - 16 };
 }
 
 export function nodePort(state, angle, placement = false) {
@@ -50,7 +52,7 @@ export function nodePort(state, angle, placement = false) {
     y = Math.sin(angle);
   const distance =
     !placement && state.group
-      ? Math.min((groupWidth(state) / 2 + 1) / Math.abs(x), 37 / Math.abs(y))
+      ? Math.min((groupWidth(state) / 2 + 1) / Math.abs(x), (groupCardHeight / 2 + 1) / Math.abs(y))
       : 37;
   return { x: state.x + x * distance, y: state.y + y * distance };
 }

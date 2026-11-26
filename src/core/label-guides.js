@@ -1,4 +1,4 @@
-import { groupWidth, tokenCaption } from './labels.js';
+import { groupCardHeight, groupWidth, tokenCaption } from './labels.js';
 import { commentLayout } from './comments.js';
 import { statePortalBox } from './portals.js';
 import { SpatialIndex } from './spatial-index.js';
@@ -101,7 +101,13 @@ export function labelGuidesFor(machine, routes, scale = 1) {
   const add = (box) => obstacles.set(id++, padded(box));
   for (const state of machine.states) {
     const half = state.group ? groupWidth(state) / 2 + 2 : 37;
-    add({ left: state.x - half, right: state.x + half, top: state.y - 37, bottom: state.y + 37 });
+    const halfHeight = state.group ? groupCardHeight / 2 + 1 : 37;
+    add({
+      left: state.x - half,
+      right: state.x + half,
+      top: state.y - halfHeight,
+      bottom: state.y + halfHeight,
+    });
     const caption = tokenCaption(state, scale);
     if (caption) add(caption);
     if (state.portal) {

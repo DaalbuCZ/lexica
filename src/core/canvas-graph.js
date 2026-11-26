@@ -1,5 +1,12 @@
 import { labelGuidesFor } from './label-guides.js';
-import { stateLabel, transitionLabel, groupLabel, groupWidth, tokenCaption } from './labels.js';
+import {
+  stateLabel,
+  transitionLabel,
+  groupCardHeight,
+  groupLabel,
+  groupWidth,
+  tokenCaption,
+} from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
 import { visualMachine } from './start-views.js';
@@ -402,7 +409,14 @@ export function createGraphCanvas(canvas, minimap) {
       }
       ctx.setLineDash(s.outside ? [6, 4] : []);
       ctx.beginPath();
-      if (s.group) ctx.roundRect(s.x - groupWidth(s) / 2, s.y - 36, groupWidth(s), 72, 13);
+      if (s.group)
+        ctx.roundRect(
+          s.x - groupWidth(s) / 2,
+          s.y - groupCardHeight / 2,
+          groupWidth(s),
+          groupCardHeight,
+          13,
+        );
       else ctx.arc(s.x, s.y, 36, 0, Math.PI * 2);
       ctx.fillStyle = bad
         ? c.node
@@ -707,9 +721,9 @@ export function createGraphCanvas(canvas, minimap) {
         s.group
           ? contains(p, {
               x: s.x - groupWidth(s) / 2,
-              y: s.y - 36,
+              y: s.y - groupCardHeight / 2,
               width: groupWidth(s),
-              height: 72,
+              height: groupCardHeight,
             })
           : Math.hypot(p.x - s.x, p.y - s.y) <= 36
       )

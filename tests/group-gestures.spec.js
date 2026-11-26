@@ -72,8 +72,8 @@ for (const presentation of ['canvas', 'overlay'])
         roundRect = ctx.roundRect.bind(ctx);
       window.lastGroupPaint = null;
       ctx.roundRect = (...args) => {
-        if (args[2] === 88 && args[3] === 72)
-          window.lastGroupPaint = { x: args[0] + 44, y: args[1] + 36 };
+        if (args[2] === 88 && args[3] === 56)
+          window.lastGroupPaint = { x: args[0] + 44, y: args[1] + 28 };
         return roundRect(...args);
       };
       return ctx.getTransform().a;
@@ -278,8 +278,16 @@ test('Ctrl-drag inserts inside the group and offers a searchable destination out
 test('a long group name paints at full size and the wider node can be opened', async ({ page }) => {
   const m = structuredClone(machine);
   m.groups[0].name = 'A much longer group name';
+  await page.addInitScript((name) => {
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      if (this.canvas.id === 'canvas' && text === name) this.canvas.dataset.groupFont = this.font;
+      return fillText.call(this, text, ...args);
+    };
+  }, m.groups[0].name);
   await setup(page, 'overlay', m);
   await expect(page.locator('#app-loading')).toBeHidden();
+  await expect(page.locator('#canvas')).toHaveAttribute('data-group-font', /^16px /);
   const point = await page.locator('#canvas').evaluate((canvas) => {
     const t = canvas.getContext('2d').getTransform();
     const r = canvas.getBoundingClientRect();
