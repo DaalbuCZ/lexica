@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export function useSvgExport(machine, simplified, colorEdges, enabled) {
+export function useSvgExport(machine, simplified, colorEdges, transitionLabelScale, enabled) {
   const [result, setResult] = useState({ files: [], pending: true, error: '' });
   useEffect(() => {
     if (!enabled) return;
@@ -21,8 +21,11 @@ export function useSvgExport(machine, simplified, colorEdges, enabled) {
     const tokenPalette = Array.from({ length: 10 }, (_, index) =>
       style.getPropertyValue(`--token-accent-${index}`).trim(),
     );
-    worker.postMessage({ machine, options: { simplified, colorEdges, tokenPalette } });
+    worker.postMessage({
+      machine,
+      options: { simplified, colorEdges, tokenPalette, transitionLabelScale },
+    });
     return () => worker.terminate();
-  }, [machine, simplified, colorEdges, enabled]);
+  }, [machine, simplified, colorEdges, transitionLabelScale, enabled]);
   return result;
 }

@@ -3567,7 +3567,7 @@ test('Radial Compact gives the same drawing after moving nodes and bending edges
   assert.deepEqual(graphView(first), graphView(moved));
   assert.deepEqual(graphView(first, group.id), graphView(moved, group.id));
 });
-test('auto-layout makes room for large overview labels and keeps focused group layout at default size', () => {
+test('auto-layout makes room for large labels in the main graph and focused groups', () => {
   const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
     seed = {
       start: 'root',
@@ -3582,8 +3582,8 @@ test('auto-layout makes room for large overview labels and keeps focused group l
     enlarged = structuredClone(seed),
     options = { mode: 'tree', spacing: 0.5, smartGroups: false },
     largeOptions = { ...options, transitionLabelScale: 4 },
-    collisions = (machine) => {
-      const view = graphView(machine),
+    collisions = (machine, groupId) => {
+      const view = graphView(machine, groupId),
         routes = routeEdges(view, graphTransitionLabel);
       return transitionLabelCollisions(view, sizedTransitionRoutes(view, routes, 4));
     };
@@ -3592,12 +3592,13 @@ test('auto-layout makes room for large overview labels and keeps focused group l
   assert.ok(collisions(standard) > 0);
   assert.equal(collisions(enlarged), 0);
 
-  const group = createGroup(seed, ['root', 'a', 'b'], 'Branch'),
+  const group = createGroup(seed, ['root', ...ids], 'Branch'),
     focused = structuredClone(seed),
     focusedLarge = structuredClone(seed);
   smartArrange(focused, group.id, options);
   smartArrange(focusedLarge, group.id, largeOptions);
-  assert.deepEqual(graphView(focusedLarge, group.id), graphView(focused, group.id));
+  assert.ok(collisions(focused, group.id) > 0);
+  assert.equal(collisions(focusedLarge, group.id), 0);
 });
 test('Tree remains a compact forward tree despite long labels and planar coordinate alternatives', () => {
   const m = {
@@ -4129,6 +4130,21 @@ test('a displaced loop label moves up to keep its guide short and straight', () 
   assert.equal(labelGuidesFor(machine, routes)[0]?.points.length, 2);
 });
 import { curvePoint as routedCurvePoint } from './src/core/route-geometry.js';
+import { machineSvg } from './src/core/svg-export.js';
+test('SVG export includes the transition label guide, black defaults, and scaled captions', () => {
+  const machine = example();
+  machine.states[1].y = machine.states[0].y;
+  machine.edges[0].bend = { x: 0, y: 0 };
+  const guide = labelGuidesFor(machine, routeEdges(machine, graphTransitionLabel))[0];
+  const points = guide.points.map(({ x, y }) => `${x},${y}`).join(' ');
+  const svg = machineSvg(machine, { simplified: true });
+  assert.ok(svg.includes(`<polyline class="edge-label-guide" points="${points}"/>`));
+  assert.match(svg, /\.edge\{fill:none;stroke:#000;/);
+  assert.match(svg, /id="arrow"[^>]*><path[^>]*fill="#000"/);
+  const enlarged = machineSvg(machine, { transitionLabelScale: 4 });
+  assert.match(enlarged, /\.edge-text\{font-size:44px/);
+  assert.match(enlarged, /class="token-label" style="font-size:36px"/);
+});
 test('label guides connect a label boundary to its own curve and omit labels on the curve', () => {
   const route = {
     p0: { x: 0, y: 0 },

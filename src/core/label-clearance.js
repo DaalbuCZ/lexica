@@ -18,6 +18,9 @@ export function sizedTransitionRoutes(machine, routes, scale = 1) {
       ...route,
       label: { ...route.label, w: route.label.w * scale, scale },
     })),
+    undefined,
+    false,
+    scale,
   );
 }
 const expand = (box, n) => ({
@@ -27,12 +30,12 @@ const expand = (box, n) => ({
   bottom: box.bottom + n,
 });
 
-function labelObstacles(machine, routes, placement) {
+function labelObstacles(machine, routes, placement, scale) {
   const obstacles = new SpatialIndex();
   machine.states.forEach((s, i) => {
     const half = !placement && s.group ? groupWidth(s) / 2 + 11 : 47;
     obstacles.set(i, { left: s.x - half, right: s.x + half, top: s.y - 47, bottom: s.y + 47 });
-    const caption = tokenCaption(s);
+    const caption = tokenCaption(s, scale);
     if (caption) obstacles.set('token:' + i, caption);
   });
   (machine.comments ?? []).forEach((c, i) => {
@@ -53,9 +56,21 @@ function labelObstacles(machine, routes, placement) {
   return obstacles;
 }
 
-export function transitionLabelCollisions(machine, routes) {
-  const obstacles = labelObstacles(machine, routes, false);
+export function transitionLabelCollisions(machine, routes, scale = 1) {
+  const obstacles = labelObstacles(machine, routes, false, scale);
   let collisions = 0;
+  if (scale > 1)
+    machine.states.forEach((state, i) => {
+      const caption = tokenCaption(state, scale);
+      if (caption)
+        collisions += obstacles
+          .query(caption)
+          .filter((key) =>
+            typeof key === 'number'
+              ? key !== i
+              : key.startsWith('token:') && Number(key.slice(6)) < i,
+          ).length;
+    });
   routes.forEach(({ label }, i) => {
     const box = expand(renderedLabelBox(label), 4);
     collisions += obstacles.query(box).length;
@@ -69,8 +84,9 @@ export function reflowRouteLabels(
   routes,
   dirty = new Set(routes.keys()),
   placement = false,
+  scale = 1,
 ) {
-  const obstacles = labelObstacles(machine, routes, placement),
+  const obstacles = labelObstacles(machine, routes, placement, scale),
     captions = new SpatialIndex(),
     wires = new SpatialIndex();
   routes.forEach((r, i) => {

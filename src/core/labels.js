@@ -51,8 +51,13 @@ export function nodePort(state, angle, placement = false) {
   return { x: state.x + x * distance, y: state.y + y * distance };
 }
 
-export function tokenCaption(state) {
+export function tokenCaption(state, scale = 1) {
   if (state.group || !state.token || state.accepting === false) return null;
-  const half = (state.token.length + (state.skip ? 7 : 0)) * 2.75 + 4;
-  return { left: state.x - half, right: state.x + half, top: state.y + 46, bottom: state.y + 60 };
+  const half = ((state.token.length + (state.skip ? 7 : 0)) * 2.75 + 4) * scale;
+  return {
+    left: state.x - half,
+    right: state.x + half,
+    top: state.y + 46,
+    bottom: state.y + 46 + 14 * scale,
+  };
 }

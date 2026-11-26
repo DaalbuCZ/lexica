@@ -93,7 +93,7 @@ const length = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
 
 // Use alternate attachment points first, then a short visibility-graph detour.
 // If no safe route exists, omit the guide rather than drawing through an obstacle.
-export function labelGuidesFor(machine, routes) {
+export function labelGuidesFor(machine, routes, scale = 1) {
   const cached = sceneGuides.get(routes);
   if (cached?.machine === machine) return cached.guides;
   const obstacles = new SpatialIndex();
@@ -102,7 +102,7 @@ export function labelGuidesFor(machine, routes) {
   for (const state of machine.states) {
     const half = state.group ? groupWidth(state) / 2 + 2 : 37;
     add({ left: state.x - half, right: state.x + half, top: state.y - 37, bottom: state.y + 37 });
-    const caption = tokenCaption(state);
+    const caption = tokenCaption(state, scale);
     if (caption) add(caption);
     if (state.portal) {
       const box = statePortalBox(state);

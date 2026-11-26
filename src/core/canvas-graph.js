@@ -1,5 +1,5 @@
 import { labelGuidesFor } from './label-guides.js';
-import { stateLabel, transitionLabel, groupWidth } from './labels.js';
+import { stateLabel, transitionLabel, groupWidth, tokenCaption } from './labels.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
 import { visualMachine } from './start-views.js';
@@ -28,7 +28,7 @@ function transitionLabelBounds(label) {
     height: bottom - top,
   };
 }
-export function graphBounds(machine, routes) {
+export function graphBounds(machine, routes, scale = 1) {
   machine = visualMachine(machine);
   const boxes = machine.states.flatMap((s) => [
     {
@@ -49,6 +49,17 @@ export function graphBounds(machine, routes) {
         ]
       : []),
   ]);
+  if (scale > 1)
+    for (const state of machine.states) {
+      const box = tokenCaption(state, scale);
+      if (box)
+        boxes.push({
+          x: box.left,
+          y: box.top,
+          width: box.right - box.left,
+          height: box.bottom - box.top,
+        });
+    }
   for (const r of routes) {
     const xs = [r.p0.x, r.c1.x, r.c2.x, r.p3.x],
       ys = [r.p0.y, r.c1.y, r.c2.y, r.p3.y];
@@ -279,7 +290,8 @@ export function createGraphCanvas(canvas, minimap) {
       current = trace?.kind ? (trace.state ?? trace.traceStates?.at(-1)) : null,
       currentEdge = trace?.kind === 'character' ? trace.traceEdges?.at(-1) : null;
     const edgeColors = scene.edgeColor ? machine.edges.map(scene.edgeColor) : [];
-    const guides = labelGuidesFor(machine, routes);
+    const scale = scene.transitionLabelScale ?? 1;
+    const guides = labelGuidesFor(machine, routes, scale);
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = c.noteLine;
     ctx.setLineDash([6 / transform().scale, 5 / transform().scale]);
@@ -429,8 +441,8 @@ export function createGraphCanvas(canvas, minimap) {
         if (s.group) ctx.fillText(s.name, s.x, s.y + label.y);
         else ctx.fillText(label.lines[i], s.x, s.y + label.y + i * label.lineHeight, label.width);
       if (!s.group && isAccepting(s)) {
-        ctx.font = '9px "IBM Plex Mono",monospace';
-        ctx.fillText(s.token + (s.skip ? ' · skip' : ''), s.x, s.y + 57);
+        ctx.font = `${9 * scale}px "IBM Plex Mono",monospace`;
+        ctx.fillText(s.token + (s.skip ? ' · skip' : ''), s.x, s.y + 46 + 11 * scale);
       }
       ctx.setLineDash([]);
       if (s.portal) {
@@ -827,7 +839,7 @@ export function createGraphCanvas(canvas, minimap) {
     selectionBox,
     bounds: () =>
       scene
-        ? graphBounds(scene.machine, scene.routes)
+        ? graphBounds(scene.machine, scene.routes, scene.transitionLabelScale)
         : {
             x: 0,
             y: 0,

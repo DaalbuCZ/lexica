@@ -6,6 +6,7 @@ import { useStudio, persistedMachine, readStorage, writeStorage } from '../state
 import { toAcademic } from '../core/academic-export.js';
 import { parseMachine, toTikz } from '../core/lexer.js';
 import { useSvgExport } from '../hooks/useSvgExport.js';
+import { sizedTransitionRoutes } from '../core/label-clearance.js';
 import { graphView } from '../core/groups.js';
 import { routeEdges } from '../core/layout.js';
 import { createGraphCanvas, graphBounds } from '../core/canvas-graph.js';
@@ -135,8 +136,9 @@ function ExportDialog({ onClose, dialog }) {
     [svgId, setSvgId] = useState('main');
   const source = useStudio((s) => s.scene.machine),
     simplified = useStudio((s) => s.settings.simplified),
-    colorEdges = useStudio((s) => s.settings.colorEdges);
-  const svg = useSvgExport(source, simplified, colorEdges, format === 'svg');
+    colorEdges = useStudio((s) => s.settings.colorEdges),
+    transitionLabelScale = useStudio((s) => s.settings.transitionLabelScale);
+  const svg = useSvgExport(source, simplified, colorEdges, transitionLabelScale, format === 'svg');
   const svgFile = svg.files.find((file) => file.id === svgId) ?? svg.files[0];
   const version = useStudio((s) => s.scene.version);
   const academic = useMemo(() => {
@@ -439,7 +441,11 @@ function GroupTargetDialog({ dialog, onClose }) {
       shown = graphView(machine, dialog.groupId, false),
       label = settings.simplified ? simpleTransitionLabel : transitionLabel,
       routes = routeEdges(shown, label),
-      bounds = graphBounds(shown, routes);
+      bounds = graphBounds(
+        shown,
+        sizedTransitionRoutes(shown, routes, settings.transitionLabelScale),
+        settings.transitionLabelScale,
+      );
     previewRef.current = preview;
     const scale = Math.max(
       (bounds.width + 100) / Math.max(220, canvas.clientWidth - 70),
@@ -455,6 +461,7 @@ function GroupTargetDialog({ dialog, onClose }) {
       machine: shown,
       routes,
       label,
+      transitionLabelScale: settings.transitionLabelScale,
       tokenColor: (name) =>
         getComputedStyle(document.documentElement)
           .getPropertyValue('--token-accent-' + tokenColorClass(name).slice(-1))
@@ -468,7 +475,7 @@ function GroupTargetDialog({ dialog, onClose }) {
         edges: [],
       },
     });
-  }, [canvas, machine, dialog.groupId, settings.simplified]);
+  }, [canvas, machine, dialog.groupId, settings.simplified, settings.transitionLabelScale]);
   return (
     <Modal
       title={`Choose a state in ${group?.name ?? 'group'}`}

@@ -1,5 +1,6 @@
 import { placementPreview } from '../core/placement.js';
 import { graphBounds } from '../core/canvas-graph.js';
+import { sizedTransitionRoutes } from '../core/label-clearance.js';
 import { editorSettings, graphTransitionLabel } from '../core/editor-settings.js';
 import { transitionError, destination } from '../core/lexer.js';
 import { routeEdges } from '../core/layout.js';
@@ -316,7 +317,15 @@ export function createCanvasRenderer(context) {
         (!manualEdit || manualEdit.committing) &&
         context.positionGroupPanel(
           overview.states.find((state) => state.id === context.openGroup),
-          graphBounds(shown, shownRoutes),
+          graphBounds(
+            shown,
+            sizedTransitionRoutes(
+              visualMachine(shown),
+              shownRoutes,
+              editorSettings.transitionLabelScale,
+            ),
+            editorSettings.transitionLabelScale,
+          ),
         );
       if (!dragging || !reuse)
         context.overviewGraph.draw({
@@ -371,7 +380,7 @@ export function createCanvasRenderer(context) {
       trace,
       failures,
       label,
-      transitionLabelScale: context.openGroup ? 1 : editorSettings.transitionLabelScale,
+      transitionLabelScale: editorSettings.transitionLabelScale,
       placement: placementPreview(
         context.placingComment ? context.commentPlacementView() : context.machine,
         context.placingState || context.rightStart?.insert

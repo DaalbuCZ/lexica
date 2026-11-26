@@ -62,8 +62,8 @@ function moveOverviewStates(machine, view, states) {
   }
 }
 
-function makeRoomForTransitionLabels(machine, options) {
-  const view = visualMachine(graphView(machine)),
+function makeRoomForTransitionLabels(machine, shown, focus, options) {
+  const view = visualMachine(shown),
     label = (edge) => graphTransitionLabel(edge, options.simplified),
     origin = view.states.find((state) => state.id === view.start) ?? { x: 0, y: 0 };
   let best;
@@ -79,14 +79,26 @@ function makeRoomForTransitionLabels(machine, options) {
         routeEdges(candidate, label),
         options.transitionLabelScale,
       ),
-      collisions = transitionLabelCollisions(candidate, routes);
+      collisions = transitionLabelCollisions(candidate, routes, options.transitionLabelScale);
     if (!best || collisions < best.collisions) best = { states, routes, collisions };
     if (collisions === 0) break;
   }
-  moveOverviewStates(machine, graphView(machine), best.states);
-  for (const state of best.states)
-    if (state.startView !== undefined)
-      Object.assign(machine.startViews[state.startView], { x: state.x, y: state.y });
+  if (focus) {
+    const group = machine.groups.find((group) => group.id === focus),
+      positions = new Map(best.states.map(({ id, x, y }) => [id, { x, y }]));
+    group.contextPositions = Object.fromEntries(
+      shown.states
+        .filter((state) => state.outside)
+        .map((state) => [state.id, positions.get(state.id)]),
+    );
+    for (const state of shown.states)
+      if (!state.outside) Object.assign(state, positions.get(state.id));
+  } else {
+    moveOverviewStates(machine, shown, best.states);
+    for (const state of best.states)
+      if (state.startView !== undefined)
+        Object.assign(machine.startViews[state.startView], { x: state.x, y: state.y });
+  }
   return best.routes;
 }
 
@@ -1197,18 +1209,21 @@ export function solveLayout(
   record('alignment', machine);
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');
-  const overviewRoutes =
-    !focus && options.transitionLabelScale > 1
-      ? makeRoomForTransitionLabels(machine, options)
-      : undefined;
-  placeCommentsAfterLayout(graphView(machine), overviewRoutes);
+  const placeLabelsAndComments = (shown, groupId) => {
+    const routes =
+      options.transitionLabelScale > 1 && (!focus || groupId)
+        ? makeRoomForTransitionLabels(machine, shown, groupId, options)
+        : undefined;
+    placeCommentsAfterLayout(shown, routes);
+  };
   for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {
     const shown = graphView(machine, group.id);
     shown.comments = shown.comments.filter((c) =>
       (c.nodeIds ?? (c.nodeId ? [c.nodeId] : [])).some((id) => group.stateIds.includes(id)),
     );
-    placeCommentsAfterLayout(shown);
+    placeLabelsAndComments(shown, group.id);
   }
+  placeLabelsAndComments(graphView(machine), null);
   metrics.commentsMs = performance.now() - commentsStarted;
   metrics.totalMs = performance.now() - started;
   return { machine, groups: count, metrics };

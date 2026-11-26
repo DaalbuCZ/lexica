@@ -60,7 +60,11 @@ export function solveComponents(topology, options, solve, progress) {
         scale > 1
           ? (edge) => graphTransitionLabel(edge, options.simplified)
           : simpleTransitionLabel,
-      bounds = graphBounds(shown, sizedTransitionRoutes(shown, routeEdges(shown, label), scale));
+      bounds = graphBounds(
+        shown,
+        sizedTransitionRoutes(shown, routeEdges(shown, label), scale),
+        scale,
+      );
     const left = bounds.x,
       dx = states.size ? right + 320 - left : 0;
     for (const s of m.states) {

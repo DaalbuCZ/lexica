@@ -1,6 +1,8 @@
 import { graphBounds } from './canvas-graph.js';
-import { editorSettings, simpleTransitionLabel } from './editor-settings.js';
-import { stateLabel, transitionLabel, groupWidth } from './labels.js';
+import { editorSettings, graphTransitionLabel } from './editor-settings.js';
+import { stateLabel, groupWidth } from './labels.js';
+import { sizedTransitionRoutes } from './label-clearance.js';
+import { labelGuidesFor } from './label-guides.js';
 import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { transitionError, isAccepting, statePortalBox } from './lexer.js';
 import { routeEdges } from './layout.js';
@@ -10,7 +12,12 @@ import { graphView } from './groups.js';
 import { tokenColorClass } from './token-colors.js';
 export function machineSvg(
   machine,
-  { simplified = editorSettings.simplified, colorEdges = false, tokenPalette = [] } = {},
+  {
+    simplified = editorSettings.simplified,
+    colorEdges = false,
+    tokenPalette = [],
+    transitionLabelScale = 1,
+  } = {},
   sourceMachine = machine,
 ) {
   const palette = tokenPalette.map((color) => (/^#[0-9a-f]{6}$/i.test(color) ? color : null));
@@ -47,13 +54,11 @@ export function machineSvg(
           "'": '&#39;',
         })[c],
     );
-  const labelFor = (edge) =>
-    edge.originalIndices?.length > 1
-      ? `${edge.originalIndices.length} transitions`
-      : simplified
-        ? simpleTransitionLabel(edge)
-        : transitionLabel(edge);
-  const routes = routeEdges(machine, labelFor);
+  const scale = transitionLabelScale,
+    labelFor = (edge) => graphTransitionLabel(edge, simplified),
+    visual = visualMachine(machine),
+    routes = sizedTransitionRoutes(visual, routeEdges(visual, labelFor), scale),
+    guides = labelGuidesFor(visual, routes, scale);
   function portalTag(name, box, invalid = false) {
     const l = box.x - box.w / 2,
       r = box.x + box.w / 2,
@@ -88,10 +93,15 @@ export function machineSvg(
       const borderStyle = color ? ` style="stroke:${color}"` : '';
       const labelStyle = color ? ` style="fill:${color}"` : '';
       const edgeStyle = color ? ` style="stroke:${color};marker-end:url(#arrow-${token})"` : '';
+      const guide = guides[i];
+      if (guide) {
+        const points = guide.points.map(({ x, y }) => `${x},${y}`).join(' ');
+        html += `<polyline class="edge-label-guide"${borderStyle} points="${points}"/>`;
+      }
       html += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title><path class="edge ${edgeSelected(e, i) ? 'selected-edge' : ''}"${edgeStyle} d="${r.d}"/><path class="edge-hit" d="${r.d}"/></g>`;
-      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box"${borderStyle} x="${r.label.x - r.label.w / 2}" y="${r.label.y - 15}" width="${r.label.w}" height="22" rx="3"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}"${labelStyle} x="${r.label.x}" y="${r.label.y}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
+      edgeLabels += `<g data-edge="${i}" class="${invalid ? 'transition-error' : ''}"><title>${esc(issue)}</title>${machine.labelBoxes && e.label ? `<rect class="edge-label-box"${borderStyle} x="${r.label.x - r.label.w / 2}" y="${r.label.y - 4 - 11 * scale}" width="${r.label.w}" height="${22 * scale}" rx="${3 * scale}"/>` : ''}<text class="edge-text ${machine.labelBoxes ? 'boxed' : ''}"${labelStyle} x="${r.label.x}" y="${r.label.y - 4 + 4 * scale}" text-anchor="middle">${esc(labelFor(e) || '⚠ empty')}</text>${r.portalBox ? portalTag(e.portal, r.portalBox, invalid) : ''}</g>`;
     }
-    for (const s of visualMachine(machine).states) {
+    for (const s of visual.states) {
       const color = palette[tokenIndex(s)];
       const label = s.group
         ? { lines: [s.name], fontSize: 12, y: 4, lineHeight: 13.2 }
@@ -119,7 +129,7 @@ export function machineSvg(
               )}`;
             })()
           : ''
-      }${isAccepting(s) ? '<circle class="inner" r="31"/>' : ''}<text class="state-name" style="font-size:${label.fontSize}px">${label.lines.map((line, i) => `<tspan x="0" y="${label.y + i * label.lineHeight}" ${!s.group && line.length > (label.lines.length > 1 ? 8 : 10) ? `textLength="${label.width}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(line)}</tspan>`).join('')}</text>${isAccepting(s) ? `<text class="token-label" y="57">${esc(s.token)}${s.skip ? ' · skip' : ''}</text>` : ''}</g>`;
+      }${isAccepting(s) ? '<circle class="inner" r="31"/>' : ''}<text class="state-name" style="font-size:${label.fontSize}px">${label.lines.map((line, i) => `<tspan x="0" y="${label.y + i * label.lineHeight}" ${!s.group && line.length > (label.lines.length > 1 ? 8 : 10) ? `textLength="${label.width}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(line)}</tspan>`).join('')}</text>${isAccepting(s) ? `<text class="token-label" style="font-size:${9 * scale}px" y="${46 + 11 * scale}">${esc(s.token)}${s.skip ? ' · skip' : ''}</text>` : ''}</g>`;
     }
     if (commentSource && connectPoint) {
       const c = machine.comments?.find((c) => c.id === commentSource);
@@ -143,11 +153,11 @@ export function machineSvg(
     const tokenMarkers = colorEdges
       ? palette.map((color, index) => (color ? marker(`arrow-${index}`, color) : '')).join('')
       : '';
-    const content = `<defs>${marker('arrow', '#64756c')}${tokenMarkers}</defs><g>${svgMarkup()}</g>`;
-    const box = graphBounds(machine, routes);
+    const content = `<defs>${marker('arrow', '#000')}${tokenMarkers}</defs><g>${svgMarkup()}</g>`;
+    const box = graphBounds(machine, routes, scale);
     const style =
-      '.edge{fill:none;stroke:#65755d;stroke-width:1.6;marker-end:url(#arrow)}.edge-hit,.comment-link-hit{display:none}.edge-label-box{fill:white;stroke:#798b79;stroke-width:1}.edge-text.boxed{stroke:none}.edge-text{font:11px monospace;fill:#53634b;paint-order:stroke;stroke:white;stroke-width:6px}.node circle{fill:var(--token-fill,#f9fbf5);stroke:var(--token-accent,#718664);stroke-width:1.7}.node .inner{fill:none}.node text{text-anchor:middle;font:12px sans-serif;fill:var(--token-accent,#425838)}.node .token-label{font:9px monospace}.portal path{fill:#edf5e9;stroke:#386b4e;stroke-width:1.2}.portal text{font:10px monospace;fill:#386b4e}.portal-wire{stroke:#386b4e;fill:none}.invalid path{stroke:#b54f3c}.invalid text{fill:#b54f3c}.comment-label rect{fill:#fff9da;stroke:#cbb879;stroke-width:1}.comment-label text{font:11px sans-serif;fill:#756536}.selection-box,.comment-preview{display:none}.comment-link{fill:none;stroke:#8b907e;stroke-width:1.4;stroke-dasharray:6 5}';
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(box.width + 60)}" height="${Math.ceil(box.height + 60)}" viewBox="${box.x - 30} ${box.y - 30} ${box.width + 60} ${box.height + 60}"><style>${style}.node rect{fill:var(--token-fill,#f9fbf5);stroke:var(--token-accent,#718664);stroke-width:1.7}.outside circle{stroke-dasharray:6 4}</style>${content}</svg>`;
+      '.edge{fill:none;stroke:#000;stroke-width:1.6;marker-end:url(#arrow)}.edge-label-guide{fill:none;stroke:#000;stroke-width:1}.edge-hit,.comment-link-hit{display:none}.edge-label-box{fill:white;stroke:#000;stroke-width:1}.edge-text.boxed{stroke:none}.edge-text{font:11px monospace;fill:#000;paint-order:stroke;stroke:white;stroke-width:6px}.node circle{fill:var(--token-fill,#fff);stroke:var(--token-accent,#000);stroke-width:1.7}.node .inner{fill:none}.node text{text-anchor:middle;font:12px sans-serif;fill:var(--token-accent,#000)}.node .token-label{font:9px monospace}.portal path{fill:#fff;stroke:#000;stroke-width:1.2}.portal text{font:10px monospace;fill:#000}.portal-wire{stroke:#000;fill:none}.invalid path{stroke:#b54f3c}.invalid text{fill:#b54f3c}.comment-label rect{fill:#fff9da;stroke:#cbb879;stroke-width:1}.comment-label text{font:11px sans-serif;fill:#756536}.selection-box,.comment-preview{display:none}.comment-link{fill:none;stroke:#8b907e;stroke-width:1.4;stroke-dasharray:6 5}';
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(box.width + 60)}" height="${Math.ceil(box.height + 60)}" viewBox="${box.x - 30} ${box.y - 30} ${box.width + 60} ${box.height + 60}"><style>${style}.edge-text{font-size:${11 * scale}px;stroke-width:${6 * scale}px}.node rect{fill:var(--token-fill,#fff);stroke:var(--token-accent,#000);stroke-width:1.7}.outside circle{stroke-dasharray:6 4}</style>${content}</svg>`;
   }
   return exportSvg();
 }

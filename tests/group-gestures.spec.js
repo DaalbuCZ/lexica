@@ -32,9 +32,7 @@ async function setup(page, presentation = 'overlay', m = machine, transitionLabe
 }
 
 for (const presentation of ['canvas', 'overlay']) {
-  test(`${presentation}: large transition labels apply only to the main graph`, async ({
-    page,
-  }) => {
+  test(`${presentation}: transition labels scale in both graph views`, async ({ page }) => {
     await page.addInitScript(() => {
       const fillText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...args) {
@@ -53,7 +51,7 @@ for (const presentation of ['canvas', 'overlay']) {
     const p = await groupPoint(page);
     await page.mouse.dblclick(p.x, p.y);
     await expect(page.locator('.group-navigation [data-current]')).toHaveCount(1);
-    await expect.poll(() => labelScale('#canvas', 'b')).toBeCloseTo(1);
+    await expect.poll(() => labelScale('#canvas', 'b')).toBeCloseTo(4);
     if (presentation === 'overlay')
       await expect.poll(() => labelScale('.group-overview-backdrop', 'a')).toBeCloseTo(4);
   });
