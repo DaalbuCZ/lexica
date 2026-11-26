@@ -11,6 +11,9 @@ export function readEditorSettings(storage) {
       followDebugState: saved.followDebugState !== false,
       rerouteWhileDragging: true,
       colorEdges: saved.colorEdges !== false,
+      transitionLabelScale: [1, 2, 3, 4].includes(saved.transitionLabelScale)
+        ? saved.transitionLabelScale
+        : 1,
       pinchSensitivity: Number.isFinite(sensitivity) ? Math.max(0.2, Math.min(2, sensitivity)) : 1,
     };
   } catch {
@@ -21,6 +24,7 @@ export function readEditorSettings(storage) {
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      transitionLabelScale: 1,
       pinchSensitivity: 1,
     };
   }

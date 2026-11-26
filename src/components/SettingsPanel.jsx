@@ -68,6 +68,17 @@ export function SettingsPanel({ dialog, onClose }) {
             }
           />
           <Select
+            id="transition-label-size"
+            label="Transition label size"
+            value={String(settings.transitionLabelScale)}
+            onChange={(size) => change({ transitionLabelScale: Number(size) })}
+          >
+            <option value="1">100%</option>
+            <option value="2">200%</option>
+            <option value="3">300%</option>
+            <option value="4">400%</option>
+          </Select>
+          <Select
             id="group-presentation"
             label="Open groups in"
             value={settings.groupPresentation}

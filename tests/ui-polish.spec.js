@@ -1,5 +1,35 @@
 import { test, expect } from '@playwright/test';
 
+test('transition label size updates the canvas and persists across reloads', async ({ page }) => {
+  await page.addInitScript(() => {
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...args) {
+      if (this.canvas.id === 'canvas' && this.font.startsWith('11px') && x === 0 && y === 4)
+        this.canvas.dataset.transitionTextScale = this.getTransform().a;
+      return fillText.call(this, text, x, y, ...args);
+    };
+  });
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toHaveAttribute('data-transition-text-scale', /.+/);
+  const original = Number(await canvas.getAttribute('data-transition-text-scale'));
+  const openSettings = async () => {
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+  };
+  await openSettings();
+  const size = page.getByRole('combobox', { name: 'Transition label size' });
+  await expect(size).toHaveText('100%');
+  await size.click();
+  await page.getByRole('option', { name: '400%', exact: true }).click();
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-transition-text-scale')))
+    .toBeCloseTo(original * 4);
+  await page.reload();
+  await openSettings();
+  await expect(size).toHaveText('400%');
+});
+
 test('HTML loader stays visible until the bundle and initial lexer are ready', async ({ page }) => {
   let release;
   const gate = new Promise((resolve) => {

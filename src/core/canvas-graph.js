@@ -18,7 +18,16 @@ export function clientToWorld(client, rect, transform) {
     y: (client.y - rect.top - transform.y) / transform.scale,
   };
 }
-export function graphBounds(machine, routes) {
+function transitionLabelBounds(label, scale) {
+  const width = label.w * scale;
+  return {
+    x: label.x - width / 2,
+    y: label.y - 4 - 12 * scale,
+    width,
+    height: 24 * scale,
+  };
+}
+export function graphBounds(machine, routes, transitionLabelScale = 1) {
   machine = visualMachine(machine);
   const boxes = machine.states.flatMap((s) => [
     {
@@ -49,12 +58,7 @@ export function graphBounds(machine, routes) {
         width: Math.max(...xs) - Math.min(...xs),
         height: Math.max(...ys) - Math.min(...ys),
       },
-      {
-        x: r.label.x - r.label.w / 2,
-        y: r.label.y - 16,
-        width: r.label.w,
-        height: 24,
-      },
+      transitionLabelBounds(r.label, transitionLabelScale),
     );
     if (r.portalBox)
       boxes.push({
@@ -452,6 +456,10 @@ export function createGraphCanvas(canvas, minimap) {
                 : traceEdges.has(index)
                   ? c.traceText
                   : c.text;
+      const scale = scene.transitionLabelScale ?? 1;
+      ctx.save();
+      ctx.translate(r.label.x, r.label.y - 4);
+      ctx.scale(scale, scale);
       ctx.font = '11px "IBM Plex Mono",monospace';
       ctx.textAlign = 'center';
       const text = labelFor(e) || '⚠ empty';
@@ -460,16 +468,17 @@ export function createGraphCanvas(canvas, minimap) {
         ctx.strokeStyle = bad ? c.error : selected ? c.green : (edgeColors[i] ?? c.edge);
         ctx.lineWidth = selected ? 2.5 : 1;
         ctx.beginPath();
-        ctx.roundRect(r.label.x - r.label.w / 2, r.label.y - 15, r.label.w, 22, 3);
+        ctx.roundRect(-r.label.w / 2, -11, r.label.w, 22, 3);
         ctx.fill();
         if (selected || machine.labelBoxes) ctx.stroke();
       } else {
         ctx.strokeStyle = c.background;
         ctx.lineWidth = 6;
-        ctx.strokeText(text, r.label.x, r.label.y);
+        ctx.strokeText(text, 0, 4);
       }
       ctx.fillStyle = color;
-      ctx.fillText(text, r.label.x, r.label.y);
+      ctx.fillText(text, 0, 4);
+      ctx.restore();
       if (r.portalBox) portal(ctx, e.portal, r.portalBox, bad ? c.error : c.green, c.panel);
     }
     for (const note of machine.comments ?? []) {
@@ -644,14 +653,7 @@ export function createGraphCanvas(canvas, minimap) {
           type: 'portal-source',
           index: machine.edges[i].originalIndex ?? i,
         };
-      if (
-        contains(p, {
-          x: r.label.x - r.label.w / 2,
-          y: r.label.y - 16,
-          width: r.label.w,
-          height: 24,
-        })
-      )
+      if (contains(p, transitionLabelBounds(r.label, scene.transitionLabelScale ?? 1)))
         return {
           type: machine.edges[i].groupEdge ? 'group-edge' : 'edge',
           index: machine.edges[i].originalIndex ?? i,
@@ -764,13 +766,7 @@ export function createGraphCanvas(canvas, minimap) {
           (edge, i) => (edge.originalIndex ?? i) === selection.index,
         ),
         r = routes[index];
-      if (r)
-        box = {
-          x: r.label.x - r.label.w / 2,
-          y: r.label.y - 16,
-          width: r.label.w,
-          height: 24,
-        };
+      if (r) box = transitionLabelBounds(r.label, scene.transitionLabelScale ?? 1);
     } else if (selection.type === 'comment') {
       const n = machine.comments?.find((n) => n.id === selection.id);
       if (n) {
@@ -808,7 +804,7 @@ export function createGraphCanvas(canvas, minimap) {
     selectionBox,
     bounds: () =>
       scene
-        ? graphBounds(scene.machine, scene.routes)
+        ? graphBounds(scene.machine, scene.routes, scene.transitionLabelScale)
         : {
             x: 0,
             y: 0,

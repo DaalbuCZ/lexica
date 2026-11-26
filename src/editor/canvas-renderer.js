@@ -323,7 +323,7 @@ export function createCanvasRenderer(context) {
         (!manualEdit || manualEdit.committing) &&
         context.positionGroupPanel(
           overview.states.find((state) => state.id === context.openGroup),
-          graphBounds(shown, shownRoutes),
+          graphBounds(shown, shownRoutes, editorSettings.transitionLabelScale),
         );
       if (!dragging || !reuse)
         context.overviewGraph.draw({
@@ -331,6 +331,7 @@ export function createCanvasRenderer(context) {
           routes: overviewRoutes,
           invalidEdges,
           label,
+          transitionLabelScale: editorSettings.transitionLabelScale,
           tokenColor,
           edgeColor,
           selectedStates: new Set(),
@@ -377,6 +378,7 @@ export function createCanvasRenderer(context) {
       trace,
       failures,
       label,
+      transitionLabelScale: editorSettings.transitionLabelScale,
       placement: placementPreview(
         context.placingComment ? context.commentPlacementView() : context.machine,
         context.placingState || context.rightStart?.insert

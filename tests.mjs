@@ -2180,6 +2180,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      transitionLabelScale: 1,
       pinchSensitivity: 2,
     },
   );
@@ -2194,6 +2195,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      transitionLabelScale: 1,
       pinchSensitivity: 1,
     },
   );
@@ -2210,6 +2212,7 @@ test('simplified settings restore safely without changing graph preferences', ()
       followDebugState: true,
       rerouteWhileDragging: true,
       colorEdges: true,
+      transitionLabelScale: 1,
       pinchSensitivity: 1,
     },
   );

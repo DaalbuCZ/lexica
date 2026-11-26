@@ -439,7 +439,7 @@ function GroupTargetDialog({ dialog, onClose }) {
       shown = graphView(machine, dialog.groupId, false),
       label = settings.simplified ? simpleTransitionLabel : transitionLabel,
       routes = routeEdges(shown, label),
-      bounds = graphBounds(shown, routes);
+      bounds = graphBounds(shown, routes, settings.transitionLabelScale);
     previewRef.current = preview;
     const scale = Math.max(
       (bounds.width + 100) / Math.max(220, canvas.clientWidth - 70),
@@ -455,6 +455,7 @@ function GroupTargetDialog({ dialog, onClose }) {
       machine: shown,
       routes,
       label,
+      transitionLabelScale: settings.transitionLabelScale,
       tokenColor: (name) =>
         getComputedStyle(document.documentElement)
           .getPropertyValue('--token-accent-' + tokenColorClass(name).slice(-1))
@@ -468,7 +469,7 @@ function GroupTargetDialog({ dialog, onClose }) {
         edges: [],
       },
     });
-  }, [canvas, machine, dialog.groupId, settings.simplified]);
+  }, [canvas, machine, dialog.groupId, settings.simplified, settings.transitionLabelScale]);
   return (
     <Modal
       title={`Choose a state in ${group?.name ?? 'group'}`}
