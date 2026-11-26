@@ -4,6 +4,7 @@ import { simpleTransitionLabel } from './editor-settings.js';
 import { curveAvoidsBox, mix } from './route-geometry.js';
 import { curveClearance } from './curve-clearance.js';
 import { cycleAnalysis, insideCycle } from './cycle-aesthetics.js';
+import { renderedLabelBox } from './label-clearance.js';
 export function commentLayout(comment) {
   const lines = [];
   for (const paragraph of comment.text.split('\n')) {
@@ -84,9 +85,11 @@ export function positionComments(anchors) {
     comment.y = nodes.reduce((sum, s) => sum + s.y, 0) / nodes.length + dy;
   }
 }
-export function placeCommentsAfterLayout(machine) {
+export function placeCommentsAfterLayout(machine, transitionRoutes) {
   if (!machine.comments?.length) return;
-  const routes = routeEdges({ ...machine, comments: [] }, simpleTransitionLabel);
+  const routes =
+      transitionRoutes ?? routeEdges({ ...machine, comments: [] }, simpleTransitionLabel),
+    labels = transitionRoutes?.map((route) => renderedLabelBox(route.label)) ?? [];
   const cycles = cycleAnalysis(machine).cycles,
     cycleNodes = new Map(machine.states.map((s) => [s.id, s]));
   const states = new Map(machine.states.map((state) => [state.id, state])),
@@ -205,6 +208,14 @@ export function placeCommentsAfterLayout(machine) {
           y: box.y + h / 2,
         };
       let score = Math.hypot(mid.x - center.x, mid.y - center.y) * 0.15 + candidate.rank * 12;
+      for (const label of labels)
+        if (
+          box.x < label.right + 8 &&
+          box.x + w > label.left - 8 &&
+          box.y < label.bottom + 8 &&
+          box.y + h > label.top - 8
+        )
+          score += 10000;
       // Prefer the open face of an attachment. Sample the whole comment box,
       // not only its center, so a box straddling a cycle is not considered free.
       let enclosure = 0;

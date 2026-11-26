@@ -1,4 +1,5 @@
 import { stackRuleSuffix } from './memory.js';
+import { transitionLabel } from './labels.js';
 const STORAGE_KEY = 'lexica-editor-settings';
 export function readEditorSettings(storage) {
   try {
@@ -70,4 +71,9 @@ export function simpleTransitionLabel(edge) {
   const set = simpleCharacterClass(edge.label, edge.invert),
     match = set ? `${set.inverted ? 'not ' : ''}${set.characters || '…'}` : edge.label || '…';
   return match + stackRuleSuffix(edge);
+}
+
+export function graphTransitionLabel(edge, simplified = true) {
+  if (edge.originalIndices?.length > 1) return `${edge.originalIndices.length} transitions`;
+  return simplified ? simpleTransitionLabel(edge) : transitionLabel(edge);
 }

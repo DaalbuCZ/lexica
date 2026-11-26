@@ -1,7 +1,6 @@
 import { placementPreview } from '../core/placement.js';
 import { graphBounds } from '../core/canvas-graph.js';
-import { editorSettings, simpleTransitionLabel } from '../core/editor-settings.js';
-import { transitionLabel } from '../core/labels.js';
+import { editorSettings, graphTransitionLabel } from '../core/editor-settings.js';
 import { transitionError, destination } from '../core/lexer.js';
 import { routeEdges } from '../core/layout.js';
 import { graphView, groupFor } from '../core/groups.js';
@@ -39,9 +38,7 @@ export function createCanvasRenderer(context) {
   context.settleRoutes = () => {
     if (!routeSnapshot || routeSnapshot.group !== context.openGroup) return;
     const shown = visualMachine(graphView(context.machine, context.openGroup)),
-      baseLabel = editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
-      label = (e) =>
-        e.originalIndices?.length > 1 ? `${e.originalIndices.length} transitions` : baseLabel(e);
+      label = (edge) => graphTransitionLabel(edge, editorSettings.simplified);
     if (
       shown.edges.length !== routeSnapshot.routes.length ||
       !shown.states.every((s) => routeSnapshot.nodes.has(s.id))
@@ -221,11 +218,7 @@ export function createCanvasRenderer(context) {
         });
         return colors.every((color) => color === colors[0]) ? colors[0] : null;
       },
-      baseLabel = editorSettings.simplified ? simpleTransitionLabel : transitionLabel,
-      label = (edge) =>
-        edge.originalIndices?.length > 1
-          ? `${edge.originalIndices.length} transitions`
-          : baseLabel(edge),
+      label = (edge) => graphTransitionLabel(edge, editorSettings.simplified),
       signature = drawingRouteKey(visualMachine(shown), shown.edges.map(label)),
       liveSnapshot =
         !manualEdit && dragging && editorSettings.rerouteWhileDragging && routeSnapshot
@@ -323,7 +316,7 @@ export function createCanvasRenderer(context) {
         (!manualEdit || manualEdit.committing) &&
         context.positionGroupPanel(
           overview.states.find((state) => state.id === context.openGroup),
-          graphBounds(shown, shownRoutes, editorSettings.transitionLabelScale),
+          graphBounds(shown, shownRoutes),
         );
       if (!dragging || !reuse)
         context.overviewGraph.draw({
@@ -378,7 +371,7 @@ export function createCanvasRenderer(context) {
       trace,
       failures,
       label,
-      transitionLabelScale: editorSettings.transitionLabelScale,
+      transitionLabelScale: context.openGroup ? 1 : editorSettings.transitionLabelScale,
       placement: placementPreview(
         context.placingComment ? context.commentPlacementView() : context.machine,
         context.placingState || context.rightStart?.insert

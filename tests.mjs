@@ -2034,7 +2034,12 @@ test('saved machines restore tester text and skipped-token preference, including
     );
 });
 import { createDebugSession } from './src/core/debug-session.js';
-import { simpleCharacterClass, readEditorSettings } from './src/core/editor-settings.js';
+import {
+  graphTransitionLabel,
+  simpleCharacterClass,
+  readEditorSettings,
+} from './src/core/editor-settings.js';
+import { sizedTransitionRoutes, transitionLabelCollisions } from './src/core/label-clearance.js';
 import { singleCharacterError, characterBounds } from './src/core/regex-analysis.js';
 import { errorSpans, underlineSegments } from './src/core/error-underlines.js';
 test('debugger seeks the token under the cursor and jumps by token or character', () => {
@@ -3561,6 +3566,38 @@ test('Radial Compact gives the same drawing after moving nodes and bending edges
   smartArrange(moved, null, options);
   assert.deepEqual(graphView(first), graphView(moved));
   assert.deepEqual(graphView(first, group.id), graphView(moved, group.id));
+});
+test('auto-layout makes room for large overview labels and keeps focused group layout at default size', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+    seed = {
+      start: 'root',
+      states: ['root', ...ids].map((id) => ({ id, name: id, token: '', x: 0, y: 0 })),
+      edges: ids.map((to) => ({
+        from: 'root',
+        to,
+        label: '[' + 'abcdefghijklmnopqrstuvwxyz'.repeat(3) + ']',
+      })),
+    },
+    standard = structuredClone(seed),
+    enlarged = structuredClone(seed),
+    options = { mode: 'tree', spacing: 0.5, smartGroups: false },
+    largeOptions = { ...options, transitionLabelScale: 4 },
+    collisions = (machine) => {
+      const view = graphView(machine),
+        routes = routeEdges(view, graphTransitionLabel);
+      return transitionLabelCollisions(view, sizedTransitionRoutes(view, routes, 4));
+    };
+  smartArrange(standard, null, options);
+  smartArrange(enlarged, null, largeOptions);
+  assert.ok(collisions(standard) > 0);
+  assert.equal(collisions(enlarged), 0);
+
+  const group = createGroup(seed, ['root', 'a', 'b'], 'Branch'),
+    focused = structuredClone(seed),
+    focusedLarge = structuredClone(seed);
+  smartArrange(focused, group.id, options);
+  smartArrange(focusedLarge, group.id, largeOptions);
+  assert.deepEqual(graphView(focusedLarge, group.id), graphView(focused, group.id));
 });
 test('Tree remains a compact forward tree despite long labels and planar coordinate alternatives', () => {
   const m = {

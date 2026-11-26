@@ -1,7 +1,9 @@
 import { graphBounds } from './canvas-graph.js';
 import { routeEdges } from './layout.js';
 import { graphView } from './groups.js';
-import { simpleTransitionLabel } from './editor-settings.js';
+import { graphTransitionLabel, simpleTransitionLabel } from './editor-settings.js';
+import { sizedTransitionRoutes } from './label-clearance.js';
+import { visualMachine } from './start-views.js';
 // Solve weak components independently so an unrelated island cannot change
 // the seed, radius, candidate budget or grouping policy of the main graph.
 export function solveComponents(topology, options, solve, progress) {
@@ -52,8 +54,13 @@ export function solveComponents(topology, options, solve, progress) {
       ),
       m = result.machine;
     if (!main) main = m;
-    const shown = graphView(m),
-      bounds = graphBounds(shown, routeEdges(shown, simpleTransitionLabel));
+    const shown = visualMachine(graphView(m)),
+      scale = options.transitionLabelScale ?? 1,
+      label =
+        scale > 1
+          ? (edge) => graphTransitionLabel(edge, options.simplified)
+          : simpleTransitionLabel,
+      bounds = graphBounds(shown, sizedTransitionRoutes(shown, routeEdges(shown, label), scale));
     const left = bounds.x,
       dx = states.size ? right + 320 - left : 0;
     for (const s of m.states) {

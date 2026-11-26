@@ -4,6 +4,7 @@ import { commentLayout, commentLinks, commentLinkKey } from './comments.js';
 import { isAccepting, transitionError, statePortalBox } from './lexer.js';
 import { visualMachine } from './start-views.js';
 import { portalTip } from './portals.js';
+import { renderedLabelBox, sizedTransitionRoutes } from './label-clearance.js';
 export function canvasTransform(view, width, height) {
   const scale = Math.min(width / view.width, height / view.height);
   return {
@@ -18,16 +19,16 @@ export function clientToWorld(client, rect, transform) {
     y: (client.y - rect.top - transform.y) / transform.scale,
   };
 }
-function transitionLabelBounds(label, scale) {
-  const width = label.w * scale;
+function transitionLabelBounds(label) {
+  const { left, top, bottom } = renderedLabelBox(label);
   return {
-    x: label.x - width / 2,
-    y: label.y - 4 - 12 * scale,
-    width,
-    height: 24 * scale,
+    x: left,
+    y: top,
+    width: label.w,
+    height: bottom - top,
   };
 }
-export function graphBounds(machine, routes, transitionLabelScale = 1) {
+export function graphBounds(machine, routes) {
   machine = visualMachine(machine);
   const boxes = machine.states.flatMap((s) => [
     {
@@ -58,7 +59,7 @@ export function graphBounds(machine, routes, transitionLabelScale = 1) {
         width: Math.max(...xs) - Math.min(...xs),
         height: Math.max(...ys) - Math.min(...ys),
       },
-      transitionLabelBounds(r.label, transitionLabelScale),
+      transitionLabelBounds(r.label),
     );
     if (r.portalBox)
       boxes.push({
@@ -233,8 +234,24 @@ export function createGraphCanvas(canvas, minimap) {
     }
     return palette;
   }
+  let labelRoutes;
   function draw(next) {
-    scene = next;
+    if (
+      !labelRoutes ||
+      labelRoutes.base !== next.routes ||
+      labelRoutes.scale !== next.transitionLabelScale
+    ) {
+      labelRoutes = {
+        base: next.routes,
+        scale: next.transitionLabelScale,
+        routes: sizedTransitionRoutes(
+          visualMachine(next.machine),
+          next.routes,
+          next.transitionLabelScale,
+        ),
+      };
+    }
+    scene = { ...next, routes: labelRoutes.routes };
     const {
         routes,
         selectedStates,
@@ -456,7 +473,8 @@ export function createGraphCanvas(canvas, minimap) {
                 : traceEdges.has(index)
                   ? c.traceText
                   : c.text;
-      const scale = scene.transitionLabelScale ?? 1;
+      const scale = r.label.scale ?? 1,
+        width = r.label.w / scale;
       ctx.save();
       ctx.translate(r.label.x, r.label.y - 4);
       ctx.scale(scale, scale);
@@ -468,7 +486,7 @@ export function createGraphCanvas(canvas, minimap) {
         ctx.strokeStyle = bad ? c.error : selected ? c.green : (edgeColors[i] ?? c.edge);
         ctx.lineWidth = selected ? 2.5 : 1;
         ctx.beginPath();
-        ctx.roundRect(-r.label.w / 2, -11, r.label.w, 22, 3);
+        ctx.roundRect(-width / 2, -11, width, 22, 3);
         ctx.fill();
         if (selected || machine.labelBoxes) ctx.stroke();
       } else {
@@ -653,7 +671,7 @@ export function createGraphCanvas(canvas, minimap) {
           type: 'portal-source',
           index: machine.edges[i].originalIndex ?? i,
         };
-      if (contains(p, transitionLabelBounds(r.label, scene.transitionLabelScale ?? 1)))
+      if (contains(p, transitionLabelBounds(r.label)))
         return {
           type: machine.edges[i].groupEdge ? 'group-edge' : 'edge',
           index: machine.edges[i].originalIndex ?? i,
@@ -766,7 +784,7 @@ export function createGraphCanvas(canvas, minimap) {
           (edge, i) => (edge.originalIndex ?? i) === selection.index,
         ),
         r = routes[index];
-      if (r) box = transitionLabelBounds(r.label, scene.transitionLabelScale ?? 1);
+      if (r) box = transitionLabelBounds(r.label);
     } else if (selection.type === 'comment') {
       const n = machine.comments?.find((n) => n.id === selection.id);
       if (n) {
@@ -799,12 +817,17 @@ export function createGraphCanvas(canvas, minimap) {
       const position = scene?.machine.edges.findIndex(
         (edge, i) => (edge.originalIndex ?? i) === index,
       );
-      return position >= 0 ? scene.routes[position] : undefined;
+      if (!(position >= 0)) return undefined;
+      const base = labelRoutes.base[position],
+        displayed = scene.routes[position];
+      if (base === displayed) return base;
+      const { x, y } = displayed.label;
+      return { ...base, label: { ...base.label, x, y } };
     },
     selectionBox,
     bounds: () =>
       scene
-        ? graphBounds(scene.machine, scene.routes, scene.transitionLabelScale)
+        ? graphBounds(scene.machine, scene.routes)
         : {
             x: 0,
             y: 0,

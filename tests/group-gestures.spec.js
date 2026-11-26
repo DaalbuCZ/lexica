@@ -16,19 +16,47 @@ const machine = {
   groups: [{ id: 'g', name: 'Group', stateIds: ['a', 'b'], x: 80, y: 0 }],
   comments: [],
 };
-async function setup(page, presentation = 'overlay', m = machine) {
+async function setup(page, presentation = 'overlay', m = machine, transitionLabelScale = 1) {
   await page.addInitScript(
-    ({ m, presentation }) => {
+    ({ m, presentation, transitionLabelScale }) => {
       localStorage.setItem('lexica-machine', JSON.stringify(m));
       localStorage.setItem(
         'lexica-editor-settings',
-        JSON.stringify({ groupPresentation: presentation }),
+        JSON.stringify({ groupPresentation: presentation, transitionLabelScale }),
       );
       localStorage.setItem('lexica-tester-collapsed', 'true');
     },
-    { m, presentation },
+    { m, presentation, transitionLabelScale },
   );
   await page.goto('/');
+}
+
+for (const presentation of ['canvas', 'overlay']) {
+  test(`${presentation}: large transition labels apply only to the main graph`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...args) {
+        if ((text === 'a' || text === 'b') && this.font.startsWith('11px') && x === 0 && y === 4)
+          this.canvas.dataset['transition' + text.toUpperCase()] = this.getTransform().a;
+        return fillText.call(this, text, x, y, ...args);
+      };
+    });
+    await setup(page, presentation, machine, 4);
+    const labelScale = (selector, label) =>
+      page.locator(selector).evaluate((canvas, text) => {
+        const paintScale = Number(canvas.dataset['transition' + text.toUpperCase()]);
+        return paintScale / canvas.getContext('2d').getTransform().a;
+      }, label);
+    await expect.poll(() => labelScale('#canvas', 'a')).toBeCloseTo(4);
+    const p = await groupPoint(page);
+    await page.mouse.dblclick(p.x, p.y);
+    await expect(page.locator('.group-navigation [data-current]')).toHaveCount(1);
+    await expect.poll(() => labelScale('#canvas', 'b')).toBeCloseTo(1);
+    if (presentation === 'overlay')
+      await expect.poll(() => labelScale('.group-overview-backdrop', 'a')).toBeCloseTo(4);
+  });
 }
 
 for (const presentation of ['canvas', 'overlay'])

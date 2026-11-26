@@ -7,9 +7,19 @@ import { segmentHitsBox } from './label-guides.js';
 export const renderedLabelBox = (l) => ({
   left: l.x - l.w / 2,
   right: l.x + l.w / 2,
-  top: l.y - 16,
-  bottom: l.y + 8,
+  top: l.y - 4 - 12 * (l.scale ?? 1),
+  bottom: l.y - 4 + 12 * (l.scale ?? 1),
 });
+export function sizedTransitionRoutes(machine, routes, scale = 1) {
+  if (scale === 1) return routes;
+  return reflowRouteLabels(
+    machine,
+    routes.map((route) => ({
+      ...route,
+      label: { ...route.label, w: route.label.w * scale, scale },
+    })),
+  );
+}
 const expand = (box, n) => ({
   left: box.left - n,
   right: box.right + n,
@@ -17,15 +27,8 @@ const expand = (box, n) => ({
   bottom: box.bottom + n,
 });
 
-export function reflowRouteLabels(
-  machine,
-  routes,
-  dirty = new Set(routes.keys()),
-  placement = false,
-) {
-  const obstacles = new SpatialIndex(),
-    captions = new SpatialIndex(),
-    wires = new SpatialIndex();
+function labelObstacles(machine, routes, placement) {
+  const obstacles = new SpatialIndex();
   machine.states.forEach((s, i) => {
     const half = !placement && s.group ? groupWidth(s) / 2 + 11 : 47;
     obstacles.set(i, { left: s.x - half, right: s.x + half, top: s.y - 47, bottom: s.y + 47 });
@@ -37,8 +40,6 @@ export function reflowRouteLabels(
     obstacles.set('comment:' + i, { left: c.x, right: c.x + w, top: c.y, bottom: c.y + h });
   });
   routes.forEach((r, i) => {
-    wires.set(i, routeBounds(r));
-    if (!dirty.has(i) || machine.edges[i]?.bend) captions.set(i, renderedLabelBox(r.label));
     if (r.portalBox) {
       const { x, y, w, h } = r.portalBox;
       obstacles.set('portal:' + i, {
@@ -48,6 +49,33 @@ export function reflowRouteLabels(
         bottom: y + h / 2,
       });
     }
+  });
+  return obstacles;
+}
+
+export function transitionLabelCollisions(machine, routes) {
+  const obstacles = labelObstacles(machine, routes, false);
+  let collisions = 0;
+  routes.forEach(({ label }, i) => {
+    const box = expand(renderedLabelBox(label), 4);
+    collisions += obstacles.query(box).length;
+    obstacles.set('label:' + i, box);
+  });
+  return collisions;
+}
+
+export function reflowRouteLabels(
+  machine,
+  routes,
+  dirty = new Set(routes.keys()),
+  placement = false,
+) {
+  const obstacles = labelObstacles(machine, routes, placement),
+    captions = new SpatialIndex(),
+    wires = new SpatialIndex();
+  routes.forEach((r, i) => {
+    wires.set(i, routeBounds(r));
+    if (!dirty.has(i) || machine.edges[i]?.bend) captions.set(i, renderedLabelBox(r.label));
   });
   for (const i of [...dirty].sort((a, b) => routes[b].label.w - routes[a].label.w || a - b)) {
     const route = routes[i];
@@ -112,9 +140,10 @@ export function reflowRouteLabels(
       const dx = b.x - a.x,
         dy = b.y - a.y,
         length = Math.hypot(dx, dy) || 1;
-      const nx = -dy / length,
+      const halfHeight = 12 * (route.label.scale ?? 1),
+        nx = -dy / length,
         ny = dx / length,
-        half = (Math.abs(nx) * route.label.w) / 2 + Math.abs(ny) * 12;
+        half = (Math.abs(nx) * route.label.w) / 2 + Math.abs(ny) * halfHeight;
       // Prefer a clear position on the owning curve; obstacle/caption/wire penalties still dominate.
       offer({ ...route.label, x: p.x, y: p.y + 4 }, Math.abs(t - 0.5) * 20, 8);
       for (const gap of [5, 14, 30, 55]) {
@@ -124,7 +153,7 @@ export function reflowRouteLabels(
           { x: nx * (half + gap), y: ny * (half + gap) },
         ];
         if (loop && !placement && t === 0.5)
-          offsets.push({ x: 0, y: -12 - gap }, { x: 0, y: 12 + gap });
+          offsets.push({ x: 0, y: -halfHeight - gap }, { x: 0, y: halfHeight + gap });
         for (const offset of offsets) {
           offer(
             { ...route.label, x: p.x + offset.x, y: p.y + offset.y + 4 },

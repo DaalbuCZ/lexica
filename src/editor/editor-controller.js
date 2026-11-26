@@ -792,7 +792,16 @@ export function createEditorController(
           machine: next,
           groups,
           metrics,
-        } = await calculateLayout(context.machine, context.openGroup, options, progress?.update);
+        } = await calculateLayout(
+          context.machine,
+          context.openGroup,
+          {
+            ...options,
+            transitionLabelScale: editorSettings.transitionLabelScale,
+            simplified: editorSettings.simplified,
+          },
+          progress?.update,
+        );
         if (context.disposed) return;
         if (
           context.documentVersion !== version ||

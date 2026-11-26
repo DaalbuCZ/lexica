@@ -1,4 +1,6 @@
-import { simpleTransitionLabel } from './editor-settings.js';
+import { graphTransitionLabel, simpleTransitionLabel } from './editor-settings.js';
+import { sizedTransitionRoutes, transitionLabelCollisions } from './label-clearance.js';
+import { visualMachine } from './start-views.js';
 import { autoLayout, crossingPairs as findCrossings, routeEdges } from './layout.js';
 import { graphView, createGroup, groupFor } from './groups.js';
 import { destination } from './portals.js';
@@ -28,10 +30,14 @@ import {
 } from './radial-aesthetics.js';
 const crossingPairs = (machine, routed, label) => findCrossings(machine, routed, label, true);
 
-// Move whole groups so their internal layouts and outside references stay intact.
 function spaceOverviewGroups(machine, radial) {
-  const view = graphView(machine),
-    positions = new Map(fitGroupBoxes(view, radial).map((s) => [s.id, s]));
+  const view = graphView(machine);
+  moveOverviewStates(machine, view, fitGroupBoxes(view, radial));
+}
+
+// Move whole groups so their internal layouts and outside references stay intact.
+function moveOverviewStates(machine, view, states) {
+  const positions = new Map(states.map((s) => [s.id, s]));
   for (const state of view.states) {
     const next = positions.get(state.id),
       dx = next.x - state.x,
@@ -54,6 +60,34 @@ function spaceOverviewGroups(machine, radial) {
       state.y += dy;
     }
   }
+}
+
+function makeRoomForTransitionLabels(machine, options) {
+  const view = visualMachine(graphView(machine)),
+    label = (edge) => graphTransitionLabel(edge, options.simplified),
+    origin = view.states.find((state) => state.id === view.start) ?? { x: 0, y: 0 };
+  let best;
+  for (const factor of [1, 1.25, 1.6, 2, 3, 4, 6]) {
+    const states = view.states.map((state) => ({
+        ...state,
+        x: origin.x + (state.x - origin.x) * factor,
+        y: origin.y + (state.y - origin.y) * factor,
+      })),
+      candidate = { ...view, states, comments: [] },
+      routes = sizedTransitionRoutes(
+        candidate,
+        routeEdges(candidate, label),
+        options.transitionLabelScale,
+      ),
+      collisions = transitionLabelCollisions(candidate, routes);
+    if (!best || collisions < best.collisions) best = { states, routes, collisions };
+    if (collisions === 0) break;
+  }
+  moveOverviewStates(machine, graphView(machine), best.states);
+  for (const state of best.states)
+    if (state.startView !== undefined)
+      Object.assign(machine.startViews[state.startView], { x: state.x, y: state.y });
+  return best.routes;
 }
 
 export function simpleBranch(machine) {
@@ -1163,7 +1197,11 @@ export function solveLayout(
   record('alignment', machine);
   const commentsStarted = performance.now();
   progress(0.9, 'Placing comments');
-  placeCommentsAfterLayout(graphView(machine));
+  const overviewRoutes =
+    !focus && options.transitionLabelScale > 1
+      ? makeRoomForTransitionLabels(machine, options)
+      : undefined;
+  placeCommentsAfterLayout(graphView(machine), overviewRoutes);
   for (const group of (machine.groups ?? []).filter((g) => !focus || g.id === focus)) {
     const shown = graphView(machine, group.id);
     shown.comments = shown.comments.filter((c) =>

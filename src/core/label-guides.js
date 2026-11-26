@@ -10,7 +10,7 @@ export function labelGuide(route) {
   const x = route.label.x,
     y = route.label.y - 4,
     halfWidth = route.label.w / 2,
-    halfHeight = 11;
+    halfHeight = 11 * (route.label.scale ?? 1);
   for (let i = 0; i <= 40; i++) {
     const p = curvePoint(route, i / 40);
     if (Math.abs(p.x - x) <= halfWidth && Math.abs(p.y - y) <= halfHeight) {
@@ -80,8 +80,8 @@ const padded = (box, n = 3) => ({
 const labelBox = (label) => ({
   left: label.x - label.w / 2,
   right: label.x + label.w / 2,
-  top: label.y - 15,
-  bottom: label.y + 7,
+  top: label.y - 4 - 11 * (label.scale ?? 1),
+  bottom: label.y - 4 + 11 * (label.scale ?? 1),
 });
 const bounds = (points) => ({
   left: Math.min(...points.map((p) => p.x)),
