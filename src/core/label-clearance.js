@@ -99,13 +99,16 @@ export function reflowRouteLabels(
     const loop = machine.edges[i]?.from === machine.edges[i]?.to;
     let best = route.label,
       bestCost = Infinity;
+    let bestOverlaps = Infinity;
     const offer = (label, preference, gap, anchor) => {
       const box = renderedLabelBox(label),
         padded = expand(box, 4),
         near = expand(box, Math.max(8, gap));
+      const nodeOverlaps = obstacles.query(padded).length,
+        labelOverlaps = captions.query(padded).length;
       let cost =
-        obstacles.query(padded).length * 100000 +
-        captions.query(padded).length * 10000 +
+        nodeOverlaps * 100000 +
+        labelOverlaps * 10000 +
         wires.query(near).reduce((sum, j) => {
           if (j === i) return sum;
           if (!curveAvoidsBox(routes[j], padded)) return sum + 2000;
@@ -144,6 +147,7 @@ export function reflowRouteLabels(
       }
       if (cost < bestCost) {
         bestCost = cost;
+        bestOverlaps = nodeOverlaps + labelOverlaps;
         best = label;
       }
     };
@@ -184,6 +188,20 @@ export function reflowRouteLabels(
         }
       }
     }
+    // Wide labels can often fit just above or below an edge, even when both
+    // perpendicular offsets would send them into neighboring nodes.
+    if (scale > 1 && bestOverlaps)
+      for (const t of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const p = curvePoint(route, t);
+        for (const gap of [8, 28, 60, 100]) {
+          for (const offset of [-1, 1]) {
+            const y = p.y + offset * (12 * scale + gap);
+            offer({ ...route.label, x: p.x, y: y + 4 }, 50 + gap * 2, gap, p);
+          }
+          if (!bestOverlaps) break;
+        }
+        if (!bestOverlaps) break;
+      }
     routes[i] = { ...route, label: best };
     captions.set(i, renderedLabelBox(best));
   }

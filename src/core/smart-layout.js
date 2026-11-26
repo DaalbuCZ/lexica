@@ -67,11 +67,26 @@ function makeRoomForTransitionLabels(machine, shown, focus, options) {
     label = (edge) => graphTransitionLabel(edge, options.simplified),
     origin = view.states.find((state) => state.id === view.start) ?? { x: 0, y: 0 };
   let best;
-  for (const factor of [1, 1.25, 1.6, 2, 3, 4, 6]) {
+  // Try the original drawing first, then open only as much space as the
+  // labels need. A few stubborn overlaps should not stretch an entire graph.
+  for (const [width, height] of [
+    [1, 1],
+    [1, 1.15],
+    [1.15, 1],
+    [1.15, 1.15],
+    [1, 1.4],
+    [1.4, 1],
+    [1.2, 1.3],
+    [1.3, 1.2],
+    [1.2, 1.5],
+    [1.5, 1.2],
+    [1.4, 1.4],
+    [1.5, 1.5],
+  ]) {
     const states = view.states.map((state) => ({
         ...state,
-        x: origin.x + (state.x - origin.x) * factor,
-        y: origin.y + (state.y - origin.y) * factor,
+        x: origin.x + (state.x - origin.x) * width,
+        y: origin.y + (state.y - origin.y) * height,
       })),
       candidate = { ...view, states, comments: [] },
       routes = sizedTransitionRoutes(
